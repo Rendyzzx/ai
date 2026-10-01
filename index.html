@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
   <meta name="theme-color" content="#141417" />
-  <meta name="description" content="Aomi — asisten chat AI cepat dan ringan." />
+  <meta name="description" content="Aomi — asisten chat AI cepat dan ringan, dengan riwayat per akun." />
   <title>Aomi — Asisten Chat</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/main.css" />
@@ -37,7 +37,15 @@
 
       <nav class="history" id="history" aria-label="Riwayat chat"></nav>
 
-      <footer class="sidebar-foot">Riwayat tersimpan di perangkat ini</footer>
+      <footer class="sidebar-foot">
+        <div class="user-box">
+          <span class="user-dot" aria-hidden="true"></span>
+          <span class="user-name" id="userBox">…</span>
+          <button class="icon-btn logout-btn" id="logoutBtn" aria-label="Keluar">
+            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#close" /></svg>
+          </button>
+        </div>
+      </footer>
     </aside>
 
     <div class="backdrop" id="backdrop" hidden></div>

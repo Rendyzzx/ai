@@ -1,17 +1,18 @@
 /* ============================================================
    Aomi — sidebar.js
-   Riwayat chat: render lazy (batch + IntersectionObserver),
-   pencarian debounce, hapus chat, dan drawer di mobile.
-   Semua interaksi lewat event delegation (satu listener list).
+   Riwayat percakapan milik akun (via /api/conversations).
+   Lazy render per batch + IntersectionObserver, pencarian
+   debounce (filter lokal atas indeks ringan), hapus via API.
    ============================================================ */
 
-import { $, debounce, Store, emit, on } from './app.js';
+import { $, debounce, api, apiJson, emit, on } from './app.js';
 
-const BATCH = 12;              // item per batch render
+const BATCH = 12;
+
 const els = {};
-
-let items = [];                 // hasil filter saat ini
-let rendered = 0;               // jumlah item yang sudah ada di DOM
+let items = [];        // indeks percakapan dari server
+let filtered = [];
+let rendered = 0;
 let query = '';
 
 export function initSidebar() {
@@ -23,8 +24,37 @@ export function initSidebar() {
   bindEvents();
   on('chat:updated', refresh);
   on('chat:activated', ({ id }) => setActive(id));
-  on('chat:deleted', ({ id }) => handleDeleted(id));
   refresh();
+}
+
+async function refresh() {
+  try {
+    const data = await apiJson('/api/conversations');
+    items = data.items || [];
+  } catch {
+    items = [];
+  }
+  applyFilter();
+}
+
+function applyFilter() {
+  filtered = !query
+    ? items
+    : items.filter((c) => (c.title || '').toLowerCase().includes(query));
+
+  rendered = 0;
+  els.history.textContent = '';
+
+  if (filtered.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'h-empty';
+    empty.textContent = query ? 'Tidak ada hasil.' : 'Belum ada percakapan.';
+    els.history.appendChild(empty);
+    els.history.appendChild(sentinel());
+    return;
+  }
+  renderBatch();
+  ensureSentinel();
 }
 
 function bindEvents() {
@@ -33,12 +63,12 @@ function bindEvents() {
     emit('chat:open', { id: null });
   });
 
-  // Event delegation: satu listener untuk seluruh item riwayat
+  // Event delegation: satu listener untuk seluruh item
   els.history.addEventListener('click', (e) => {
     const del = e.target.closest('[data-del]');
     if (del) {
       e.stopPropagation();
-      deleteChat(del.dataset.del, del.closest('.h-item'));
+      deleteConversation(del.dataset.del);
       return;
     }
     const item = e.target.closest('[data-open]');
@@ -50,7 +80,7 @@ function bindEvents() {
 
   els.input.addEventListener('input', debounce(() => {
     query = els.input.value.trim().toLowerCase();
-    refresh();
+    applyFilter();
   }, 150));
 
   // Drawer (mobile)
@@ -60,84 +90,74 @@ function bindEvents() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeDrawer();
   });
-
-  // Lazy loading: render batch berikutnya saat sentinel terlihat
-  const sentinel = document.createElement('div');
-  sentinel.dataset.sentinel = '';
-  els.history.appendChild(sentinel);
-  new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting) renderBatch();
-  }, { root: els.history, rootMargin: '200px' }).observe(sentinel);
 }
 
-/* ---------------- Render ---------------- */
+/* ---------------- Render lazy ---------------- */
 
-function refresh() {
-  const all = Store.readIndex();
-  items = !query
-    ? all
-    : all.filter((c) =>
-        c.title.toLowerCase().includes(query) ||
-        (c.snippet || '').toLowerCase().includes(query));
+let observer = null;
+let observerSentinel = null;
 
-  rendered = 0;
-  els.history.textContent = '';
+function ensureSentinel() {
+  if (observerSentinel && els.history.contains(observerSentinel)) return;
+  const node = sentinel();
+  els.history.appendChild(node);
+  observerSentinel = node;
 
-  if (items.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'h-empty';
-    empty.textContent = query ? 'Tidak ada hasil.' : 'Belum ada percakapan.';
-    els.history.appendChild(empty);
-    return;
-  }
-  renderBatch();
+  observer?.disconnect();
+  observer = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) renderBatch();
+  }, { root: els.history, rootMargin: '200px' });
+  observer.observe(node);
+}
+
+function sentinel() {
+  const div = document.createElement('div');
+  div.dataset.sentinel = '';
+  return div;
 }
 
 function renderBatch() {
-  const fragment = document.createDocumentFragment();
-  const slice = items.slice(rendered, rendered + BATCH);
+  const slice = filtered.slice(rendered, rendered + BATCH);
   if (slice.length === 0) return;
 
-  for (const chat of slice) {
-    fragment.appendChild(buildItem(chat));
+  const fragment = document.createDocumentFragment();
+  for (const conv of slice) {
+    fragment.appendChild(buildItem(conv));
   }
   rendered += slice.length;
-  // sisipkan sebelum sentinel agar urutan tetap
-  els.history.insertBefore(
-    fragment,
-    els.history.querySelector('[data-sentinel]') || null
-  );
+
+  const anchor = els.history.querySelector('[data-sentinel]');
+  els.history.insertBefore(fragment, anchor || null);
 }
 
-function buildItem(chat) {
+function buildItem(conv) {
   const item = document.createElement('div');
   item.className = 'h-item';
-  item.dataset.open = chat.id;
+  item.dataset.open = conv.conversation_id;
   item.setAttribute('role', 'button');
   item.tabIndex = 0;
 
   const title = document.createElement('span');
   title.className = 'h-title';
-  title.textContent = chat.title;          // textContent = aman XSS
+  title.textContent = conv.title || 'Chat baru';
   item.appendChild(title);
 
   const time = document.createElement('span');
   time.className = 'h-time';
-  time.textContent = formatTime(chat.updatedAt);
+  time.textContent = formatTime(conv.updated_at);
   item.appendChild(time);
 
   const del = document.createElement('button');
   del.className = 'h-del';
-  del.dataset.del = chat.id;
+  del.dataset.del = conv.conversation_id;
   del.setAttribute('aria-label', 'Hapus percakapan');
   del.innerHTML = '<svg class="icon" aria-hidden="true"><use href="components/icons.svg#trash" /></svg>';
   item.appendChild(del);
 
-  // Aksesibilitas keyboard: Enter/Space membuka chat
   item.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      emit('chat:open', { id: chat.id });
+      emit('chat:open', { id: conv.conversation_id });
     }
   });
 
@@ -148,35 +168,34 @@ function setActive(id) {
   for (const el of els.history.querySelectorAll('.h-item.active')) {
     el.classList.remove('active');
   }
-  const current = els.history.querySelector(`[data-open="${id}"]`);
-  if (current) current.classList.add('active');
+  if (id) {
+    const current = els.history.querySelector(`[data-open="${id}"]`);
+    if (current) current.classList.add('active');
+  }
 }
 
-function formatTime(ts) {
+function formatTime(iso) {
+  const ts = new Date(iso).getTime();
+  if (!Number.isFinite(ts)) return '';
   const diff = Date.now() - ts;
   const day = 86400000;
   if (diff < day) return 'Hari ini';
-  if (diff < 7 * day) {
-    return Math.ceil(diff / day) + ' hr';
-  }
+  if (diff < 7 * day) return Math.ceil(diff / day) + ' hr';
   return new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
 
 /* ---------------- Aksi ---------------- */
 
-function deleteChat(id, itemEl) {
-  const title = itemEl?.querySelector('.h-title')?.textContent || 'percakapan ini';
-  if (!window.confirm(`Hapus "${title}"?`)) return;
-  Store.deleteChat(id);
-  items = items.filter((c) => c.id !== id);
-  rendered = Math.max(0, rendered - 1);
-  itemEl?.remove();
+async function deleteConversation(id) {
+  if (!window.confirm('Hapus percakapan ini?')) return;
+  try {
+    await api('/api/conversations?id=' + encodeURIComponent(id), { method: 'DELETE' });
+  } catch {
+    /* 401 → sudah dialihkan ke login */
+  }
+  items = items.filter((c) => c.conversation_id !== id);
   emit('chat:deleted', { id });
-}
-
-function handleDeleted(id) {
-  // Jika chat yang terbuka dihapus, modul chat yang reaksi via event.
-  setActive(null);
+  applyFilter();
 }
 
 /* ---------------- Drawer (mobile) ---------------- */

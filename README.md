@@ -1,68 +1,98 @@
 # Aomi — Asisten Chat AI
 
-Aplikasi web chat AI modern (terinspirasi ChatGPT, dengan identitas sendiri),
-dioptimalkan untuk Vercel Serverless: ringan, mobile-first, hemat RAM.
+Aplikasi web chat AI modern dengan sistem login lengkap (register, login,
+logout, remember me, session management, verifikasi manusia, anti brute force),
+dioptimalkan untuk Vercel Serverless. Riwayat percakapan tersimpan per akun.
+
+## Arsitektur
+
+```
+Browser → /api/* (Vercel Serverless, cookie session HttpOnly)
+              ├── Provider AI (Gemini scraping → Groq → ChatEverywhere)
+              └── GitHub private repo sebagai database JSON
+```
+
+- Frontend **tidak pernah** mengakses GitHub atau provider AI langsung.
+- Token GitHub hanya hidup di **Vercel Environment Variables** (`GITHUB_TOKEN`),
+  tidak pernah muncul di browser maupun source code.
+- Database: repo private [Rendyzzx/token](https://github.com/Rendyzzx/token) —
+  hanya file JSON yang dibutuhkan yang dibaca (per file via Contents API),
+  tidak pernah memuat seluruh database.
 
 ## Struktur
 
 ```
 .
-├── index.html            # Markup, tanpa CSS/JS inline
-├── vercel.json           # Cache header, security header, durasi function
+├── index.html            # Aplikasi chat (wajib login)
+├── auth.html             # Halaman login & registrasi
+├── vercel.json
 ├── api/
-│   └── chat.js           # Serverless function: scraping + fallback AI
-├── css/
-│   ├── main.css          # Token desain (CSS variables), reset, kerangka
-│   ├── sidebar.css       # Riwayat chat (drawer di mobile)
-│   └── chat.css          # Area chat + komposer
-├── js/
-│   ├── app.js            # Bootstrap, utilitas, penyimpanan, event bus
-│   ├── sidebar.js        # Riwayat: lazy render, cari, hapus, drawer
-│   └── chat.js           # Percakapan: render, kirim, virtualisasi DOM
-├── components/
-│   └── icons.svg         # Sprite ikon SVG (di-cache, tanpa font ikon)
-└── assets/
-    └── favicon.svg
+│   ├── lib/
+│   │   ├── github.js     # Contents API: read/put/update/delete JSON
+│   │   ├── auth.js       # scrypt, session, captcha terenkripsi, lock login
+│   │   └── ratelimit.js  # rate limiter in-memory per instance
+│   ├── auth/
+│   │   ├── captcha.js    # GET  soal verifikasi manusia
+│   │   ├── register.js   # POST registrasi (+ auto login)
+│   │   ├── login.js      # POST login (remember me, lock brute force)
+│   │   ├── logout.js     # POST logout
+│   │   └── me.js          # GET  info user dari session
+│   ├── conversations.js  # CRUD riwayat percakapan per user
+│   └── chat.js           # proxy AI + simpan pesan ke percakapan user
+├── css/                  # main, sidebar, chat, auth
+├── js/                   # app (gerbang auth), sidebar, chat, auth
+├── components/icons.svg
+└── assets/favicon.svg
 ```
 
-## Arsitektur
+## Data yang disimpan (repo database)
 
 ```
-Browser → /api/chat (Vercel Serverless) → Provider AI
+users/_index.json          { emails: {…}, usernames: {…} }
+users/<user_id>.json       { id, username, email, password_hash, created_at }
+sessions/<session_id>.json { session_id, user_id, last_activity, expires_at }
+chats/<user_id>/_index.json [ { conversation_id, title, updated_at } ]
+chats/<user_id>/<conversation_id>.json
+                          { messages: [ { message_id, role, content, timestamp } ] }
+locks/login-<hash>.json   { fails, locked_until }   # anti brute force
 ```
 
-- Frontend TIDAK pernah memanggil provider AI secara langsung (bebas CORS,
-  API key tidak pernah sampai ke browser).
-- `api/chat.js` mencoba provider berikut (fallback otomatis):
-  1. **Gemini** — scraping internal, tanpa API key. Konteks percakapan
-     nyambung lewat `sessionId` yang disimpan klien.
-  2. **Groq** — jika env `GROQ_API_KEY` di-set.
-  3. **ChatEverywhere** — fallback terakhir.
-- API key hanya hidup di **Vercel Environment Variables**.
+## Environment Variables (Vercel — WAJIB)
 
-## Deploy
+| Nama | Keterangan |
+|------|------------|
+| `GITHUB_TOKEN` | Token GitHub dengan akses repo `Rendyzzx/token` |
+| `SESSION_SECRET` | String acak bebas (untuk enkripsi captcha & verifikasi token). Jika tidak di-set, fallback ke `GITHUB_TOKEN` |
+| `GROQ_API_KEY` | Opsional. Fallback AI bila scraping Gemini gagal |
 
-1. Push repo ini ke GitHub, import di Vercel (framework: Other).
-2. (Opsional, disarankan) Set `GROQ_API_KEY` di
-   Settings → Environment Variables, lalu redeploy.
+Set di: **Settings → Environment Variables** → isi Production, Preview,
+Development → **Redeploy**.
 
-## Performa & keamanan
+## Keamanan
 
-- Append-only rendering: pesan baru tidak pernah me-render ulang chat.
-- Virtualisasi DOM: maks ±150 node pesan; pesan lama dimuat per 30.
-- Sidebar lazy loading per 12 item (IntersectionObserver).
-- Event delegation, listener pasif, `requestAnimationFrame`, debounce.
-- Tanpa framework, tanpa webfont: hanya HTML/CSS/JS native.
-- Rate limiting 15 req/menit/IP (best-effort in-memory per instance).
-- Validasi & sanitasi semua input; timeout ketat; batas ukuran respons;
-  hostname upstream fixed (cegah SSRF); error generik tanpa info internal.
-- Mobile-first: sidebar jadi drawer, `100dvh`,
-  `interactive-widget=resizes-content` (input tetap terlihat saat keyboard
-  Android muncul), tidak ada horizontal scroll.
+- Password di-hash **scrypt** + salt, verifikasi timing-safe.
+- Session: token acak 256-bit, cookie **HttpOnly + Secure + SameSite=Lax**.
+- Masa berlaku session: 12 jam, atau 30 hari dengan "Remember Me"
+  (server-side expiry + refresh lazy tiap 6 jam).
+- Verifikasi manusia: soal matematika acak, jawaban dikirim ke browser
+  dalam bentuk terenkripsi AES-256-GCM → bot tidak bisa membaca jawaban
+  dari token. Tanpa layanan pihak ketiga.
+- Login gagal 5x dalam 15 menit → akun+IP terkunci 15 menit (persist di repo).
+- Rate limit register/login/chat per IP.
+- Validasi & sanitasi semua input; timeout ketat; hostname upstream fixed
+  (cegah SSRF); error generik tanpa path/env/debug; geminiSessionId tidak
+  pernah dikirim ke browser.
 
-## Penyimpanan
+## Performa
 
-- Indeks riwayat dan isi chat disimpan terpisah di `localStorage`
-  (membuka aplikasi tidak memuat seluruh histori).
-- Maks 200 pesan disimpan per percakapan; chat terlama otomatis
-  dibersihkan jika `localStorage` penuh.
+- Append-only rendering; virtualisasi DOM (maks ±150 node, muat per 30).
+- Sidebar lazy render per 12 item (IntersectionObserver), pencarian debounce.
+- Indeks riwayat dipisah dari isi percakapan → daftar chat tetap ringan
+  walau percakapan panjang.
+- Tanpa framework, tanpa webfont, tanpa dependency eksternal.
+- Mobile-first: drawer, `100dvh`, keyboard-safe, tanpa horizontal scroll.
+
+## Forgot Password
+
+Belum diimplementasikan (butuh layanan email untuk mengirim tautan reset).
+Bisa ditambahkan nanti.

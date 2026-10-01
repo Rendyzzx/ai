@@ -145,10 +145,39 @@
 }
 
 .sidebar-foot {
-  padding: 10px 16px;
+  padding: 10px 12px;
   border-top: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--text-muted);
+}
+
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.user-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #3ddc84;
+}
+
+.user-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.logout-btn {
+  width: 30px;
+  height: 30px;
+  flex: none;
 }
 
 /* ---------------- Mode drawer (mobile/tablet) ---------------- */

@@ -1,15 +1,14 @@
 /* ============================================================
    Aomi — app.js
-   Titik masuk aplikasi: utilitas bersama, penyimpanan, dan
-   event bus antar modul. Tidak menyentuh DOM chat/sidebar
-   langsung (itu tugas modul masing-masing).
+   Titik masuk aplikasi: utilitas bersama, event bus antar modul,
+   gerbang otentikasi. Penyimpanan chat sepenuhnya di server
+   (per akun) — tidak ada localStorage untuk riwayat.
    ============================================================ */
 
 // ---------------- Utilitas kecil ----------------
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 
-/** Debounce untuk event berfrekuensi tinggi (search, resize, dst). */
 export const debounce = (fn, ms = 150) => {
   let t;
   return (...args) => {
@@ -18,7 +17,6 @@ export const debounce = (fn, ms = 150) => {
   };
 };
 
-/** Wrapper requestAnimationFrame: gabung banyak panggilan jadi 1 frame. */
 export const raf = (fn) => {
   let queued = false;
   return () => {
@@ -31,7 +29,14 @@ export const raf = (fn) => {
   };
 };
 
-// ---------------- Event bus antar modul (hemat listener) ----------------
+/** Buang karakter kontrol & batasi panjang. */
+export const sanitizeText = (text, maxLen = 4000) =>
+  String(text)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .slice(0, maxLen)
+    .trim();
+
+// ---------------- Event bus antar modul ----------------
 
 const bus = new EventTarget();
 
@@ -41,94 +46,57 @@ export const emit = (name, detail) =>
 export const on = (name, handler) =>
   bus.addEventListener(name, handler);
 
-// ---------------- Penyimpanan ----------------
-// Indeks riwayat dipisah dari isi chat supaya membuka aplikasi
-// tidak pernah memuat seluruh histori sekaligus.
+// ---------------- Helper API (redirect bila sesi habis) ----------------
 
-const INDEX_KEY = 'aomi.index.v1';
-const CURRENT_KEY = 'aomi.current.v1';
-const chatKey = (id) => `aomi.chat.${id}`;
+export async function api(path, options = {}) {
+  const res = await fetch(path, options);
+  if (res.status === 401) {
+    location.replace('/auth.html');
+    throw new Error('unauthorized');
+  }
+  return res;
+}
 
-const safeParse = (raw) => {
-  try { return JSON.parse(raw); } catch { return null; }
-};
+export async function apiJson(path, options = {}) {
+  const res = await api(path, options);
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Gagal memuat data');
+  return data;
+}
 
-export const Store = {
-  /** Daftar ringkas: [{ id, title, snippet, updatedAt, count }] */
-  readIndex() {
-    const list = safeParse(localStorage.getItem(INDEX_KEY));
-    return Array.isArray(list) ? list : [];
-  },
-
-  writeIndex(list) {
-    localStorage.setItem(INDEX_KEY, JSON.stringify(list));
-  },
-
-  readChat(id) {
-    return safeParse(localStorage.getItem(chatKey(id)));
-  },
-
-  writeChat(chat) {
-    // Hanya pesan terbaru yang disimpan; riwayat sangat panjang dipangkas.
-    if (chat.messages.length > STORE_CAP) {
-      chat.messages = chat.messages.slice(-STORE_CAP);
-    }
-    try {
-      localStorage.setItem(chatKey(chat.id), JSON.stringify(chat));
-    } catch {
-      // localStorage penuh → buang chat terlama lalu coba lagi
-      const index = this.readIndex();
-      if (index.length > 1) {
-        this.deleteChat(index[index.length - 1].id);
-        localStorage.setItem(chatKey(chat.id), JSON.stringify(chat));
-      }
-    }
-  },
-
-  deleteChat(id) {
-    localStorage.removeItem(chatKey(id));
-    const index = this.readIndex().filter((c) => c.id !== id);
-    this.writeIndex(index);
-  },
-
-  upsertIndexEntry(entry) {
-    const index = this.readIndex().filter((c) => c.id !== entry.id);
-    index.push(entry);
-    // Terbaru selalu di atas → pencarian & render murah
-    index.sort((a, b) => b.updatedAt - a.updatedAt);
-    this.writeIndex(index);
-  },
-
-  readCurrentId() {
-    return localStorage.getItem(CURRENT_KEY);
-  },
-
-  writeCurrentId(id) {
-    if (id) localStorage.setItem(CURRENT_KEY, id);
-    else localStorage.removeItem(CURRENT_KEY);
-  },
-};
-
-const STORE_CAP = 200; // pesan maksimum per chat yang disimpan
-
-// ---------------- Sanitasi input pengguna ----------------
-
-/** Buang karakter kontrol & batasi panjang (anti XSS by construction). */
-export const sanitizeText = (text, maxLen = 4000) =>
-  String(text)
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-    .slice(0, maxLen)
-    .trim();
-
-// ---------------- Bootstrap ----------------
+// ---------------- Gerbang auth + bootstrap ----------------
 
 import { initSidebar } from './sidebar.js';
 import { initChat } from './chat.js';
 
-const boot = () => {
+async function boot() {
+  let me = null;
+  try {
+    me = await apiJson('/api/auth/me');
+  } catch (err) {
+    if (err.message === 'unauthorized') return; // sudah redirect
+    // Server tak terjangkau → tampilkan error sederhana
+    document.body.textContent = 'Tidak bisa menghubungi server. Muat ulang halaman.';
+    return;
+  }
+
+  const user = me.user;
+
+  // Info user + logout di sidebar
+  $('#userBox').textContent = user.username;
+
   initSidebar();
-  initChat();
-};
+  initChat(user);
+
+  $('#logoutBtn').addEventListener('click', async () => {
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+    } catch {
+      /* lanjut redirect meskipun gagal */
+    }
+    location.replace('/auth.html');
+  });
+}
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', boot, { once: true });

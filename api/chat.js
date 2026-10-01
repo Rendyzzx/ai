@@ -1,37 +1,39 @@
 // ============================================================
 // Aomi — api/chat.js (Vercel Serverless Function)
 //
-// Arsitektur: Frontend → Function ini → Provider AI.
-// API key hanya hidup di Environment Variables Vercel
-// (GROQ_API_KEY) dan tidak pernah dikirim ke browser.
+// Arsitektur: Browser → Function ini (session wajib) → Provider AI
+//             → pesan tersimpan ke repo database per user.
 //
 // Urutan provider (fallback otomatis):
 //   1. Gemini (scraping internal, tanpa API key)
-//   2. Groq   (butuh env GROQ_API_KEY)
+//   2. Groq   (env GROQ_API_KEY, opsional)
 //   3. ChatEverywhere (fallback terakhir)
 //
-// Hardening:
-//   - Rate limiting per IP (best-effort, in-memory per instance)
-//   - Validasi & sanitasi seluruh input
-//   - Timeout ketat + batas ukuran respons (anti payload raksasa)
-//   - Hanya hostname fixed (cegah SSRF: tidak ada URL dari user)
-//   - Error generik: tidak membocorkan path/env/debug
+// Konteks percakapan: hidup di chats/<userId>/<chatId>.json
+// (termasuk sessionId Gemini) → user bisa lanjut chat lama
+// kapan pun, di perangkat mana pun, tanpa kehilangan konteks.
+//
+// Hardening: rate limit, validasi & sanitasi input, timeout ketat,
+// batas ukuran respons, hostname fixed (cegah SSRF), error generik.
 // ============================================================
 
-// ---------------- Konstanta & limit ----------------
+import crypto from 'node:crypto';
+import { readJson, putJson, updateJson } from './lib/github.js';
+import { getSession } from './lib/auth.js';
+import { allow, clientIp } from './lib/ratelimit.js';
 
 const LIMITS = {
   rateWindowMs: 60_000,
-  rateMax: 15,           // maks 15 request/menit/IP
-  rateMapMax: 5000,      // jaga memori instance
+  rateMax: 20,           // maks 20 request/menit/IP
   messageMaxLen: 4000,
   promptMaxLen: 1000,
-  maxMessages: 40,
-  responseMaxLen: 8000,  // potong respons agar hemat memori
-  fetchBytes: 100_000,   // batas baca body respons upstream
+  responseMaxLen: 8000,
+  fetchBytes: 100_000,
   geminiTimeout: 25_000,
   groqTimeout: 20_000,
-  ceTimeout: 15_000
+  ceTimeout: 15_000,
+  maxMessages: 100,       // batas isi percakapan yang disimpan
+  contextSend: 8          // pesan terakhir yang dikirim ke provider fallback
 };
 
 const HOSTS = {
@@ -45,11 +47,12 @@ const HOSTS = {
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0';
 
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const INSTRUCTION =
+  'Kamu adalah Aomi, asisten chat santai berbahasa Indonesia. ' +
+  'Jawab singkat, jelas, dan ramah. Jangan gunakan format markdown berat.';
 
-// ---------------- Util kecil ----------------
+// ---------------- Util ----------------
 
-// fetch dengan timeout ketat + batas ukuran respons
 async function fetchT(url, options = {}, timeoutMs, maxBytes = LIMITS.fetchBytes) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -72,64 +75,7 @@ function sanitize(str, maxLen) {
     .slice(0, maxLen);
 }
 
-// ---------------- Rate limiting (best-effort) ----------------
-
-const hits = new Map();
-
-function rateLimited(ip) {
-  const now = Date.now();
-  const arr = (hits.get(ip) || []).filter((t) => now - t < LIMITS.rateWindowMs);
-  if (arr.length >= LIMITS.rateMax) {
-    hits.set(ip, arr);
-    return true;
-  }
-  arr.push(now);
-  hits.set(ip, arr);
-  if (hits.size > LIMITS.rateMapMax) hits.clear();
-  return false;
-}
-
-function clientIp(headers) {
-  const fwd = headers['x-forwarded-for'];
-  return (typeof fwd === 'string' ? fwd.split(',')[0].trim() : '') || 'anon';
-}
-
-// ---------------- Validasi body ----------------
-
-function parseBody(body) {
-  if (!body || typeof body !== 'object') return null;
-
-  const messages = Array.isArray(body.messages) ? body.messages : [];
-  if (messages.length === 0 || messages.length > LIMITS.maxMessages) return null;
-
-  const clean = [];
-  for (const m of messages) {
-    if (!m || typeof m !== 'object') continue;
-    const role = m.role === 'assistant' ? 'assistant' : 'user';
-    const content = sanitize(m.content, LIMITS.messageMaxLen);
-    if (content) clean.push({ role, content });
-  }
-  if (clean.length === 0) return null;
-
-  const lastUser = [...clean].reverse().find((m) => m.role === 'user');
-  if (!lastUser) return null;
-
-  let temperature = Number(body.temperature);
-  if (!Number.isFinite(temperature)) temperature = 0.5;
-  temperature = Math.min(Math.max(temperature, 0), 2);
-
-  return {
-    messages: clean,
-    message: lastUser.content,
-    prompt: sanitize(body.prompt, LIMITS.promptMaxLen),
-    temperature,
-    sessionId: sanitize(body.sessionId, 8192)
-  };
-}
-
-// ============================================================
-// PROVIDER 1 — Gemini (scraping)
-// ============================================================
+// ---------------- PROVIDER 1 — Gemini ----------------
 
 function decodeSessionId(sessionId) {
   try {
@@ -142,7 +88,7 @@ function decodeSessionId(sessionId) {
       };
     }
   } catch {
-    /* sessionId rusak → mulai sesi baru */
+    /* sessionId rusak → mulai baru */
   }
   return { resumeArray: null, cookie: null, instruction: '' };
 }
@@ -175,10 +121,9 @@ async function geminiGetCookie() {
 }
 
 async function chatGemini(input) {
-  let { resumeArray, cookie } = input.sessionId
-    ? decodeSessionId(input.sessionId)
+  let { resumeArray, cookie } = input.geminiSessionId
+    ? decodeSessionId(input.geminiSessionId)
     : { resumeArray: null, cookie: null };
-  const instruction = input.prompt || '';
 
   if (!cookie) cookie = await geminiGetCookie();
 
@@ -188,7 +133,7 @@ async function chatGemini(input) {
     resumeArray || ['', '', '', null, null, null, null, null, null, ''],
     null, null, null, [1], 1, null, null, 1, 0, null, null, null, null, null,
     [[0]], 1, null, null, null, null, null,
-    ['', '', instruction, null, null, null, null, null, 0, null, 1, null, null, null, []],
+    ['', '', INSTRUCTION, null, null, null, null, null, 0, null, 1, null, null, null, []],
     null, null, 1, null, null, null, null, null, null, null,
     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
     1, null, null, null, null, [1]
@@ -215,7 +160,6 @@ async function chatGemini(input) {
 
   const match = Array.from(res.text.matchAll(/^\d+\n(.+?)\n/gm)).reverse();
   let parsed = null;
-
   for (const item of match) {
     try {
       const outer = JSON.parse(item[1]);
@@ -227,34 +171,28 @@ async function chatGemini(input) {
         break;
       }
     } catch {
-      /* lewati chunk yang bukan JSON */
+      /* lewati chunk non-JSON */
     }
   }
-
   if (!parsed) throw new Error('parsing gemini gagal');
 
   const resume = [...parsed[1], parsed[4][0][0]];
   const text = parsed[4][0][1][0].replace(/\*\*(.+?)\*\*/g, '*$1*');
-
   return {
     text: text.slice(0, LIMITS.responseMaxLen),
-    sessionId: encodeSessionId(resume, cookie, instruction)
+    geminiSessionId: encodeSessionId(resume, cookie, INSTRUCTION)
   };
 }
 
-// ============================================================
-// PROVIDER 2 — Groq (GROQ_API_KEY dari env Vercel)
-// ============================================================
+// ---------------- PROVIDER 2 — Groq ----------------
 
 async function chatGroq(input, apiKey) {
-  const messages = [];
-  if (input.prompt) messages.push({ role: 'system', content: input.prompt });
+  const messages = [{ role: 'system', content: INSTRUCTION }];
   messages.push(
-    ...input.messages.slice(-10).map((m) => ({
+    ...input.messages.slice(-LIMITS.contextSend).map((m) => ({
       role: m.role, content: m.content
     }))
   );
-
   const res = await fetchT(
     HOSTS.groq,
     {
@@ -264,24 +202,21 @@ async function chatGroq(input, apiKey) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: GROQ_MODEL,
-        temperature: input.temperature,
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.5,
         messages
       })
     },
     LIMITS.groqTimeout
   );
-
   const data = JSON.parse(res.text);
-  if (!res.status || res.status >= 300) throw new Error('groq ' + res.status);
+  if (res.status >= 300) throw new Error('groq ' + res.status);
   const text = data.choices?.[0]?.message?.content;
-  if (!text) throw new Error('groq: respons kosong');
+  if (!text) throw new Error('groq kosong');
   return { text: String(text).slice(0, LIMITS.responseMaxLen) };
 }
 
-// ============================================================
-// PROVIDER 3 — ChatEverywhere (fallback terakhir)
-// ============================================================
+// ---------------- PROVIDER 3 — ChatEverywhere ----------------
 
 async function chatEverywhere(input) {
   const res = await fetchT(
@@ -299,17 +234,16 @@ async function chatEverywhere(input) {
           id: 'gpt-3.5-turbo', name: 'GPT-3.5', maxLength: 12000,
           tokenLimit: 4000, completionTokenLimit: 2500, deploymentName: 'gpt-35'
         },
-        messages: input.messages.map((m) => ({
+        messages: input.messages.slice(-LIMITS.contextSend).map((m) => ({
           pluginId: null, content: m.content, fileList: [], role: m.role
         })),
-        prompt: input.prompt,
-        temperature: input.temperature,
+        prompt: INSTRUCTION,
+        temperature: 0.5,
         enableConversationPrompt: false
       })
     },
     LIMITS.ceTimeout
   );
-
   if (res.status >= 300) throw new Error('ce ' + res.status);
   let text = res.text;
   try {
@@ -318,14 +252,11 @@ async function chatEverywhere(input) {
     text = typeof data.text === 'string' ? data.text : res.text;
   } catch (e) {
     if (String(e.message) === 'ce error') throw e;
-    /* respons plain-text → pakai apa adanya */
   }
   return { text: text.slice(0, LIMITS.responseMaxLen) };
 }
 
-// ============================================================
-// HANDLER
-// ============================================================
+// ---------------- HANDLER ----------------
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -335,53 +266,116 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method tidak diizinkan' });
   }
 
-  if (rateLimited(clientIp(req.headers))) {
+  // Wajib login → riwayat per akun, tidak pernah tercampur
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: 'Sesi berakhir. Silakan login kembali.' });
+  const uid = session.user_id;
+
+  if (!allow('chat:' + clientIp(req.headers), LIMITS.rateMax, LIMITS.rateWindowMs)) {
     return res.status(429).json({ error: 'Terlalu banyak permintaan. Tunggu sebentar.' });
   }
 
-  const input = parseBody(req.body);
-  if (!input) {
-    return res.status(400).json({ error: 'Pesan tidak valid' });
+  const body = req.body || {};
+  const message = sanitize(body.message, LIMITS.messageMaxLen);
+  if (!message) return res.status(400).json({ error: 'Pesan tidak valid' });
+
+  // Muat / buat percakapan milik user ini
+  const convId = String(body.conversation_id || '');
+  const convPath = `chats/${uid}/${convId}.json`;
+  const file = /^[a-f0-9-]{8,36}$/.test(convId) ? await readJson(convPath) : null;
+  const conv = file
+    ? file.data
+    : {
+        conversation_id: crypto.randomUUID(),
+        user_id: uid,
+        title: 'Chat baru',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        geminiSessionId: null,
+        messages: []
+      };
+
+  if (conv.messages.length > LIMITS.maxMessages) {
+    conv.messages = conv.messages.slice(-LIMITS.maxMessages);
   }
 
-  const errors = [];
+  const input = {
+    message,
+    geminiSessionId: conv.geminiSessionId,
+    messages: conv.messages
+  };
 
-  // 1) Gemini
+  // Coba provider berurutan
+  let reply = null;
+  let provider = null;
+  let newGeminiSid = null;
+
   try {
     const out = await chatGemini(input);
-    return res.status(200).json({
-      text: out.text, sessionId: out.sessionId, provider: 'gemini'
-    });
+    reply = out.text;
+    provider = 'gemini';
+    newGeminiSid = out.geminiSessionId;
   } catch (err) {
-    errors.push('gemini');
     console.error('[chat] gemini:', err.message);
   }
 
-  // 2) Groq (hanya jika key tersimpan di env Vercel)
   const groqKey = process.env.GROQ_API_KEY;
-  if (groqKey) {
+  if (!reply && groqKey) {
     try {
       const out = await chatGroq(input, groqKey);
-      return res.status(200).json({
-        text: out.text, sessionId: null, provider: 'groq'
-      });
+      reply = out.text;
+      provider = 'groq';
     } catch (err) {
-      errors.push('groq');
       console.error('[chat] groq:', err.message);
     }
   }
 
-  // 3) ChatEverywhere
-  try {
-    const out = await chatEverywhere(input);
-    return res.status(200).json({
-      text: out.text, sessionId: null, provider: 'chateverywhere'
-    });
-  } catch (err) {
-    errors.push('chateverywhere');
-    console.error('[chat] ce:', err.message);
+  if (!reply) {
+    try {
+      const out = await chatEverywhere(input);
+      reply = out.text;
+      provider = 'chateverywhere';
+    } catch (err) {
+      console.error('[chat] ce:', err.message);
+    }
   }
 
-  // Gagal semua → pesan generik, tanpa detail internal
-  return res.status(502).json({ error: 'Semua penyedia AI sedang tidak tersedia. Coba lagi nanti.' });
+  if (!reply) {
+    return res.status(502).json({
+      error: 'Semua penyedia AI sedang tidak tersedia. Coba lagi nanti.'
+    });
+  }
+
+  // Simpan pesan ke percakapan user
+  const now = new Date().toISOString();
+  conv.messages.push(
+    { message_id: crypto.randomUUID(), role: 'user', content: message, timestamp: now },
+    { message_id: crypto.randomUUID(), role: 'assistant', content: reply, timestamp: now }
+  );
+  if (conv.title === 'Chat baru') {
+    conv.title = message.slice(0, 48);
+  }
+  conv.updated_at = now;
+  if (newGeminiSid) conv.geminiSessionId = newGeminiSid;
+
+  await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'chat append');
+  await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+    const items = Array.isArray(current) ? current : [];
+    const entry = {
+      conversation_id: conv.conversation_id,
+      title: conv.title,
+      updated_at: conv.updated_at
+    };
+    const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
+    if (i >= 0) items[i] = entry;
+    else items.unshift(entry);
+    return items;
+  });
+
+  return res.status(200).json({
+    text: reply,
+    conversation_id: conv.conversation_id,
+    title: conv.title,
+    provider
+  });
 }
