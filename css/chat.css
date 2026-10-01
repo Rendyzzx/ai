@@ -1,0 +1,269 @@
+/* ============================================================
+   Aomi — chat.css
+   Area percakapan + komposer. Semua ukuran fluid
+   (flex, clamp, min/max), tanpa width/height tetap.
+   ============================================================ */
+
+/* ---------------- Topbar ---------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+
+.menu-btn {
+  display: none;
+}
+
+.topbar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+/* ---------------- Area chat ---------------- */
+
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: clamp(16px, 3vw, 28px) 0;
+}
+
+.chat-column {
+  max-width: 1000px;             /* batas konten desktop */
+  margin: 0 auto;
+  padding: 0 clamp(14px, 3vw, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Layar sambutan (hidden saat percakapan aktif) */
+.welcome {
+  margin: auto;                   /* vertikal tengah di area flex */
+  text-align: center;
+  padding: 40px 16px;
+  max-width: 560px;
+}
+
+.welcome-icon {
+  width: 34px;
+  height: 34px;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+
+.welcome h1 {
+  font-size: clamp(20px, 4vw, 26px);
+  font-weight: 700;
+}
+
+.welcome p {
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+
+.suggestions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.suggestion {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: left;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.suggestion:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* ---------------- Pesan ---------------- */
+
+.msg {
+  max-width: min(100%, 48rem);   /* ukuran mengikuti isi, tidak memenuhi layar */
+}
+
+.msg .who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.msg .who .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.msg .body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;        /* URL panjang tidak merusak layout */
+  font-size: 15px;
+}
+
+/* Pesan user → kanan, dengan bubble */
+.msg.user {
+  align-self: flex-end;
+}
+
+.msg.user .who {
+  justify-content: flex-end;
+}
+
+.msg.user .body {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 10px 16px;
+  border-radius: 18px 18px 4px 18px;
+}
+
+/* Pesan AI → kiri, tanpa bubble berat, seperti teks editorial */
+.msg.ai {
+  align-self: flex-start;
+}
+
+.msg.ai.error .body {
+  color: var(--danger);
+}
+
+/* Indikator mengetik */
+.msg.typing .body {
+  display: flex;
+  gap: 5px;
+  padding: 8px 0;
+}
+
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: aomi-blink 1.1s infinite;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes aomi-blink {
+  0%, 100% { opacity: 0.25; }
+  40%      { opacity: 1; }
+}
+
+/* Tombol muat pesan lama */
+.load-earlier-wrap {
+  display: flex;
+  justify-content: center;
+  order: -1;                      /* selalu paling atas di kolom flex */
+  flex: none;
+}
+
+.load-earlier-wrap button {
+  font-size: 13px;
+  color: var(--accent);
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.load-earlier-wrap button:hover {
+  background: var(--surface-2);
+}
+
+/* ---------------- Komposer (fixed di bawah kolom utama) ---------------- */
+
+.composer-wrap {
+  flex: none;
+  padding: 10px clamp(12px, 3vw, 24px) calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.composer {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  transition: border-color 0.15s;
+}
+
+.composer:focus-within {
+  border-color: var(--accent);
+}
+
+.composer textarea {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  background: none;
+  border: 0;
+  outline: 0;
+  resize: none;
+  line-height: 1.45;
+  max-height: min(160px, 30dvh);  /* auto-resize dibatasi, layout tetap stabil */
+}
+
+.send {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.send .icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5;
+}
+
+.send:disabled {
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.composer-note {
+  max-width: 1000px;
+  margin: 8px auto 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* ---------------- Penyesuaian mobile ---------------- */
+
+@media (max-width: 1023px) {
+  .menu-btn {
+    display: grid;
+  }
+}

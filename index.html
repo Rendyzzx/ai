@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="theme-color" content="#141417" />
+  <meta name="description" content="Aomi — asisten chat AI cepat dan ringan." />
+  <title>Aomi — Asisten Chat</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/chat.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <header class="sidebar-head">
+        <div class="brand">
+          <svg class="icon brand-icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg>
+          <span>Aomi</span>
+        </div>
+        <button class="icon-btn close-btn" id="sidebarClose" aria-label="Tutup sidebar">
+          <svg class="icon" aria-hidden="true"><use href="components/icons.svg#close" /></svg>
+        </button>
+      </header>
+
+      <button class="new-chat" id="newChatBtn">
+        <svg class="icon" aria-hidden="true"><use href="components/icons.svg#plus" /></svg>
+        <span>Chat baru</span>
+      </button>
+
+      <div class="search-box">
+        <svg class="icon" aria-hidden="true"><use href="components/icons.svg#search" /></svg>
+        <input id="searchInput" type="search" placeholder="Cari riwayat…" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <nav class="history" id="history" aria-label="Riwayat chat"></nav>
+
+      <footer class="sidebar-foot">Riwayat tersimpan di perangkat ini</footer>
+    </aside>
+
+    <div class="backdrop" id="backdrop" hidden></div>
+
+    <!-- ================= AREA UTAMA ================= -->
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="sidebarToggle" aria-label="Buka sidebar">
+          <svg class="icon" aria-hidden="true"><use href="components/icons.svg#menu" /></svg>
+        </button>
+        <div class="topbar-title" id="chatTitle">Chat baru</div>
+        <button class="icon-btn" id="scrollDownBtn" aria-label="Gulir ke bawah" hidden>
+          <svg class="icon" aria-hidden="true"><use href="components/icons.svg#chevron-down" /></svg>
+        </button>
+      </header>
+
+      <section class="chat-scroll" id="chatScroll">
+        <div class="chat-column" id="chatColumn">
+          <!-- Layar sambutan (statis, cukup di-toggle) -->
+          <div class="welcome" id="welcome">
+            <svg class="icon welcome-icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg>
+            <h1>Halo, ada yang bisa dibantu?</h1>
+            <p>Mulai percakapan baru atau pilih salah satu ide di bawah.</p>
+            <div class="suggestions" id="suggestions">
+              <button class="suggestion" data-q="Halo! Apa kabar hari ini?">Halo! Apa kabar hari ini?</button>
+              <button class="suggestion" data-q="Jelaskan cara kerja AI dengan bahasa sederhana">Jelaskan cara kerja AI dengan bahasa sederhana</button>
+              <button class="suggestion" data-q="Buatkan rencana belajar 7 hari untuk pemrograman">Buatkan rencana belajar 7 hari untuk pemrograman</button>
+              <button class="suggestion" data-q="Buatkan puisi singkat tentang hujan sore">Buatkan puisi singkat tentang hujan sore</button>
+            </div>
+          </div>
+
+          <div class="load-earlier-wrap" id="loadEarlierWrap" hidden>
+            <button id="loadEarlierBtn">Muat pesan sebelumnya</button>
+          </div>
+          <!-- Pesan ditambahkan oleh js/chat.js -->
+        </div>
+      </section>
+
+      <div class="composer-wrap">
+        <form class="composer" id="composer">
+          <textarea id="input" rows="1" placeholder="Kirim pesan ke Aomi…"
+            autocomplete="off" enterkeyhint="send" aria-label="Pesan"></textarea>
+          <button class="send" id="sendBtn" type="submit" aria-label="Kirim" disabled>
+            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#send" /></svg>
+          </button>
+        </form>
+        <p class="composer-note">Aomi bisa keliru. Periksa kembali informasi penting.</p>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
