@@ -1,8 +1,8 @@
 /* ============================================================
    Aomi — app.js
-   Titik masuk aplikasi: utilitas bersama, event bus antar modul,
-   gerbang otentikasi. Penyimpanan chat sepenuhnya di server
-   (per akun) — tidak ada localStorage untuk riwayat.
+   Titik masuk aplikasi: utilitas bersama, event bus, state
+   (profil user + konfigurasi bot), gerbang auth, sinkronisasi
+   tinggi viewport (visualViewport) untuk keyboard mobile.
    ============================================================ */
 
 // ---------------- Utilitas kecil ----------------
@@ -36,6 +36,24 @@ export const sanitizeText = (text, maxLen = 4000) =>
     .slice(0, maxLen)
     .trim();
 
+/**
+ * Render avatar ke container: <img> bila ada dataUrl,
+ * kalau tidak → ikon SVG default (bukan emoji).
+ */
+export function renderAvatar(el, dataUrl, fallbackIcon) {
+  el.textContent = '';
+  if (dataUrl) {
+    const img = new Image();
+    img.alt = '';
+    img.decoding = 'async';
+    img.src = dataUrl;
+    el.appendChild(img);
+  } else {
+    el.innerHTML =
+      `<svg class="icon" aria-hidden="true"><use href="components/icons.svg#${fallbackIcon}" /></svg>`;
+  }
+}
+
 // ---------------- Event bus antar modul ----------------
 
 const bus = new EventTarget();
@@ -45,6 +63,16 @@ export const emit = (name, detail) =>
 
 export const on = (name, handler) =>
   bus.addEventListener(name, handler);
+
+// ---------------- State global (profil + bot user login) ----------------
+
+export const state = {
+  user: { username: '', display_name: '', bio: '', avatar: null },
+  bot: {
+    bot_name: 'Aomi', bot_avatar: null, personality: '',
+    system_prompt: '', language: 'id', response_style: 'casual'
+  }
+};
 
 // ---------------- Helper API (redirect bila sesi habis) ----------------
 
@@ -64,38 +92,62 @@ export async function apiJson(path, options = {}) {
   return data;
 }
 
+// ---------------- Tinggi viewport & keyboard mobile ----------------
+// Satu listener visualViewport (bukan polling): set --app-h agar
+// seluruh app pas di area terlihat; komposer otomatis duduk tepat
+// di atas keyboard. Diabaikan saat pinch-zoom (scale ≠ 1).
+
+const syncViewport = raf(() => {
+  const vv = window.visualViewport;
+  if (!vv || vv.scale !== 1) return;
+  document.documentElement.style.setProperty('--app-h', Math.round(vv.height) + 'px');
+});
+
+function bindViewport() {
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncViewport);
+  }
+  syncViewport();
+}
+
 // ---------------- Gerbang auth + bootstrap ----------------
 
 import { initSidebar } from './sidebar.js';
 import { initChat } from './chat.js';
+import { initSettings } from './settings.js';
 
 async function boot() {
+  bindViewport();
+
   let me = null;
   try {
-    me = await apiJson('/api/auth/me');
+    // me + profil + bot diambil paralel (hemat waktu boot)
+    const [meRes, profileRes, botRes] = await Promise.all([
+      api('/api/auth/me'),
+      api('/api/profile'),
+      api('/api/bot')
+    ]);
+    me = await meRes.json();
+    const profile = await profileRes.json();
+    const botCfg = await botRes.json();
+
+    Object.assign(state.user, profile);
+    Object.assign(state.bot, botCfg.bot);
   } catch (err) {
     if (err.message === 'unauthorized') return; // sudah redirect
-    // Server tak terjangkau → tampilkan error sederhana
     document.body.textContent = 'Tidak bisa menghubungi server. Muat ulang halaman.';
     return;
   }
 
-  const user = me.user;
-
-  // Info user + logout di sidebar
-  $('#userBox').textContent = user.username;
+  // Info user + nama bot di UI
+  $('#userBox').textContent = state.user.display_name || state.user.username;
+  renderAvatar($('#sidebarAvatar'), state.user.avatar, 'user');
+  $('#brandName').textContent = state.bot.bot_name;
+  $('#chatTitle').textContent = state.bot.bot_name;
 
   initSidebar();
-  initChat(user);
-
-  $('#logoutBtn').addEventListener('click', async () => {
-    try {
-      await api('/api/auth/logout', { method: 'POST' });
-    } catch {
-      /* lanjut redirect meskipun gagal */
-    }
-    location.replace('/auth.html');
-  });
+  initChat();
+  initSettings();
 }
 
 if (document.readyState === 'loading') {

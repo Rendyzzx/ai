@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/main.css" />
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/chat.css" />
+  <link rel="stylesheet" href="css/settings.css" />
 </head>
 <body>
   <div class="app">
@@ -18,7 +19,7 @@
       <header class="sidebar-head">
         <div class="brand">
           <svg class="icon brand-icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg>
-          <span>Aomi</span>
+          <span id="brandName">Aomi</span>
         </div>
         <button class="icon-btn close-btn" id="sidebarClose" aria-label="Tutup sidebar">
           <svg class="icon" aria-hidden="true"><use href="components/icons.svg#close" /></svg>
@@ -38,13 +39,11 @@
       <nav class="history" id="history" aria-label="Riwayat chat"></nav>
 
       <footer class="sidebar-foot">
-        <div class="user-box">
-          <span class="user-dot" aria-hidden="true"></span>
+        <button class="profile-btn" id="settingsBtn" aria-label="Buka pengaturan">
+          <span class="avatar small" id="sidebarAvatar"><svg class="icon" aria-hidden="true"><use href="components/icons.svg#user" /></svg></span>
           <span class="user-name" id="userBox">…</span>
-          <button class="icon-btn logout-btn" id="logoutBtn" aria-label="Keluar">
-            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#close" /></svg>
-          </button>
-        </div>
+          <svg class="icon" aria-hidden="true"><use href="components/icons.svg#gear" /></svg>
+        </button>
       </footer>
     </aside>
 
@@ -95,6 +94,109 @@
         <p class="composer-note">Aomi bisa keliru. Periksa kembali informasi penting.</p>
       </div>
     </main>
+  </div>
+
+  <!-- ================= PENGATURAN (profil + bot) ================= -->
+  <div class="settings-backdrop" id="settingsModal" hidden>
+    <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <header class="settings-head">
+        <h2 id="settingsTitle">Pengaturan</h2>
+        <button class="icon-btn" id="settingsClose" aria-label="Tutup">
+          <svg class="icon" aria-hidden="true"><use href="components/icons.svg#close" /></svg>
+        </button>
+      </header>
+
+      <div class="settings-tabs">
+        <button class="settings-tab active" data-tab="profile">Profil</button>
+        <button class="settings-tab" data-tab="bot">Bot</button>
+      </div>
+
+      <div class="settings-body">
+        <!-- ===== PROFIL ===== -->
+        <form class="settings-form" id="profileForm" novalidate>
+          <div class="avatar-edit">
+            <span class="avatar big" id="profileAvatarPrev"><svg class="icon" aria-hidden="true"><use href="components/icons.svg#user" /></svg></span>
+            <div class="meta">
+              <button type="button" class="link-btn" id="profileAvatarBtn">Ganti foto profil</button>
+              <span class="hint">JPG/PNG/WebP, otomatis dikecilkan ke 256px.</span>
+            </div>
+            <input type="file" id="profileAvatarFile" accept="image/jpeg,image/png,image/webp" hidden />
+          </div>
+
+          <label class="field">
+            <span>Username</span>
+            <input type="text" id="profileUsername" maxlength="20" autocomplete="username" />
+          </label>
+
+          <label class="field">
+            <span>Nama tampilan</span>
+            <input type="text" id="profileDisplay" maxlength="40" />
+          </label>
+
+          <label class="field">
+            <span>Bio (opsional)</span>
+            <textarea id="profileBio" maxlength="200"></textarea>
+          </label>
+
+          <p class="settings-error" id="profileError"></p>
+          <div class="settings-actions">
+            <button class="btn-primary" type="submit" id="profileSave">Simpan profil</button>
+          </div>
+          <button type="button" class="link-btn danger" id="logoutBtn">Keluar dari akun</button>
+        </form>
+
+        <!-- ===== BOT ===== -->
+        <form class="settings-form" id="botForm" hidden novalidate>
+          <div class="avatar-edit">
+            <span class="avatar big" id="botAvatarPrev"><svg class="icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg></span>
+            <div class="meta">
+              <button type="button" class="link-btn" id="botAvatarBtn">Ganti avatar bot</button>
+              <span class="hint">Tampil di samping setiap balasan bot.</span>
+            </div>
+            <input type="file" id="botAvatarFile" accept="image/jpeg,image/png,image/webp" hidden />
+          </div>
+
+          <label class="field">
+            <span>Nama bot</span>
+            <input type="text" id="botName" maxlength="40" />
+          </label>
+
+          <label class="field">
+            <span>Personality</span>
+            <textarea id="botPersonality" maxlength="300" placeholder="Mis: Jawab dengan santai, singkat, dan tidak terlalu formal."></textarea>
+          </label>
+
+          <label class="field">
+            <span>System prompt tambahan (opsional)</span>
+            <textarea id="botPrompt" maxlength="1000" placeholder="Instruksi khusus untuk bot…"></textarea>
+          </label>
+
+          <div class="settings-form" style="gap:14px">
+            <label class="field">
+              <span>Bahasa</span>
+              <select id="botLanguage">
+                <option value="id">Indonesia</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Gaya bicara</span>
+              <select id="botStyle">
+                <option value="casual">Santai</option>
+                <option value="neutral">Netral</option>
+                <option value="formal">Formal</option>
+              </select>
+            </label>
+          </div>
+
+          <p class="settings-error" id="botError"></p>
+          <p class="settings-note">Perubahan langsung berlaku tanpa reload halaman.</p>
+          <div class="settings-actions">
+            <button class="btn-primary" type="submit" id="botSave">Simpan bot</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="js/app.js"></script>

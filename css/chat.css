@@ -97,24 +97,29 @@
 }
 
 /* ---------------- Pesan ---------------- */
+/* [Avatar] [Konten] — untuk user & bot, avatar selalu di kiri */
 
 .msg {
-  max-width: min(100%, 48rem);   /* ukuran mengikuti isi, tidak memenuhi layar */
+  max-width: min(100%, 48rem);
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.msg .avatar {
+  margin-top: 18px;              /* sejajar dengan baris pertama teks (di bawah label nama) */
 }
 
 .msg .who {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
 }
 
-.msg .who .icon {
-  width: 14px;
-  height: 14px;
+.msg-content {
+  min-width: 0;                  /* fleksibel tanpa memicu overflow */
 }
 
 .msg .body {
@@ -123,29 +128,35 @@
   font-size: 15px;
 }
 
-/* Pesan user → kanan, dengan bubble */
-.msg.user {
-  align-self: flex-end;
-}
-
-.msg.user .who {
-  justify-content: flex-end;
-}
-
+/* Pesan user: bubble halus, radius moderat (bukan bubble jadul) */
 .msg.user .body {
   background: var(--surface-2);
   border: 1px solid var(--border);
-  padding: 10px 16px;
-  border-radius: 18px 18px 4px 18px;
+  padding: 9px 14px;
+  border-radius: 4px 14px 14px 14px;
 }
 
-/* Pesan AI → kiri, tanpa bubble berat, seperti teks editorial */
-.msg.ai {
-  align-self: flex-start;
-}
-
+/* Pesan bot: teks editorial tanpa bubble berat */
 .msg.ai.error .body {
   color: var(--danger);
+}
+
+@media (max-width: 640px) {
+  .msg {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .msg .avatar {
+    width: 28px;
+    height: 28px;
+    margin-top: 16px;
+  }
+
+  .msg .avatar svg {
+    width: 14px;
+    height: 14px;
+  }
 }
 
 /* Indikator mengetik */
@@ -225,7 +236,10 @@
   outline: 0;
   resize: none;
   line-height: 1.45;
-  max-height: min(160px, 30dvh);  /* auto-resize dibatasi, layout tetap stabil */
+  min-height: 21px;
+  max-height: min(160px, 30dvh);  /* batas tinggi: hanya textarea yang tumbuh */
+  overflow-y: auto;                /* setelah batas → scroll internal */
+  overscroll-behavior: contain;
 }
 
 .send {

@@ -1,0 +1,199 @@
+/* ============================================================
+   Aomi — settings.css
+   Modal pengaturan: tab Profil & Bot. Scroll di dalam kartu,
+   tinggi mengikuti viewport, tanpa memicu layout shift.
+   ============================================================ */
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 3vw, 24px);
+}
+
+.settings-card {
+  width: min(100%, 30rem);
+  max-height: min(88dvh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+
+.settings-head h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.settings-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 4px 16px 12px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.settings-tab {
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.settings-tab.active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;              /* kartu sendiri yang scroll, bukan halaman */
+  overscroll-behavior: contain;
+  padding: 2px 16px 16px;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---------------- Edit avatar ---------------- */
+
+.avatar-edit {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.avatar-edit .meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.avatar-edit .hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.link-btn {
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  padding: 4px 0;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.link-btn.danger {
+  color: var(--danger);
+}
+
+/* ---------------- Field & select ---------------- */
+
+.settings-form .field span {
+  font-size: 12.5px;
+}
+
+.settings-form select {
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: 0;
+  width: 100%;
+  color: var(--text);
+}
+
+.settings-form textarea {
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: 0;
+  resize: vertical;
+  min-height: 60px;
+  max-height: 120px;
+  width: 100%;
+  color: var(--text);
+  overflow-y: auto;
+}
+
+.settings-form input:focus,
+.settings-form textarea:focus,
+.settings-form select:focus {
+  border-color: var(--accent);
+}
+
+.settings-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: -8px;
+}
+
+/* ---------------- Aksi ---------------- */
+
+.settings-actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.btn-primary {
+  flex: 1;
+  padding: 11px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.settings-error {
+  font-size: 13px;
+  color: var(--danger);
+  min-height: 1em;
+}
+
+.settings-ok {
+  font-size: 13px;
+  color: #3ddc84;
+  min-height: 1em;
+}

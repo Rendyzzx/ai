@@ -19,6 +19,7 @@
 
 import crypto from 'node:crypto';
 import { readJson, putJson, updateJson } from './lib/github.js';
+import { DEFAULT_BOT } from './bot.js';
 import { getSession } from './lib/auth.js';
 import { allow, clientIp } from './lib/ratelimit.js';
 
@@ -47,9 +48,23 @@ const HOSTS = {
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0';
 
-const INSTRUCTION =
-  'Kamu adalah Aomi, asisten chat santai berbahasa Indonesia. ' +
-  'Jawab singkat, jelas, dan ramah. Jangan gunakan format markdown berat.';
+const STYLE_PROMPTS = {
+  casual: 'Gaya bicara santai dan ramah, tidak kaku.',
+  neutral: 'Gaya bicara netral, jelas, dan lugas.',
+  formal: 'Gaya bicara formal dan sopan.'
+};
+
+// System prompt dibangun dari customization user (nama, personality, dll.)
+function buildInstruction(bot) {
+  const name = bot.bot_name || 'Aomi';
+  const parts = [`Kamu adalah ${name}, asisten chat.`];
+  parts.push(bot.language === 'en' ? 'Reply in English.' : 'Berbahasa Indonesia.');
+  if (bot.personality) parts.push(bot.personality);
+  parts.push(STYLE_PROMPTS[bot.response_style] || STYLE_PROMPTS.casual);
+  parts.push('Jawab singkat, jelas, dan ramah. Jangan gunakan format markdown berat.');
+  if (bot.system_prompt) parts.push(bot.system_prompt);
+  return parts.join(' ');
+}
 
 // ---------------- Util ----------------
 
@@ -120,7 +135,7 @@ async function geminiGetCookie() {
   return cookie;
 }
 
-async function chatGemini(input) {
+async function chatGemini(input, instruction) {
   let { resumeArray, cookie } = input.geminiSessionId
     ? decodeSessionId(input.geminiSessionId)
     : { resumeArray: null, cookie: null };
@@ -133,7 +148,7 @@ async function chatGemini(input) {
     resumeArray || ['', '', '', null, null, null, null, null, null, ''],
     null, null, null, [1], 1, null, null, 1, 0, null, null, null, null, null,
     [[0]], 1, null, null, null, null, null,
-    ['', '', INSTRUCTION, null, null, null, null, null, 0, null, 1, null, null, null, []],
+    ['', '', instruction, null, null, null, null, null, 0, null, 1, null, null, null, []],
     null, null, 1, null, null, null, null, null, null, null,
     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
     1, null, null, null, null, [1]
@@ -180,14 +195,14 @@ async function chatGemini(input) {
   const text = parsed[4][0][1][0].replace(/\*\*(.+?)\*\*/g, '*$1*');
   return {
     text: text.slice(0, LIMITS.responseMaxLen),
-    geminiSessionId: encodeSessionId(resume, cookie, INSTRUCTION)
+    geminiSessionId: encodeSessionId(resume, cookie, instruction)
   };
 }
 
 // ---------------- PROVIDER 2 — Groq ----------------
 
-async function chatGroq(input, apiKey) {
-  const messages = [{ role: 'system', content: INSTRUCTION }];
+async function chatGroq(input, apiKey, instruction) {
+  const messages = [{ role: 'system', content: instruction }];
   messages.push(
     ...input.messages.slice(-LIMITS.contextSend).map((m) => ({
       role: m.role, content: m.content
@@ -218,7 +233,7 @@ async function chatGroq(input, apiKey) {
 
 // ---------------- PROVIDER 3 — ChatEverywhere ----------------
 
-async function chatEverywhere(input) {
+async function chatEverywhere(input, instruction) {
   const res = await fetchT(
     HOSTS.chatEverywhere,
     {
@@ -237,7 +252,7 @@ async function chatEverywhere(input) {
         messages: input.messages.slice(-LIMITS.contextSend).map((m) => ({
           pluginId: null, content: m.content, fileList: [], role: m.role
         })),
-        prompt: INSTRUCTION,
+        prompt: instruction,
         temperature: 0.5,
         enableConversationPrompt: false
       })
@@ -299,6 +314,11 @@ export default async function handler(req, res) {
     conv.messages = conv.messages.slice(-LIMITS.maxMessages);
   }
 
+  // Customization bot milik user ini (terisolasi per akun)
+  const botFile = await readJson(`bots/${uid}.json`);
+  const bot = { ...DEFAULT_BOT, ...(botFile?.data || {}) };
+  const instruction = buildInstruction(bot);
+
   const input = {
     message,
     geminiSessionId: conv.geminiSessionId,
@@ -311,7 +331,7 @@ export default async function handler(req, res) {
   let newGeminiSid = null;
 
   try {
-    const out = await chatGemini(input);
+    const out = await chatGemini(input, instruction);
     reply = out.text;
     provider = 'gemini';
     newGeminiSid = out.geminiSessionId;
@@ -322,7 +342,7 @@ export default async function handler(req, res) {
   const groqKey = process.env.GROQ_API_KEY;
   if (!reply && groqKey) {
     try {
-      const out = await chatGroq(input, groqKey);
+      const out = await chatGroq(input, groqKey, instruction);
       reply = out.text;
       provider = 'groq';
     } catch (err) {
@@ -332,7 +352,7 @@ export default async function handler(req, res) {
 
   if (!reply) {
     try {
-      const out = await chatEverywhere(input);
+      const out = await chatEverywhere(input, instruction);
       reply = out.text;
       provider = 'chateverywhere';
     } catch (err) {
@@ -376,6 +396,7 @@ export default async function handler(req, res) {
     text: reply,
     conversation_id: conv.conversation_id,
     title: conv.title,
-    provider
+    provider,
+    bot_name: bot.bot_name
   });
 }

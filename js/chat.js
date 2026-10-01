@@ -1,10 +1,12 @@
 /* ============================================================
    Aomi — chat.js
-   Percakapan milik akun: render append-only, virtualisasi DOM,
-   kirim ke /api/chat (server menyimpan riwayat & konteks).
+   Percakapan: render append-only, virtualisasi DOM, avatar user
+   & bot di sisi kiri pesan, kirim ke /api/chat. Nama bot dan
+   profil diambil dari state (settings.js bisa mengubahnya
+   kapan pun tanpa reload).
    ============================================================ */
 
-import { $, raf, sanitizeText, api, apiJson, emit, on } from './app.js';
+import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state } from './app.js';
 
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
@@ -12,7 +14,7 @@ const DOM_CAP = 150;       // node pesan maksimum di DOM
 const els = {};
 let currentId = null;      // conversation_id aktif
 let loading = false;
-let loaded = [];           // pesan yang sedang dirender dari server
+let loaded = [];           // pesan yang sedang dirender
 let firstHidden = 0;
 let nearBottom = true;
 
@@ -35,26 +37,61 @@ export function initChat() {
   on('chat:deleted', ({ id }) => {
     if (currentId === id) resetView();
   });
+  // nama bot / display name berubah → perbarui label yang sudah ada (bukan re-render)
+  on('settings:updated', refreshLabels);
 }
 
 /* ============================================================
    RENDER — append-only, tidak pernah render ulang semua pesan
    ============================================================ */
 
+function labelFor(role) {
+  return role === 'user'
+    ? (state.user.display_name || state.user.username || 'Kamu')
+    : (state.bot.bot_name || 'Aomi');
+}
+
+/** [Avatar] [Konten] untuk user & bot. */
 function messageNode(role, content, isError) {
   const msg = document.createElement('div');
   msg.className = 'msg ' + (role === 'user' ? 'user' : 'ai') + (isError ? ' error' : '');
 
+  // Avatar di kiri (32px desktop / 28px mobile, via CSS)
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  if (role === 'user') {
+    renderAvatar(avatar, state.user.avatar, 'user');
+  } else {
+    renderAvatar(avatar, state.bot.bot_avatar, 'logo');
+  }
+  msg.appendChild(avatar);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-content';
+
   const who = document.createElement('div');
   who.className = 'who';
-  who.textContent = role === 'user' ? 'Kamu' : 'Aomi';
+  who.dataset.role = role === 'user' ? 'user' : 'assistant';
+  who.textContent = labelFor(role);
 
   const body = document.createElement('div');
   body.className = 'body';
   body.textContent = content;
 
-  msg.append(who, body);
+  wrap.append(who, body);
+  msg.appendChild(wrap);
   return msg;
+}
+
+/** Perbarui label nama yang sudah dirender (murah, tanpa re-render). */
+function refreshLabels() {
+  for (const who of els.column.querySelectorAll('.who')) {
+    const role = who.dataset.role;
+    who.textContent = role === 'user'
+      ? (state.user.display_name || state.user.username)
+      : state.bot.bot_name;
+  }
 }
 
 function appendMessage(role, content, isError = false) {
@@ -78,7 +115,9 @@ function resetView() {
   currentId = null;
   els.earlierWrap.hidden = true;
   els.welcome.hidden = false;
-  els.title.textContent = 'Chat baru';
+  // header: nama bot saat belum ada percakapan (default, mudah diganti settings)
+  els.title.textContent = state.bot.bot_name || 'Aomi';
+  els.title.dataset.default = '1';
   emit('chat:activated', { id: null });
 }
 
@@ -88,7 +127,8 @@ async function loadConversation(id) {
     const conv = data.conversation;
     currentId = conv.conversation_id;
     loaded = conv.messages || [];
-    els.title.textContent = conv.title || 'Chat baru';
+    els.title.textContent = conv.title || labelFor('assistant');
+    els.title.dataset.default = '0';
 
     els.column.querySelectorAll('.msg').forEach((n) => n.remove());
     firstHidden = Math.max(0, loaded.length - RENDER_BATCH);
@@ -129,7 +169,7 @@ function updateEarlierButton() {
 }
 
 /* ============================================================
-   SCROLL
+   SCROLL — hanya area chat yang scroll; body terkunci (main.css)
    ============================================================ */
 
 function scrollToBottom(smooth) {
@@ -153,6 +193,8 @@ function bindScroll() {
     if (e.target.id === 'loadEarlierBtn') prependBatch();
   });
 
+  // Keyboard mobile: setelah viewport menyusut (visualViewport di app.js
+  // menyesuaikan --app-h), pertahankan posisi baca bila sedang di bawah.
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', raf(() => {
       if (nearBottom) scrollToBottom(false);
@@ -161,7 +203,7 @@ function bindScroll() {
 }
 
 /* ============================================================
-   KOMPOSER
+   KOMPOSER — tetap di bawah Main Chat, tidak ikut scroll
    ============================================================ */
 
 function bindComposer() {
@@ -213,7 +255,7 @@ async function submit() {
   els.input.style.height = 'auto';
   els.input.focus();
 
-  // Indikator mengetik
+  // Indikator mengetik (dengan avatar bot)
   const typing = messageNode('assistant', '');
   typing.classList.add('typing');
   typing.querySelector('.body').innerHTML =
@@ -236,7 +278,10 @@ async function submit() {
     if (res.ok && data?.text) {
       ok = true;
       currentId = data.conversation_id || currentId;
-      els.title.textContent = data.title || els.title.textContent;
+      if (els.title.dataset.default === '1') {
+        els.title.textContent = data.title || els.title.textContent;
+        els.title.dataset.default = '0';
+      }
       typing.remove();
       appendMessage('assistant', data.text, false);
       emit('chat:updated');   // sidebar refresh (judul/urutan baru)

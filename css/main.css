@@ -46,7 +46,10 @@ body {
   font-family: var(--font);
   font-size: 15px;
   line-height: 1.5;
-  overflow: hidden;              /* layout app-shell, tanpa horizontal scroll */
+  overflow: hidden;              /* body TIDAK pernah scroll: hanya area chat */
+  overscroll-behavior: none;
+  position: fixed;               /* cegah iOS rubber-band menggeser layout */
+  inset: 0;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -103,7 +106,7 @@ input, textarea {
    ============================================================ */
 
 .app {
-  height: 100dvh;
+  height: var(--app-h, 100dvh);
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
 }
@@ -117,7 +120,7 @@ input, textarea {
 
 @media (max-width: 1023px) {
   .app {
-    display: block;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -127,4 +130,54 @@ input, textarea {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* ============================================================
+   Avatar (dipakai di pesan, sidebar, dan pengaturan)
+   ============================================================ */
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;             /* cover: potong rapi, tidak gepeng */
+  display: block;
+}
+
+.avatar svg {
+  width: 16px;
+  height: 16px;
+}
+
+.avatar.big {
+  width: 64px;
+  height: 64px;
+}
+
+.avatar.big svg {
+  width: 26px;
+  height: 26px;
+}
+
+.avatar.small {
+  width: 28px;
+  height: 28px;
+}
+
+.avatar.small svg {
+  width: 14px;
+  height: 14px;
 }
