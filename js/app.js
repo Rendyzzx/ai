@@ -169,7 +169,16 @@ async function boot() {
     Object.assign(state.bot, botCfg.bot);
   } catch (err) {
     if (err.message === 'unauthorized') return; // sudah redirect
-    document.body.textContent = 'Tidak bisa menghubungi server. Muat ulang halaman.';
+    // Jangan hapus seluruh <body> (membuat halaman terasa beku/tanpa
+    // scroll) — tampilkan pesan ringkas + tombol coba lagi, tetap bisa disentuh.
+    document.body.innerHTML = `
+      <div style="min-height:100dvh;display:grid;place-items:center;padding:24px;text-align:center;gap:12px;font-family:${getComputedStyle(document.documentElement).fontFamily || 'sans-serif'}">
+        <div>
+          <p style="margin-bottom:14px;color:#9b9ba4;font-size:14px;">Tidak bisa menghubungi server. Periksa koneksimu.</p>
+          <button id="retryBoot" style="padding:10px 20px;border-radius:10px;background:#6f7dff;color:#fff;border:0;font-size:14px;cursor:pointer;">Coba lagi</button>
+        </div>
+      </div>`;
+    document.getElementById('retryBoot').addEventListener('click', () => location.reload());
     return;
   }
 

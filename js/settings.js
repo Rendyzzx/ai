@@ -112,7 +112,7 @@ function bindOnce() {
   // Personality
   $('#botPersonality').addEventListener('input', () => {
     markDirty('personality');
-    $('#personalityCounter').textContent = $('#botPersonality').value.length + '/300';
+    $('#personalityCounter').textContent = $('#botPersonality').value.length + '/3000';
     // diedit manual → jadi custom
     setPreset('custom', { silent: true });
   });
@@ -198,7 +198,7 @@ function fillAll() {
 
   // Personality
   $('#botPersonality').value = state.bot.personality || '';
-  $('#personalityCounter').textContent = (state.bot.personality || '').length + '/300';
+  $('#personalityCounter').textContent = (state.bot.personality || '').length + '/3000';
   $('#botPrompt').value = state.bot.system_prompt || '';
   $('#promptCounter').textContent = (state.bot.system_prompt || '').length + '/1000';
   setPreset(state.bot.personality_preset || 'friendly', { silent: true });
@@ -244,7 +244,7 @@ function applyPreset(preset) {
   setPreset(preset);
   if (preset !== 'custom') {
     $('#botPersonality').value = PRESET_TEXT[preset];
-    $('#personalityCounter').textContent = PRESET_TEXT[preset].length + '/300';
+    $('#personalityCounter').textContent = PRESET_TEXT[preset].length + '/3000';
   }
   markDirty('personality');
 }

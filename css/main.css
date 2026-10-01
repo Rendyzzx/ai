@@ -37,7 +37,7 @@ html {
 }
 
 html, body {
-  height: 100%;
+  height: 100%;    /* fallback: browser lama yang tak kenal dvh/svh tetap punya tinggi pasti */
 }
 
 body {
@@ -106,7 +106,9 @@ input, textarea {
    ============================================================ */
 
 .app {
-  height: var(--app-h, 100dvh);
+  height: 100vh;                   /* fallback universal: browser/WebView lama yang tak kenal dvh */
+  height: 100dvh;                  /* lebih akurat: ikut UI browser mobile yang muncul/hilang */
+  height: var(--app-h, 100dvh);    /* paling akurat: disinkronkan JS ke visualViewport (keyboard) */
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
 }
