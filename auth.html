@@ -11,78 +11,131 @@
   <link rel="stylesheet" href="css/auth.css" />
 </head>
 <body>
-  <main class="auth-wrap">
-    <section class="auth-card" aria-labelledby="authHeading">
-      <header class="auth-head">
-        <svg class="icon brand-icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg>
-        <h1 id="authHeading">Aomi</h1>
-        <p id="authSubtitle">Masuk untuk melanjutkan percakapanmu.</p>
-      </header>
-
-      <div class="auth-tabs" role="tablist">
-        <button class="auth-tab active" id="tabLogin" role="tab" aria-selected="true" data-panel="login">Masuk</button>
-        <button class="auth-tab" id="tabRegister" role="tab" aria-selected="false" data-panel="register">Daftar</button>
+  <main class="auth-shell">
+    <!-- ============ PANEL BRAND (desktop) ============ -->
+    <section class="auth-brand" aria-hidden="true">
+      <div class="auth-brand-inner">
+        <svg class="icon brand-mark"><use href="components/icons.svg#logo" /></svg>
+        <h1>Aomi</h1>
+        <p>Asisten AI pribadimu. Ngobrol, tanya apa saja,<br />dan atur kepribadian bot sesukamu.</p>
+        <div class="auth-visual">
+          <div class="mock-msg bot">
+            <span>Hai! Ada yang bisa dibantu hari ini?</span>
+          </div>
+          <div class="mock-msg user">
+            <span>Jelaskan cara kerja AI singkat saja</span>
+          </div>
+          <div class="mock-msg bot">
+            <span>Tentu! AI belajar pola dari data, lalu memprediksi jawaban terbaik untukmu.</span>
+          </div>
+        </div>
       </div>
+    </section>
 
-      <!-- ============ LOGIN ============ -->
-      <form class="auth-panel" id="formLogin" data-panel-body="login" novalidate>
-        <label class="field">
-          <span>Email atau username</span>
-          <input type="text" name="identifier" autocomplete="username" required />
-        </label>
-        <label class="field">
-          <span>Password</span>
-          <input type="password" name="password" autocomplete="current-password" required />
-        </label>
-        <label class="check">
-          <input type="checkbox" name="remember" />
-          <span>Ingat saya (30 hari)</span>
-        </label>
+    <!-- ============ PANEL FORM ============ -->
+    <section class="auth-panel-wrap">
+      <div class="auth-panel">
+        <header class="auth-head">
+          <svg class="icon auth-mobile-logo"><use href="components/icons.svg#logo" /></svg>
+          <h2 id="authHeading">Selamat datang kembali</h2>
+          <p id="authSubtitle">Masuk untuk melanjutkan percakapanmu.</p>
+        </header>
 
-        <div class="captcha-row">
-          <span id="captchaQLogin" class="captcha-q">Memuat soal…</span>
-          <input type="text" id="captchaALogin" inputmode="numeric" autocomplete="off"
-                 placeholder="Jawaban" aria-label="Jawaban verifikasi" />
-          <button type="button" class="captcha-refresh" id="refreshLogin" aria-label="Soal baru">
-            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#chevron-down" /></svg>
-          </button>
+        <div class="auth-tabs" role="tablist">
+          <button class="auth-tab active" id="tabLogin" data-panel="login" aria-selected="true">Masuk</button>
+          <button class="auth-tab" id="tabRegister" data-panel="register" aria-selected="false">Buat akun</button>
         </div>
 
-        <button class="auth-submit" type="submit">Masuk</button>
-        <p class="auth-error" id="errLogin" hidden></p>
-      </form>
+        <!-- ===== LOGIN ===== -->
+        <form class="auth-form" id="formLogin" novalidate>
+          <label class="auth-field">
+            <span>Email atau username</span>
+            <input type="text" name="identifier" autocomplete="username" required />
+          </label>
 
-      <!-- ============ REGISTER ============ -->
-      <form class="auth-panel" id="formRegister" data-panel-body="register" hidden novalidate>
-        <label class="field">
-          <span>Username</span>
-          <input type="text" name="username" autocomplete="username" maxlength="20"
-                 placeholder="3-20 karakter" required />
-        </label>
-        <label class="field">
-          <span>Email</span>
-          <input type="email" name="email" autocomplete="email" required />
-        </label>
-        <label class="field">
-          <span>Password</span>
-          <input type="password" name="password" autocomplete="new-password"
-                 placeholder="Minimal 8 karakter" required />
-        </label>
+          <label class="auth-field">
+            <span>Password</span>
+            <span class="pw-wrap">
+              <input type="password" name="password" id="loginPw" autocomplete="current-password" required />
+              <button type="button" class="pw-toggle" data-target="loginPw" aria-label="Tampilkan password">
+                <svg class="icon"><use href="components/icons.svg#eye" /></svg>
+              </button>
+            </span>
+          </label>
 
-        <div class="captcha-row">
-          <span id="captchaQRegister" class="captcha-q">Memuat soal…</span>
-          <input type="text" id="captchaARegister" inputmode="numeric" autocomplete="off"
-                 placeholder="Jawaban" aria-label="Jawaban verifikasi" />
-          <button type="button" class="captcha-refresh" id="refreshRegister" aria-label="Soal baru">
-            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#chevron-down" /></svg>
-          </button>
-        </div>
+          <label class="auth-check">
+            <input type="checkbox" name="remember" />
+            <span>Ingat saya selama 30 hari</span>
+          </label>
 
-        <button class="auth-submit" type="submit">Buat akun</button>
-        <p class="auth-error" id="errRegister" hidden></p>
-      </form>
+          <div class="verify">
+            <div class="verify-label">Verifikasi</div>
+            <div class="verify-row">
+              <span class="verify-num" id="capNumLogin">····</span>
+              <input type="text" id="capAnsLogin" inputmode="numeric" maxlength="4"
+                     autocomplete="off" placeholder="Ketik angka" aria-label="Ketik angka verifikasi" />
+              <button type="button" class="verify-refresh" data-which="login" aria-label="Angka baru">
+                <svg class="icon"><use href="components/icons.svg#chevron-down" /></svg>
+              </button>
+            </div>
+          </div>
 
-      <p class="auth-note">Verifikasi manusia tidak mengirim data ke layanan luar.</p>
+          <button class="auth-submit" id="loginSubmit" type="submit">Masuk</button>
+          <p class="auth-error" id="errLogin" hidden></p>
+        </form>
+
+        <!-- ===== REGISTER ===== -->
+        <form class="auth-form" id="formRegister" hidden novalidate>
+          <label class="auth-field">
+            <span>Username</span>
+            <input type="text" name="username" autocomplete="username" maxlength="20"
+                   placeholder="3-20 karakter" required />
+          </label>
+
+          <label class="auth-field">
+            <span>Email</span>
+            <input type="email" name="email" autocomplete="email" required />
+          </label>
+
+          <label class="auth-field">
+            <span>Password</span>
+            <span class="pw-wrap">
+              <input type="password" name="password" id="regPw" autocomplete="new-password"
+                     placeholder="Minimal 8 karakter" required />
+              <button type="button" class="pw-toggle" data-target="regPw" aria-label="Tampilkan password">
+                <svg class="icon"><use href="components/icons.svg#eye" /></svg>
+              </button>
+            </span>
+          </label>
+
+          <label class="auth-field">
+            <span>Konfirmasi password</span>
+            <span class="pw-wrap">
+              <input type="password" id="regPw2" autocomplete="new-password" required />
+              <button type="button" class="pw-toggle" data-target="regPw2" aria-label="Tampilkan password">
+                <svg class="icon"><use href="components/icons.svg#eye" /></svg>
+              </button>
+            </span>
+          </label>
+
+          <div class="verify">
+            <div class="verify-label">Verifikasi</div>
+            <div class="verify-row">
+              <span class="verify-num" id="capNumRegister">····</span>
+              <input type="text" id="capAnsRegister" inputmode="numeric" maxlength="4"
+                     autocomplete="off" placeholder="Ketik angka" aria-label="Ketik angka verifikasi" />
+              <button type="button" class="verify-refresh" data-which="register" aria-label="Angka baru">
+                <svg class="icon"><use href="components/icons.svg#chevron-down" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <button class="auth-submit" id="registerSubmit" type="submit">Buat akun</button>
+          <p class="auth-error" id="errRegister" hidden></p>
+        </form>
+
+        <p class="auth-note">Sesi aman dengan cookie terenkripsi. Foto profil dan riwayat tersimpan di akunmu.</p>
+      </div>
     </section>
   </main>
 

@@ -11,5 +11,5 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method tidak diizinkan' });
   }
   const c = makeCaptcha();
-  return res.status(200).json({ question: c.question, token: c.token });
+  return res.status(200).json({ number: c.number, token: c.token });
 }

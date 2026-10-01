@@ -1,98 +1,173 @@
 /* ============================================================
    Aomi — settings.css
-   Modal pengaturan: tab Profil & Bot. Scroll di dalam kartu,
-   tinggi mengikuti viewport, tanpa memicu layout shift.
+   Settings view: navigasi kategori (sidebar desktop / list mobile),
+   section card, preset card, segmented control, save state.
+   Transisi ringan 150-200ms, hormat prefers-reduced-motion.
    ============================================================ */
 
-.settings-backdrop {
+.settings-view {
   position: fixed;
   inset: 0;
-  z-index: 50;
-  background: rgba(0, 0, 0, 0.55);
-  display: grid;
-  place-items: center;
-  padding: clamp(12px, 3vw, 24px);
+  z-index: 60;
+  background: var(--bg);
+  overflow: hidden;
+  display: none;
 }
 
-.settings-card {
-  width: min(100%, 30rem);
-  max-height: min(88dvh, 640px);
+.settings-view.open {
+  display: block;
+  animation: viewIn 160ms ease;
+}
+
+@keyframes viewIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.settings-shell {
+  height: 100%;
+  max-width: 62rem;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+/* ---------------- Navigasi kategori ---------------- */
+
+.settings-nav {
+  border-right: 1px solid var(--border);
+  padding: 16px 10px;
   display: flex;
   flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: var(--shadow-1);
+  gap: 14px;
+  min-height: 0;
 }
 
-.settings-head {
+.settings-nav-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 10px;
+  gap: 10px;
+  padding: 2px 6px;
 }
 
-.settings-head h2 {
-  font-size: 16px;
+.settings-nav-head h2 {
+  flex: 1;
+  font-size: 15px;
   font-weight: 600;
 }
 
-.settings-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  margin: 4px 16px 12px;
-  padding: 4px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+.settings-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.settings-tab {
-  padding: 8px;
-  border-radius: 8px;
-  font-size: 13.5px;
-  font-weight: 500;
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  min-height: 44px;               /* touch target */
+  border-radius: 10px;
+  font-size: 14px;
   color: var(--text-muted);
+  text-align: left;
   transition: background 0.15s, color 0.15s;
 }
 
-.settings-tab.active {
+.settings-nav-item:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.settings-nav-item.active {
   background: var(--surface-2);
   color: var(--text);
 }
 
-.settings-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;              /* kartu sendiri yang scroll, bukan halaman */
-  overscroll-behavior: contain;
-  padding: 2px 16px 16px;
+.settings-nav-item .icon {
+  width: 17px;
+  height: 17px;
 }
 
-.settings-form {
+/* ---------------- Konten ---------------- */
+
+.settings-main {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px clamp(16px, 4vw, 32px) 32px;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-/* ---------------- Edit avatar ---------------- */
+.settings-back {
+  display: none;
+}
+
+.settings-page {
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 34rem;
+  width: 100%;
+  margin: 0 auto;
+  animation: viewIn 150ms ease;
+}
+
+.settings-page.active {
+  display: flex;
+}
+
+.page-head h3 {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.page-head .page-desc {
+  margin-top: 2px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+/* ---------------- Section card ---------------- */
+
+.section-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.card-desc {
+  margin-top: -8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ---------------- Avatar edit ---------------- */
 
 .avatar-edit {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
 }
 
 .avatar-edit .meta {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -102,98 +177,389 @@
 }
 
 .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   align-self: flex-start;
   font-size: 13px;
   font-weight: 500;
   color: var(--accent);
-  padding: 4px 0;
+  min-height: 32px;
 }
 
 .link-btn:hover {
   text-decoration: underline;
 }
 
+.link-btn .icon {
+  width: 15px;
+  height: 15px;
+}
+
 .link-btn.danger {
   color: var(--danger);
 }
 
-/* ---------------- Field & select ---------------- */
+/* ---------------- Field ---------------- */
 
-.settings-form .field span {
-  font-size: 12.5px;
+.form-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.settings-form select {
-  padding: 10px 12px;
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field > span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.field input,
+.field textarea,
+.field select {
+  padding: 11px 12px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   outline: 0;
   width: 100%;
   color: var(--text);
+  font-size: 14px;
+  transition: border-color 0.15s;
 }
 
-.settings-form textarea {
-  padding: 10px 12px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  outline: 0;
+.field textarea {
   resize: vertical;
-  min-height: 60px;
-  max-height: 120px;
-  width: 100%;
-  color: var(--text);
+  min-height: 52px;
+  max-height: 160px;
   overflow-y: auto;
 }
 
-.settings-form input:focus,
-.settings-form textarea:focus,
-.settings-form select:focus {
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
   border-color: var(--accent);
 }
 
-.settings-note {
+.field-hint {
   font-size: 12px;
   color: var(--text-muted);
-  margin-top: -8px;
 }
 
-/* ---------------- Aksi ---------------- */
+.counter {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
-.settings-actions {
+/* ---------------- Preview bot ---------------- */
+
+.bot-preview {
   display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.bp-name {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.bp-desc {
+  margin-top: 2px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+/* ---------------- Sub-navigasi bot ---------------- */
+
+.subnav {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.subnav-item {
+  flex: 1;
+  padding: 9px 10px;
+  min-height: 40px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.subnav-item.active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.bot-page {
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bot-page.active {
+  display: flex;
+  animation: viewIn 150ms ease;
+}
+
+/* ---------------- Preset card ---------------- */
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  padding-top: 4px;
+}
+
+.preset-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: left;
+  min-height: 44px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.preset-card:hover {
+  border-color: var(--accent);
+}
+
+.preset-card.active {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.preset-card strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.preset-card span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---------------- Segmented control ---------------- */
+
+.seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.seg-btn {
+  padding: 9px 10px;
+  min-height: 40px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.seg-btn.active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ---------------- Save row & status ---------------- */
+
+.save-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.save-status {
+  font-size: 13px;
+  color: var(--text-muted);
+  min-height: 1em;
+}
+
+.save-status.ok {
+  color: #3ddc84;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.save-status.err {
+  color: var(--danger);
 }
 
 .btn-primary {
-  flex: 1;
-  padding: 11px;
+  padding: 11px 20px;
   border-radius: 10px;
   background: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
   font-size: 14px;
+  min-height: 44px;
+  transition: opacity 0.15s;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   opacity: 0.9;
 }
 
 .btn-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 
-.settings-error {
-  font-size: 13px;
-  color: var(--danger);
-  min-height: 1em;
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 16px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
 }
 
-.settings-ok {
+.btn-ghost:hover {
+  background: var(--surface-2);
+  border-color: var(--danger);
+}
+
+.btn-ghost.danger {
+  color: var(--danger);
+}
+
+.btn-ghost .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------------- Akun ---------------- */
+
+.account-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 24px;
+}
+
+.account-row + .account-row {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.account-label {
   font-size: 13px;
-  color: #3ddc84;
-  min-height: 1em;
+  color: var(--text-muted);
+}
+
+.account-value {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   MOBILE: nav jadi list/card, halaman dibuka dengan Back
+   ============================================================ */
+
+@media (max-width: 859px) {
+  .settings-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-nav {
+    border-right: 0;
+    padding: 12px;
+  }
+
+  .settings-nav-head {
+    padding: 4px 2px 10px;
+  }
+
+  .settings-nav-list {
+    gap: 8px;
+  }
+
+  .settings-nav-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 14px 14px;
+    font-weight: 500;
+  }
+
+  /* Awal: tampilkan list kategori, konten disembunyikan */
+  .settings-main {
+    display: none;
+    padding-top: 12px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .settings-shell.page-open .settings-nav {
+    display: none;
+  }
+
+  .settings-shell.page-open .settings-main {
+    display: flex;
+  }
+
+  .settings-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  .settings-back .icon {
+    width: 17px;
+    height: 17px;
+  }
+
+  .preset-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-view,
+  .settings-page,
+  .bot-page,
+  .settings-nav-item,
+  .seg-btn,
+  .subnav-item,
+  .preset-card {
+    animation: none !important;
+    transition: none !important;
+  }
 }

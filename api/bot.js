@@ -1,14 +1,15 @@
 // ============================================================
 // Aomi — api/bot.js
-// Customization bot per user: nama, avatar, personality,
-// system prompt, bahasa, gaya bicara.
+// Customization bot per user: identitas, personality, perilaku.
 //
-// Data: bots/<user_id>.json — sepenuhnya terisolasi per akun
-// (user_id hanya dari session, tidak pernah dari request body).
+// Data: bots/<user_id>.json — terisolasi per akun (user_id hanya
+// dari session, tidak pernah dari request body).
 //
-// GET → konfigurasi bot user
-// PUT → { bot_name?, bot_avatar?, personality?, system_prompt?,
-//         language?, response_style? }
+// GET → konfigurasi bot user (merge dengan default)
+// PUT → field yang berubah saja:
+//   { bot_name?, bot_description?, bot_avatar?, personality_preset?,
+//     personality?, system_prompt?, language?, response_length?,
+//     response_style? }
 // ============================================================
 
 import { readJson, putJson } from './lib/github.js';
@@ -19,15 +20,20 @@ const AVATAR_MAX_BYTES = 200 * 1024;
 
 export const DEFAULT_BOT = {
   bot_name: 'Aomi',
+  bot_description: 'Asisten AI pribadimu.',
   bot_avatar: null,
+  personality_preset: 'friendly',
   personality: '',
   system_prompt: '',
-  language: 'id',
-  response_style: 'casual'
+  language: 'auto',
+  response_length: 'balanced',
+  response_style: 'casual'          // nada bicara: casual | neutral | formal
 };
 
-const LANGUAGES = ['id', 'en'];
+const LANGUAGES = ['auto', 'id', 'en'];
+const LENGTHS = ['concise', 'balanced', 'detailed'];
 const STYLES = ['casual', 'neutral', 'formal'];
+const PRESETS = ['friendly', 'professional', 'creative', 'custom'];
 
 function sanitize(str, maxLen) {
   return String(str ?? '')
@@ -84,10 +90,21 @@ export default async function handler(req, res) {
       next.bot_name = name;
     }
 
+    if (Object.prototype.hasOwnProperty.call(body, 'bot_description')) {
+      next.bot_description = sanitize(body.bot_description, 120);
+    }
+
     if (Object.prototype.hasOwnProperty.call(body, 'bot_avatar')) {
       const err = validateAvatar(body.bot_avatar);
       if (err) return res.status(400).json({ error: err });
       next.bot_avatar = body.bot_avatar || null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'personality_preset')) {
+      if (!PRESETS.includes(body.personality_preset)) {
+        return res.status(400).json({ error: 'Preset personality tidak valid.' });
+      }
+      next.personality_preset = body.personality_preset;
     }
 
     if (Object.prototype.hasOwnProperty.call(body, 'personality')) {
@@ -105,9 +122,16 @@ export default async function handler(req, res) {
       next.language = body.language;
     }
 
+    if (Object.prototype.hasOwnProperty.call(body, 'response_length')) {
+      if (!LENGTHS.includes(body.response_length)) {
+        return res.status(400).json({ error: 'Panjang jawaban tidak valid.' });
+      }
+      next.response_length = body.response_length;
+    }
+
     if (Object.prototype.hasOwnProperty.call(body, 'response_style')) {
       if (!STYLES.includes(body.response_style)) {
-        return res.status(400).json({ error: 'Gaya bicara tidak valid.' });
+        return res.status(400).json({ error: 'Nada bicara tidak valid.' });
       }
       next.response_style = body.response_style;
     }

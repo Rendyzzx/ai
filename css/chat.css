@@ -125,7 +125,7 @@
 .msg .body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;        /* URL panjang tidak merusak layout */
-  font-size: 15px;
+  font-size: var(--chat-fs, 15px); /* diatur dari Pengaturan > Tampilan */
 }
 
 /* Pesan user: bubble halus, radius moderat (bukan bubble jadul) */

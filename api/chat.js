@@ -48,20 +48,30 @@ const HOSTS = {
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0';
 
-const STYLE_PROMPTS = {
-  casual: 'Gaya bicara santai dan ramah, tidak kaku.',
-  neutral: 'Gaya bicara netral, jelas, dan lugas.',
-  formal: 'Gaya bicara formal dan sopan.'
+const TONE_PROMPTS = {
+  casual: 'Gunakan nada santai dan ramah.',
+  neutral: 'Gunakan nada netral dan lugas.',
+  formal: 'Gunakan nada formal dan sopan.'
+};
+
+const LENGTH_PROMPTS = {
+  concise: 'Jawab sangat singkat dan langsung ke inti.',
+  balanced: 'Jawab ringkas dan jelas.',
+  detailed: 'Jawab lengkap dan terstruktur.'
 };
 
 // System prompt dibangun dari customization user (nama, personality, dll.)
 function buildInstruction(bot) {
   const name = bot.bot_name || 'Aomi';
   const parts = [`Kamu adalah ${name}, asisten chat.`];
-  parts.push(bot.language === 'en' ? 'Reply in English.' : 'Berbahasa Indonesia.');
+  if (bot.bot_description) parts.push(bot.bot_description);
+  if (bot.language === 'en') parts.push('Always reply in English.');
+  else if (bot.language === 'id') parts.push('Selalu berbahasa Indonesia.');
+  else parts.push('Balas menggunakan bahasa yang dipakai pengguna.');
   if (bot.personality) parts.push(bot.personality);
-  parts.push(STYLE_PROMPTS[bot.response_style] || STYLE_PROMPTS.casual);
-  parts.push('Jawab singkat, jelas, dan ramah. Jangan gunakan format markdown berat.');
+  parts.push(TONE_PROMPTS[bot.response_style] || TONE_PROMPTS.casual);
+  parts.push(LENGTH_PROMPTS[bot.response_length] || LENGTH_PROMPTS.balanced);
+  parts.push('Jangan gunakan format markdown berat.');
   if (bot.system_prompt) parts.push(bot.system_prompt);
   return parts.join(' ');
 }

@@ -148,18 +148,12 @@ function decryptJSON(token) {
 }
 
 export function makeCaptcha() {
-  const ops = ['+', '-', '×'];
-  const op = ops[crypto.randomInt(0, ops.length)];
-  let a, b;
-  switch (op) {
-    case '+': a = crypto.randomInt(2, 50); b = crypto.randomInt(2, 49); break;
-    case '-': a = crypto.randomInt(10, 99); b = crypto.randomInt(2, 9); break;
-    default:  a = crypto.randomInt(2, 9);  b = crypto.randomInt(2, 9);
-  }
-  const answer = op === '+' ? a + b : op === '-' ? a - b : a * b;
+  // Angka acak 4 digit: ditampilkan ke user, jawaban tetap terenkripsi
+  // di token → bot yang tidak me-render halaman tidak bisa menjawab.
+  const number = String(crypto.randomInt(1000, 10000));
   return {
-    question: `Berapa ${a} ${op} ${b}?`,
-    token: encryptJSON({ a: answer, exp: Date.now() + CAPTCHA_TTL_MS })
+    number,
+    token: encryptJSON({ a: Number(number), exp: Date.now() + CAPTCHA_TTL_MS })
   };
 }
 

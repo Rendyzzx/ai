@@ -114,7 +114,14 @@ function bindViewport() {
 
 import { initSidebar } from './sidebar.js';
 import { initChat } from './chat.js';
-import { initSettings } from './settings.js';
+
+// Settings dimuat LAZY: baru di-import saat pertama kali dibuka
+// (UI chat tetap ringan, tanpa chunk kecil berlebihan)
+let settingsMod = null;
+async function openSettings() {
+  if (!settingsMod) settingsMod = await import('./settings.js');
+  settingsMod.openSettings();
+}
 
 async function boot() {
   bindViewport();
@@ -144,10 +151,18 @@ async function boot() {
   renderAvatar($('#sidebarAvatar'), state.user.avatar, 'user');
   $('#brandName').textContent = state.bot.bot_name;
   $('#chatTitle').textContent = state.bot.bot_name;
+  $('#chatTitle').dataset.default = '1';
+
+  // Tampilan: ukuran font tersimpan lokal (tanpa fetch)
+  try {
+    const fs = localStorage.getItem('aomi.fontSize');
+    if (fs) document.documentElement.style.setProperty('--chat-fs', fs + 'px');
+  } catch { /* private mode */ }
 
   initSidebar();
   initChat();
-  initSettings();
+
+  $('#settingsBtn').addEventListener('click', openSettings);
 }
 
 if (document.readyState === 'loading') {
