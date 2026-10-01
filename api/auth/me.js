@@ -1,6 +1,7 @@
 // GET /api/auth/me → info user dari session cookie (untuk restore login)
 import { getSession } from '../lib/auth.js';
 import { readJson } from '../lib/github.js';
+import { APP_VERSION } from '../lib/version.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -17,6 +18,7 @@ export default async function handler(req, res) {
 
   const u = userFile.data;
   return res.status(200).json({
-    user: { id: u.id, username: u.username, email: u.email }
+    user: { id: u.id, username: u.username, email: u.email },
+    app_version: APP_VERSION
   });
 }

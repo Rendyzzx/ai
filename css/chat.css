@@ -97,7 +97,8 @@
 }
 
 /* ---------------- Pesan ---------------- */
-/* [Avatar] [Konten] — untuk user & bot, avatar selalu di kiri */
+/* Bot: [Avatar][Nama + Konten] rata kiri.
+   User: [Konten][Avatar] rata kanan. */
 
 .msg {
   max-width: min(100%, 48rem);
@@ -107,6 +108,7 @@
   align-items: start;
 }
 
+/* --- Bot (kiri) --- */
 .msg .avatar {
   margin-top: 18px;              /* sejajar dengan baris pertama teks (di bawah label nama) */
 }
@@ -128,12 +130,28 @@
   font-size: var(--chat-fs, 15px); /* diatur dari Pengaturan > Tampilan */
 }
 
-/* Pesan user: bubble halus, radius moderat (bukan bubble jadul) */
+/* --- User (kanan): konten dulu, avatar di kanan --- */
+.msg.user {
+  grid-template-columns: minmax(0, 1fr) 32px;
+  margin-left: auto;
+  max-width: min(85%, 48rem);      /* bubble tidak memenuhi layar */
+}
+
+.msg.user .msg-content {
+  justify-self: end;
+}
+
 .msg.user .body {
+  width: fit-content;
+  max-width: 100%;
   background: var(--surface-2);
   border: 1px solid var(--border);
   padding: 9px 14px;
-  border-radius: 4px 14px 14px 14px;
+  border-radius: 14px 4px 14px 14px;
+}
+
+.msg.user .avatar {
+  margin-top: 2px;                /* sejajar dengan bubble */
 }
 
 /* Pesan bot: teks editorial tanpa bubble berat */
@@ -147,10 +165,19 @@
     gap: 8px;
   }
 
+  .msg.user {
+    grid-template-columns: minmax(0, 1fr) 28px;
+    max-width: 88%;
+  }
+
   .msg .avatar {
     width: 28px;
     height: 28px;
     margin-top: 16px;
+  }
+
+  .msg.user .avatar {
+    margin-top: 2px;
   }
 
   .msg .avatar svg {

@@ -431,6 +431,33 @@
   cursor: default;
 }
 
+.btn-primary.saving:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+/* Loading indicator halus: titik kecil berdenyut di samping teks */
+.btn-primary.saving::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 8px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: currentColor;
+  animation: savePulse 0.9s ease-in-out infinite;
+}
+
+@keyframes savePulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary.saving::after { animation: none; }
+}
+
 .btn-ghost {
   display: inline-flex;
   align-items: center;

@@ -54,6 +54,15 @@ export function renderAvatar(el, dataUrl, fallbackIcon) {
   }
 }
 
+/** Bersihkan seluruh state/cache klien milik aplikasi (prefiks aomi.*). */
+export function resetClientState() {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith('aomi.')) localStorage.removeItem(k);
+    }
+  } catch { /* private mode */ }
+}
+
 // ---------------- Event bus antar modul ----------------
 
 const bus = new EventTarget();
@@ -138,6 +147,24 @@ async function boot() {
     const profile = await profileRes.json();
     const botCfg = await botRes.json();
 
+    // ---------- Deployment check (tanpa polling) ----------
+    // Session versi lama sudah dihancurkan server (401). Jika cookie
+    // ternyata masih valid tapi versi klien berbeda dari server,
+    // bersihkan seluruh state klien lama → jangan pakai UI lama.
+    const serverVersion = me.app_version;
+    const storedVersion = (() => {
+      try { return localStorage.getItem('aomi.appVersion'); } catch { return null; }
+    })();
+    if (storedVersion && serverVersion && storedVersion !== serverVersion) {
+      resetClientState();
+      try { localStorage.setItem('aomi.appVersion', serverVersion); } catch { /* pv */ }
+      location.replace('/auth.html');
+      return;
+    }
+    if (!storedVersion && serverVersion) {
+      try { localStorage.setItem('aomi.appVersion', serverVersion); } catch { /* pv */ }
+    }
+
     Object.assign(state.user, profile);
     Object.assign(state.bot, botCfg.bot);
   } catch (err) {
@@ -163,6 +190,21 @@ async function boot() {
   initChat();
 
   $('#settingsBtn').addEventListener('click', openSettings);
+  watchSession();
+}
+
+// Validasi sesi ringan saat tab kembali aktif (visibilitychange,
+// dibatasi 1x/menit — bukan setInterval, tidak membebani CPU/RAM).
+let lastSessionCheck = Date.now();
+function watchSession() {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - lastSessionCheck < 60_000) return;
+    lastSessionCheck = Date.now();
+    fetch('/api/auth/me').then((r) => {
+      if (r.status === 401) location.replace('/auth.html');
+    }).catch(() => { /* offline: abaikan */ });
+  });
 }
 
 if (document.readyState === 'loading') {

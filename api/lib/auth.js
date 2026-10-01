@@ -7,6 +7,7 @@
 
 import crypto from 'node:crypto';
 import { readJson, putJson, deleteJson } from './github.js';
+import { APP_VERSION } from './version.js';
 
 export const SESSION_COOKIE = 'aomi_session';
 
@@ -56,6 +57,7 @@ export async function createSession(userId, remember) {
     session_id: newSessionId(),
     user_id: userId,
     remember: Boolean(remember),
+    app_version: APP_VERSION,
     last_activity: now,
     expires_at: now + (remember ? SESSION_LONG_MS : SESSION_SHORT_MS)
   };
@@ -96,6 +98,13 @@ export async function getSession(req) {
   const now = Date.now();
 
   if (typeof s.expires_at !== 'number' || s.expires_at < now) {
+    await deleteJson(`sessions/${sid}.json`).catch(() => {});
+    return null;
+  }
+
+  // Deployment baru → session versi lama tidak valid: hancurkan.
+  // (client akan mendapat 401 → state klien dibersihkan → login page)
+  if (s.app_version !== APP_VERSION) {
     await deleteJson(`sessions/${sid}.json`).catch(() => {});
     return null;
   }

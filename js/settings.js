@@ -221,7 +221,7 @@ function fillAll() {
   pendingAvatar = { user: null, bot: null };
   dirty = { profile: false, identity: false, personality: false, behavior: false };
   for (const sec of ['profile', 'identity', 'personality', 'behavior']) {
-    $('#' + sec + 'Save').disabled = true;
+    setSaveBtn(sec, 'idle');
     setStatus(sec, '');
   }
   updatePreview();
@@ -249,11 +249,48 @@ function applyPreset(preset) {
   markDirty('personality');
 }
 
+/* ---------------- State tombol Save ---------------- */
+/* Normal: "Simpan perubahan" → Saving: "Menyimpan…" (disabled + dot halus)
+   Sukses: "Tersimpan ✓" → 1.6 dtk kembali ke normal.
+   Gagal: "Gagal menyimpan" → 1.8 dtk kembali (edit lokal tetap ada). */
+
+const revertTimers = {};
+
+function setSaveBtn(sec, phase) {
+  const btn = $('#' + sec + 'Save');
+  clearTimeout(revertTimers[sec]);
+  btn.classList.remove('saving');
+  switch (phase) {
+    case 'saving':
+      btn.textContent = 'Menyimpan…';
+      btn.classList.add('saving');
+      btn.disabled = true;
+      break;
+    case 'saved':
+      btn.textContent = 'Tersimpan ✓';
+      btn.disabled = true;
+      revertTimers[sec] = setTimeout(() => {
+        btn.textContent = 'Simpan perubahan';
+      }, 1600);
+      break;
+    case 'failed':
+      btn.textContent = 'Gagal menyimpan';
+      btn.disabled = false;
+      revertTimers[sec] = setTimeout(() => {
+        btn.textContent = 'Simpan perubahan';
+      }, 1800);
+      break;
+    default:
+      btn.textContent = 'Simpan perubahan';
+      btn.disabled = !dirty[sec];
+  }
+}
+
 /* ---------------- Dirty tracking & status ---------------- */
 
 function markDirty(sec) {
   dirty[sec] = true;
-  $('#' + sec + 'Save').disabled = false;
+  setSaveBtn(sec, 'idle');
   setStatus(sec, 'Belum disimpan');
 }
 
@@ -354,7 +391,8 @@ function diff(body, reference, fields) {
 
 async function persist(sec, endpoint, body, apply) {
   const btn = $('#' + sec + 'Save');
-  btn.disabled = true;
+  if (btn.classList.contains('saving')) return; // cegah double-submit
+  setSaveBtn(sec, 'saving');
   setStatus(sec, 'Menyimpan…');
   try {
     const data = await apiJson(endpoint, {
@@ -364,13 +402,14 @@ async function persist(sec, endpoint, body, apply) {
     });
     apply(data);
     dirty[sec] = false;
+    setSaveBtn(sec, 'saved');
     setStatus(sec, 'Tersimpan ✓', 'ok');
     emit('settings:updated');
   } catch (err) {
     if (err.message === 'unauthorized') return; // sudah dialihkan ke login
     // gagal: pertahankan edit lokal, tampilkan error jelas
-    btn.disabled = false;
     dirty[sec] = true;
+    setSaveBtn(sec, 'failed');
     setStatus(sec, err.message || 'Gagal menyimpan. Perubahanmu tetap ada.', 'err');
   }
 }

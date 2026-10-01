@@ -51,46 +51,57 @@ function labelFor(role) {
     : (state.bot.bot_name || 'Aomi');
 }
 
-/** [Avatar] [Konten] untuk user & bot. */
+/** Bot: [Avatar][Nama+Konten] di kiri. User: [Konten][Avatar] di kanan. */
 function messageNode(role, content, isError) {
   const msg = document.createElement('div');
   msg.className = 'msg ' + (role === 'user' ? 'user' : 'ai') + (isError ? ' error' : '');
 
-  // Avatar di kiri (32px desktop / 28px mobile, via CSS)
   const avatar = document.createElement('div');
   avatar.className = 'avatar';
   avatar.setAttribute('aria-hidden', 'true');
-  if (role === 'user') {
-    renderAvatar(avatar, state.user.avatar, 'user');
-  } else {
-    renderAvatar(avatar, state.bot.bot_avatar, 'logo');
-  }
-  msg.appendChild(avatar);
+  const drawAvatar = () => renderAvatar(
+    avatar, role === 'user' ? state.user.avatar : state.bot.bot_avatar,
+    role === 'user' ? 'user' : 'logo'
+  );
+  drawAvatar();
 
   const wrap = document.createElement('div');
   wrap.className = 'msg-content';
-
-  const who = document.createElement('div');
-  who.className = 'who';
-  who.dataset.role = role === 'user' ? 'user' : 'assistant';
-  who.textContent = labelFor(role);
 
   const body = document.createElement('div');
   body.className = 'body';
   body.textContent = content;
 
-  wrap.append(who, body);
-  msg.appendChild(wrap);
+  if (role === 'user') {
+    // Pesan user: tanpa label nama, avatar di KANAN
+    wrap.appendChild(body);
+    msg.append(wrap, avatar);
+  } else {
+    // Pesan bot: nama bot di atas konten, avatar di KIRI
+    const who = document.createElement('div');
+    who.className = 'who';
+    who.dataset.role = 'assistant';
+    who.textContent = labelFor(role);
+    wrap.append(who, body);
+    msg.append(avatar, wrap);
+  }
   return msg;
 }
 
-/** Perbarui label nama yang sudah dirender (murah, tanpa re-render). */
+/**
+ * Terapkan profile/bot terbaru ke pesan yang sudah dirender.
+ * Hanya elemen avatar & label yang di-update (src swap), bukan
+ * membangun ulang ribuan node — DOM cap tetap ~150.
+ */
 function refreshLabels() {
   for (const who of els.column.querySelectorAll('.who')) {
-    const role = who.dataset.role;
-    who.textContent = role === 'user'
-      ? (state.user.display_name || state.user.username)
-      : state.bot.bot_name;
+    if (who.dataset.role === 'assistant') who.textContent = state.bot.bot_name;
+  }
+  for (const av of els.column.querySelectorAll('.msg.user > .avatar')) {
+    renderAvatar(av, state.user.avatar, 'user');
+  }
+  for (const av of els.column.querySelectorAll('.msg.ai > .avatar')) {
+    renderAvatar(av, state.bot.bot_avatar, 'logo');
   }
 }
 
