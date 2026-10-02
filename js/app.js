@@ -39,18 +39,46 @@ export const sanitizeText = (text, maxLen = 4000) =>
 /**
  * Render avatar ke container: <img> bila ada dataUrl,
  * kalau tidak → ikon SVG default (bukan emoji).
+ *
+ * Anti-"jeda kelihatan": gambar di-decode PENUH dulu di luar DOM
+ * (img.decode()), BARU ikon lama dihapus & foto dipasang — satu
+ * swap atomic, tanpa frame kosong di antaranya. Tanpa ini: ikon
+ * lama hilang duluan (el.textContent='') sementara <img> yang baru
+ * dipasang belum selesai decode → ada jeda kosong sampai browser
+ * selesai decode byte-nya.
+ * Juga skip total (tanpa kerja/flash apa pun) bila avatar yang
+ * diminta SAMA PERSIS dengan yang sudah tampil — updateCharHead()
+ * dipanggil berkali-kali (tiap kirim pesan dsb.), bukan hanya saat
+ * avatar benar-benar berubah.
  */
 export function renderAvatar(el, dataUrl, fallbackIcon) {
-  el.textContent = '';
-  if (dataUrl) {
-    const img = new Image();
-    img.alt = '';
-    img.decoding = 'async';
-    img.src = dataUrl;
-    el.appendChild(img);
-  } else {
+  if (!dataUrl) {
+    el.textContent = '';
+    delete el.dataset.avatarSrc;
     el.innerHTML =
       `<svg class="icon" aria-hidden="true"><use href="components/icons.svg#${fallbackIcon}" /></svg>`;
+    return;
+  }
+  if (el.dataset.avatarSrc === dataUrl) return;   // sudah tampil persis ini
+
+  const img = new Image();
+  img.alt = '';
+  img.decoding = 'async';
+  img.src = dataUrl;
+
+  const swap = () => {
+    el.textContent = '';
+    el.appendChild(img);
+    el.dataset.avatarSrc = dataUrl;
+  };
+
+  if (img.decode) {
+    img.decode().then(swap).catch(swap);   // format aneh/gagal decode → tetap tampilkan
+  } else if (img.complete) {
+    swap();
+  } else {
+    img.onload = swap;
+    img.onerror = swap;
   }
 }
 
@@ -271,6 +299,23 @@ async function boot() {
     return;
   }
 
+  // STEP 0.5 — tampilkan avatar dari cache lokal SEGERA, SEBELUM fetch
+  // apa pun selesai. Elemen avatar sudah ada di HTML statis (ikon
+  // default) — di sini kita langsung ganti ke foto asli dari cache
+  // tanpa menunggu /api/auth/me → /api/profile → /api/bot (2 round-trip
+  // berurutan). Ini yang menghilangkan 'jeda' sebelum foto muncul untuk
+  // user yang kembali. Kalau datanya nanti berubah di server, STEP 4
+  // akan menimpa — tapi kalau SAMA, renderAvatar skip (tanpa flash).
+  try {
+    const cachedBot = localStorage.getItem('aomi.cache.botAvatar');
+    const cachedUser = localStorage.getItem('aomi.cache.userAvatar');
+    if (cachedBot) {
+      renderAvatar($('#charAvatar'), cachedBot, 'logo');
+      renderAvatar($('#welcomeAvatar'), cachedBot, 'logo');
+    }
+    if (cachedUser) renderAvatar($('#sidebarAvatar'), cachedUser, 'user');
+  } catch { /* private mode / storage diblokir */ }
+
   // STEP 1-3 — validasi session: SERVER satu-satunya sumber kebenaran.
   // /api/auth/me menolak (401) bila sid salah, session expired, atau
   // APP_VERSION beda (deployment baru → session dihancurkan server,
@@ -303,6 +348,15 @@ async function boot() {
     const botCfg = await botRes.json();
     Object.assign(state.user, profile);
     Object.assign(state.bot, botCfg.bot);
+
+    // Simpan avatar terbaru ke cache lokal untuk load SELANJUTNYA
+    // (lihat STEP 0.5 di atas) — bukan untuk render saat ini.
+    try {
+      if (state.bot.bot_avatar) localStorage.setItem('aomi.cache.botAvatar', state.bot.bot_avatar);
+      else localStorage.removeItem('aomi.cache.botAvatar');
+      if (state.user.avatar) localStorage.setItem('aomi.cache.userAvatar', state.user.avatar);
+      else localStorage.removeItem('aomi.cache.userAvatar');
+    } catch { /* private mode / quota */ }
   } catch (err) {
     if (err.message === 'unauthorized') return;
     showBootError();
