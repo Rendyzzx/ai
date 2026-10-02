@@ -7,10 +7,20 @@
    diambil dari state (settings.js bisa mengubahnya kapan pun).
    ============================================================ */
 
-import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state, confirmDialog } from './app.js?v=a4dd9cb5d3';
+import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state, confirmDialog } from './app.js?v=1764d59c65';
 
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
+
+// Deteksi permintaan edit foto (gambar terlampir + kata pemicu).
+// SALINAN dari EDIT_TRIGGER_RE di api/chat.js — server tetap yang
+// memutuskan rute; ini hanya memilih animasi loading yang tepat.
+const EDIT_TRIGGER_RE = /\b(edit(?:in|kan|ed|an)?|ubah(?:in)?|ganti(?:in)?|hias(?:in)?|rapikan|perjelas(?:kan)?|perbaiki(?:k)?(?:in|kan)?|hilangkan|hapus(?:in)?|tambah(?:in|kan)?|jadikan|warnain|warnai|warna(?:kan)?|colori[sz]e|retouch|remove|restore)\b/i;
+
+// Metadata unduh pesan hasil edit (disimpan server per pesan)
+const fileOf = (m) => (m && typeof m.image_url === 'string')
+  ? { url: m.image_url, name: m.image_name, expiresAt: m.expires_at }
+  : null;
 
 const els = {};
 let currentId = null;      // conversation_id aktif
@@ -130,7 +140,7 @@ function labelFor(role) {
  * .message-body > [.message-header (nama pengirim), .message-content]
  * Avatar & nama dari state terpusat (profile/bot dinamis, tidak hardcode).
  */
-function messageNode(role, content, isError, showName, imageUrl, mid) {
+function messageNode(role, content, isError, showName, imageUrl, mid, file) {
   const row = document.createElement('div');
   row.className = 'message-row ' + (role === 'user' ? 'user' : 'assistant') + (isError ? ' error' : '');
   if (mid) row.dataset.mid = mid;   // id pesan server → aksi menu (copy/delete/edit/regen)
@@ -165,7 +175,7 @@ function messageNode(role, content, isError, showName, imageUrl, mid) {
   // Gambar (opsional) di dalam bubble — teks jadi caption, boleh kosong
   if (imageUrl) {
     const img = document.createElement('img');
-    img.className = 'message-image';
+    img.className = 'message-image' + (file ? ' result' : '');
     img.src = imageUrl;
     img.alt = 'Gambar terlampir';
     img.loading = 'lazy';
@@ -178,6 +188,26 @@ function messageNode(role, content, isError, showName, imageUrl, mid) {
     contentEl.appendChild(txt);
   } else if (!imageUrl) {
     contentEl.textContent = content;   // pesan kosong teknis
+  }
+
+  // Tombol unduh hasil edit foto — di bawah gambar, selama masa
+  // unduh (TTL) masih hidup; setelah itu cukup hint kecil.
+  if (file && file.url) {
+    const alive = file.expiresAt ? Date.parse(file.expiresAt) > Date.now() : true;
+    if (alive) {
+      const dl = document.createElement('a');
+      dl.className = 'img-dl';
+      dl.href = file.url + (file.url.includes('?') ? '&' : '?') + 'dl=1'
+        + (file.name ? '&name=' + encodeURIComponent(file.name) : '');
+      dl.setAttribute('download', file.name || 'aomi-edit.png');
+      dl.innerHTML = '<svg class="icon" aria-hidden="true"><use href="components/icons.svg#download" /></svg><span>Unduh</span>';
+      contentEl.appendChild(dl);
+    } else {
+      const hint = document.createElement('span');
+      hint.className = 'img-dl-hint';
+      hint.textContent = 'masa unduh sudah habis';
+      contentEl.appendChild(hint);
+    }
   }
 
   body.append(header, contentEl);
@@ -211,11 +241,11 @@ function refreshLabels() {
   }
 }
 
-function appendMessage(role, content, isError = false, imageUrl = null, mid = null) {
+function appendMessage(role, content, isError = false, imageUrl = null, mid = null, file = null) {
   const wasNearBottom = nearBottom;
   els.welcome.hidden = true;
   const showName = role !== lastRole;   // nama hanya saat ganti peran
-  const row = messageNode(role, content, isError, showName, imageUrl, mid);
+  const row = messageNode(role, content, isError, showName, imageUrl, mid, file);
   els.column.appendChild(row);
   lastRole = role;
 
@@ -243,6 +273,45 @@ function typingRow() {
   typing.querySelector('.message-content').innerHTML =
     '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
   return typing;
+}
+
+// Indikator khusus "sedang mengedit foto" — proses edit butuh puluhan
+// detik, jadi label eksplisit + ikon foto berdenyut supaya user tahu
+// ini bukan sekadar mengetik (dan tidak mengira aplikasinya nge-hang).
+function editingRow() {
+  const editing = messageNode('assistant', '', false, false);
+  editing.classList.add('editing');
+  editing.querySelector('.message-content').innerHTML =
+    '<svg class="icon edit-ic" aria-hidden="true"><use href="components/icons.svg#image" /></svg>'
+    + '<span class="edit-label">lagi ngedit fotonya</span>'
+    + '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+  return editing;
+}
+
+/**
+ * Setelah hasil edit tampil, klien mengompres salinannya menjadi
+ * thumbnail (±540px) lalu mengirim ke server untuk disimpan permanen
+ * di pesan — percakapan tetap bisa menampilkan hasil SETELAH masa
+ * unduh (TTL 3 hari) berakhir. Gagal → diam-diam lewati, pesan
+ * tetap punya URL unduh.
+ */
+async function persistEditThumb(url, messageId, convId) {
+  try {
+    const blob = await (await fetch(url)).blob();
+    if (!blob.type.startsWith('image/')) return;
+    const file = new File([blob], 'edit', { type: blob.type });
+    const thumb = await compressImage(file, 540, 0.72);
+    await api('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conversation_id: convId,
+        action: 'thumb',
+        message_id: messageId,
+        thumb
+      })
+    });
+  } catch { /* opsional — URL unduh masih valid */ }
 }
 
 function resetView(greet) {
@@ -324,7 +393,9 @@ async function loadConversation(id) {
     let prev = firstHidden > 0 ? loaded[firstHidden - 1].role : null;
     for (const m of loaded.slice(firstHidden)) {
       const showName = m.role === 'assistant' && m.role !== prev;
-      fragment.appendChild(messageNode(m.role, m.content, false, showName, m.image || null, m.message_id));
+      fragment.appendChild(
+        messageNode(m.role, m.content, false, showName, m.image || m.image_url || null, m.message_id, fileOf(m))
+      );
       prev = m.role;
     }
     els.column.appendChild(fragment);
@@ -358,7 +429,9 @@ function prependBatch() {
   let prev = start > 0 ? loaded[start - 1].role : null;
   for (const m of slice) {
     const showName = m.role === 'assistant' && m.role !== prev;
-    fragment.appendChild(messageNode(m.role, m.content, false, showName, m.image || null));
+    fragment.appendChild(
+      messageNode(m.role, m.content, false, showName, m.image || m.image_url || null, m.message_id, fileOf(m))
+    );
     prev = m.role;
   }
   const prevHeight = els.scroll.scrollHeight;
@@ -528,8 +601,11 @@ async function submit() {
   clearPendingImage();
   els.input.focus();
 
-  // Indikator mengetik (dengan avatar bot, tanpa nama)
-  const typing = typingRow();
+  // Indikator: permintaan edit foto → "lagi ngedit fotonya" (proses
+  // ±40 detik), selain itu titik mengetik biasa. Deteksi regex sama
+  // dengan server (server tetap pemutus rute).
+  const wantsEdit = !!(img && text && EDIT_TRIGGER_RE.test(text));
+  const typing = wantsEdit ? editingRow() : typingRow();
   els.column.appendChild(typing);
   scrollToBottom(true);
 
@@ -557,7 +633,18 @@ async function submit() {
         trackMessage('user', text, data.user_message_id, img?.thumb || null);
       }
       trackMessage('assistant', data.text, data.assistant_message_id);
-      appendMessage('assistant', data.text, false, null, data.assistant_message_id);
+      // Hasil edit foto: gambar + tombol unduh + metadata unduhan
+      if (data.image_url) {
+        const file = {
+          url: data.image_url,
+          name: data.image_name,
+          expiresAt: data.expires_at
+        };
+        appendMessage('assistant', data.text, false, data.image_url, data.assistant_message_id, file);
+        persistEditThumb(data.image_url, data.assistant_message_id, data.conversation_id || currentId);
+      } else {
+        appendMessage('assistant', data.text, false, null, data.assistant_message_id);
+      }
       emit('chat:updated');   // sidebar refresh (judul/urutan baru)
       emit('chat:activated', { id: currentId });
     } else {

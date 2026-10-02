@@ -15,7 +15,7 @@
 // ============================================================
 
 import crypto from 'node:crypto';
-import { readJson, putJson, updateJson } from '../lib/store.js';
+import { readJson, putJson, updateJson, deleteJson, expireJson } from '../lib/store.js';
 import { DEFAULT_BOT } from './bot.js';
 import { getSession } from '../lib/auth.js';
 import { allow, clientIp } from '../lib/ratelimit.js';
@@ -29,7 +29,11 @@ const LIMITS = {
   fetchBytes: 100_000,
   geminiTimeout: 25_000,
   maxMessages: 100,       // batas isi percakapan yang disimpan
-  contextSend: 8          // pesan terakhir yang dikirim sebagai konteks
+  contextSend: 8,         // pesan terakhir yang dikirim sebagai konteks
+  editTimeout: 52_000,    // API edit foto eksternal (terukur: ±41 detik)
+  tempInputTtl: 3600,     // gambar masukan di-host 1 jam (cukup untuk 1x proses)
+  tempResultTtl: 259_200, // hasil edit: masa unduh 3 hari
+  editResultMax: 10_000_000  // hasil edit maks ~10MB
 };
 
 const HOSTS = {
@@ -398,6 +402,45 @@ async function chatGemini(input, instruction) {
 
 // ---------------- HANDLER ----------------
 
+/* ------------------------------------------------------------
+   MODE EDIT FOTO
+   Terpicu bila user mengirim GAMBAR + teks berisi kata pemicu
+   ("editin dong", "ubah rambut jadi hitam", dsb.).
+   Regex ini DISALIN di js/chat.js (untuk memilih animasi loading)
+   — ubah keduanya bersamaan.
+   ------------------------------------------------------------ */
+const EDIT_TRIGGER_RE = /\b(edit(?:in|kan|ed|an)?|ubah(?:in)?|ganti(?:in)?|hias(?:in)?|rapikan|perjelas(?:kan)?|perbaiki(?:k)?(?:in|kan)?|hilangkan|hapus(?:in)?|tambah(?:in|kan)?|jadikan|warnain|warnai|warna(?:kan)?|colori[sz]e|retouch|remove|restore)\b/i;
+
+const EDIT_API = 'https://api-faa.my.id/faa/editfoto';
+
+/** Cek magic bytes → { mime, ext } | null (API luar kadang balas
+ *  .bin mentah — ekstensi ditentukan dari isi byte, bukan nama). */
+function sniffImage(buf) {
+  if (buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return { mime: 'image/png', ext: 'png' };
+  }
+  if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return { mime: 'image/jpeg', ext: 'jpg' };
+  }
+  if (buf.length > 12 && buf.slice(0, 4).toString('latin1') === 'RIFF' && buf.slice(8, 12).toString('latin1') === 'WEBP') {
+    return { mime: 'image/webp', ext: 'webp' };
+  }
+  if (buf.length > 6 && buf.slice(0, 3).toString('latin1') === 'GIF') {
+    return { mime: 'image/gif', ext: 'gif' };
+  }
+  return null;
+}
+
+async function fetchWithTimeout(url, ms) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -541,6 +584,29 @@ export default async function handler(req, res) {
     });
   }
 
+  // ---------------- MODE THUMB (thumbnail hasil edit foto) ----------------
+  // Alur edit foto: server simpan hasil sebagai gambar temp dengan URL
+  // unduh (TTL 3 hari). Agar percakapan tetap bisa MENAMPILKAN hasil
+  // setelah masa unduh habis, klien mengompres salinannya menjadi
+  // thumbnail kecil dan mengirimkannya ke sini untuk disimpan permanen.
+  if (body.action === 'thumb') {
+    if (!file) return res.status(404).json({ error: 'Percakapan tidak ditemukan' });
+
+    const mid = String(body.message_id || '');
+    const thumb = typeof body.thumb === 'string' ? body.thumb : '';
+    const target = conv.messages.find(
+      (m) => m && m.message_id === mid && m.role === 'assistant' && typeof m.image_url === 'string'
+    );
+    if (!target) return res.status(404).json({ error: 'Pesan tidak ditemukan' });
+
+    if (!/^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/.test(thumb) || thumb.length > 400_000) {
+      return res.status(400).json({ error: 'Thumbnail tidak valid' });
+    }
+    target.image = thumb;
+    await putJson(convPath, conv, 'edit result thumb');
+    return res.status(200).json({ ok: true });
+  }
+
   // ---------------- MODE REGENERATE / EDIT PESAN ----------------
   // Regenerate: buang jawaban assistant di ujung, jawab ulang pesan
   // user terakhir (thread Gemini baru + recap → tidak pernah duplikat).
@@ -635,6 +701,116 @@ export default async function handler(req, res) {
       title: conv.title,
       provider: regOut.provider,
       bot_name: bot.bot_name
+    });
+  }
+
+  // ---------------- MODE EDIT FOTO (gambar + instruksi edit) ----------------
+  if (imageBuffer && message && EDIT_TRIGGER_RE.test(message)) {
+    // a) Host gambar masukan sebagai URL temp — API edit mengambil gambar
+    //    via URL publik, browser hanya punya dataURL.
+    const tempId = crypto.randomUUID();
+    await putJson(
+      `tempimg/${tempId}.json`,
+      { b64: imageBuffer.toString('base64'), mime: imgMatch[1] },
+      'temp image'
+    );
+    await expireJson(`tempimg/${tempId}.json`, LIMITS.tempInputTtl);
+
+    const host = String(req.headers.host || '').replace(/[^a-zA-Z0-9.\-]/g, '');
+    if (!host) {
+      return res.status(500).json({ error: 'Host tidak diketahui. Coba lagi.' });
+    }
+    const publicUrl = `https://${host}/api/tempimg?id=${tempId}`;
+
+    // b) Tembak API edit dengan URL gambar + prompt (teks user apa adanya)
+    let editRes;
+    try {
+      editRes = await fetchWithTimeout(
+        `${EDIT_API}?url=${encodeURIComponent(publicUrl)}&prompt=${encodeURIComponent(message)}`,
+        LIMITS.editTimeout
+      );
+    } catch (err) {
+      await deleteJson(`tempimg/${tempId}.json`).catch(() => {});
+      const msg = err.name === 'AbortError'
+        ? 'Ngeditnya kelamaan, waktunya habis. Coba lagi ya.'
+        : 'Layanan edit fotonya sedang tidak bisa dihubungi.';
+      return res.status(504).json({ error: msg });
+    }
+
+    // c) Validasi hasil: API luar kadang balas JSON error / .bin mentah.
+    const raw = Buffer.from(await editRes.arrayBuffer());
+    await deleteJson(`tempimg/${tempId}.json`).catch(() => {});
+
+    if (!editRes.ok || raw.length === 0) {
+      let apiMsg = '';
+      try {
+        const j = JSON.parse(raw.toString('utf8'));
+        apiMsg = j.error || j.message || '';
+      } catch { /* bukan JSON */ }
+      console.error('[chat] editfoto http', editRes.status, apiMsg);
+      return res.status(502).json({ error: 'Gagal mengedit foto. Coba prompt lain ya.' });
+    }
+    if (raw.length > LIMITS.editResultMax) {
+      return res.status(502).json({ error: 'Hasil edit terlalu besar.' });
+    }
+    const sniff = sniffImage(raw);
+    if (!sniff) {
+      console.error('[chat] editfoto bukan gambar, content-type:', editRes.headers.get('content-type'));
+      return res.status(502).json({ error: 'Hasil edit tidak bisa dibaca sebagai gambar. Coba lagi ya.' });
+    }
+
+    // d) Simpan hasil sebagai gambar temp (TTL unduh 3 hari) → URL publik.
+    const resultId = crypto.randomUUID();
+    await putJson(
+      `tempimg/${resultId}.json`,
+      { b64: raw.toString('base64'), mime: sniff.mime },
+      'edit result'
+    );
+    await expireJson(`tempimg/${resultId}.json`, LIMITS.tempResultTtl);
+    const resultUrl = `https://${host}/api/tempimg?id=${resultId}`;
+    const imageName = `aomi-edit-${resultId.slice(0, 8)}.${sniff.ext}`;
+    const expiresAt = new Date(Date.now() + LIMITS.tempResultTtl * 1000).toISOString();
+
+    // e) Simpan ke percakapan: user (gambar+instruksi) & hasil edit.
+    const replyText = 'selesai~ ini dia hasilnya. kalau masih kurang pas, kirim fotonya lagi bareng instruksinya ya.';
+    const userMessageId = crypto.randomUUID();
+    const assistantMessageId = crypto.randomUUID();
+    conv.messages.push(
+      {
+        message_id: userMessageId, role: 'user', content: message,
+        image: imageBuffer ? (imageThumb || imageDataUrl) : undefined,
+        timestamp: now
+      },
+      {
+        message_id: assistantMessageId, role: 'assistant', content: replyText,
+        image_url: resultUrl, image_name: imageName, image_mime: sniff.mime,
+        expires_at: expiresAt, edit: true, timestamp: now
+      }
+    );
+    if (conv.title === 'Chat baru') conv.title = message.slice(0, 48) || 'Edit foto';
+    conv.updated_at = now;
+
+    await putJson(convPath, conv, 'photo edit append');
+    await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+      const items = Array.isArray(current) ? current : [];
+      const entry = { conversation_id: conv.conversation_id, title: conv.title, updated_at: conv.updated_at };
+      const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
+      if (i >= 0) items[i] = entry; else items.unshift(entry);
+      return items;
+    });
+
+    return res.status(200).json({
+      text: replyText,
+      user_message_id: userMessageId,
+      assistant_message_id: assistantMessageId,
+      conversation_id: conv.conversation_id,
+      title: conv.title,
+      provider: 'faa-edit',
+      bot_name: bot.bot_name,
+      image_url: resultUrl,
+      image_name: imageName,
+      image_mime: sniff.mime,
+      expires_at: expiresAt
     });
   }
 

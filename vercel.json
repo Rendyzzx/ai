@@ -5,6 +5,9 @@
   "cleanUrls": true,
   "functions": {
     "api/chat.js": {
+      "maxDuration": 60
+    },
+    "api/tempimg.js": {
       "maxDuration": 30
     }
   },
