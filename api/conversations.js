@@ -10,7 +10,7 @@
 // ============================================================
 
 import crypto from 'node:crypto';
-import { readJson, putJson, updateJson, deleteJson } from '../lib/github.js';
+import { readJson, putJson, updateJson, deleteJson } from '../lib/store.js';
 import { getSession } from '../lib/auth.js';
 
 const convPath = (uid, id) => `chats/${uid}/${id}.json`;

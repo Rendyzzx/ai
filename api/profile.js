@@ -15,7 +15,7 @@
 //     dicek magic bytes → file palsu/executable ditolak
 // ============================================================
 
-import { readJson, putJson, updateJson } from '../lib/github.js';
+import { readJson, putJson, updateJson } from '../lib/store.js';
 import { getSession } from '../lib/auth.js';
 import { allow, clientIp } from '../lib/ratelimit.js';
 

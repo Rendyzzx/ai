@@ -18,7 +18,7 @@
 // ============================================================
 
 import crypto from 'node:crypto';
-import { readJson, putJson, updateJson } from '../lib/github.js';
+import { readJson, putJson, updateJson } from '../lib/store.js';
 import { DEFAULT_BOT } from './bot.js';
 import { getSession } from '../lib/auth.js';
 import { allow, clientIp } from '../lib/ratelimit.js';

@@ -4,7 +4,7 @@
 // Anti brute force: lock 15 menit setelah 5 kegagalan (persist repo).
 // ============================================================
 
-import { readJson } from '../../lib/github.js';
+import { readJson } from '../../lib/store.js';
 import { allow, clientIp } from '../../lib/ratelimit.js';
 import {
   verifyPassword, verifyCaptcha,

@@ -9,15 +9,18 @@ dioptimalkan untuk Vercel Serverless. Riwayat percakapan tersimpan per akun.
 ```
 Browser → /api/* (Vercel Serverless, session via header X-Session-Id)
               ├── Provider AI (Gemini scraping → Groq → ChatEverywhere)
-              └── GitHub private repo sebagai database JSON
+              └── lib/store.js → Upstash Redis (utama; fallback: GitHub repo)
 ```
 
-- Frontend **tidak pernah** mengakses GitHub atau provider AI langsung.
-- Token GitHub hanya hidup di **Vercel Environment Variables** (`GITHUB_TOKEN`),
-  tidak pernah muncul di browser maupun source code.
-- Database: repo private [Rendyzzx/token](https://github.com/Rendyzzx/token) —
-  hanya file JSON yang dibutuhkan yang dibaca (per file via Contents API),
-  tidak pernah memuat seluruh database.
+- Frontend **tidak pernah** mengakses database atau provider AI langsung.
+- Database utama: **Upstash Redis** (free tier, REST API — 500K command/bulan,
+  tanpa 'abuse rate limit' seperti GitHub Contents API). Semua operasi lewat
+  `lib/store.js` (interface readJson/putJson/updateJson/deleteJson + TTL).
+- **Fallback otomatis**: selama env Upstash belum diset, `lib/store.js`
+  meneruskan semua operasi ke GitHub (repo private
+  [Rendyzzx/token](https://github.com/Rendyzzx/token)) — situs tetap jalan
+  selama transisi. Migrasi data: `scripts/migrate-github-to-redis.mjs`.
+- Session ber-TTL otomatis di Redis (kedaluwarsa terhapus sendiri, tanpa GC manual).
 
 ## Struktur
 
@@ -61,7 +64,9 @@ locks/login-<hash>.json   { fails, locked_until }   # anti brute force
 
 | Nama | Keterangan |
 |------|------------|
-| `GITHUB_TOKEN` | Token GitHub dengan akses repo `Rendyzzx/token` |
+| `UPSTASH_REDIS_REST_URL` | URL REST database Upstash Redis (database utama; jika kosong → otomatis fallback ke GitHub) |
+| `UPSTASH_REDIS_REST_TOKEN` | Token REST Upstash |
+| `GITHUB_TOKEN` | Token GitHub dengan akses repo `Rendyzzx/token` (fallback + migrasi data) |
 | `SESSION_SECRET` | String acak bebas (untuk enkripsi captcha & verifikasi token). Jika tidak di-set, fallback ke `GITHUB_TOKEN` |
 | `GROQ_API_KEY` | Opsional. Fallback AI bila scraping Gemini gagal |
 
