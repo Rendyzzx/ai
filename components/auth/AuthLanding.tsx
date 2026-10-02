@@ -420,8 +420,8 @@ export default function AuthLanding() {
 
             {/* Navigasi fitur ringkas — informasi produk, bukan pill dekoratif.
                 Mobile: muncul SETELAH artwork, mengantar ke section fitur. */}
-            <nav className="hero-feats" aria-label="Yang bisa kamu lakukan">
-              <span className="hero-feats-label">Yang bisa kamu lakukan</span>
+            <nav className="hero-feats" aria-label="Navigasi fitur Aomi">
+              <span className="hero-feats-label">Langsung coba:</span>
               <div className="hero-feats-items">
                 <a href="#feat-chat">Ngobrol</a>
                 <a href="#feat-coding">Coding</a>
