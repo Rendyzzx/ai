@@ -7,7 +7,7 @@
    diambil dari state (settings.js bisa mengubahnya kapan pun).
    ============================================================ */
 
-import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state, confirmDialog } from './app.js?v=1764d59c65';
+import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state, confirmDialog, getSessionId } from './app.js?v=1764d59c65';
 
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
@@ -20,6 +20,25 @@ const EDIT_TRIGGER_RE = /\b(edit(?:in|kan|ed|an)?|ubah(?:in)?|ganti(?:in)?|hias(
 // Metadata unduh pesan hasil edit (disimpan server per pesan)
 const fileOf = (m) => (m && typeof m.image_url === 'string')
   ? { url: m.image_url, name: m.image_name, expiresAt: m.expires_at }
+  : null;
+
+// Deteksi link TikTok/Instagram (SALINAN dari api/chat.js — server
+// tetap yang memutuskan rute; ini hanya memilih animasi loading).
+function matchDlTarget(text) {
+  const urls = String(text || '').match(/https?:\/\/[^\s<>"')\]]+/gi) || [];
+  for (const raw of urls) {
+    let u;
+    try { u = new URL(raw.replace(/[.,;!?]+$/, '')); } catch { continue; }
+    const h = u.hostname.replace(/^www\./, '').toLowerCase();
+    if (/(^|\.)tiktok\.com$/.test(h)) return 'tiktok';
+    if (/(^|\.)instagram\.com$/.test(h)) return 'ig';
+  }
+  return null;
+}
+
+// Metadata kartu downloader (disimpan server di pesan assistant)
+const dlOf = (m) => (m && m.dl && typeof m.dl === 'object' && (m.dl.video || m.dl.images || m.dl.music))
+  ? m.dl
   : null;
 
 const els = {};
@@ -116,7 +135,114 @@ function labelFor(role) {
  * .message-body > [.message-header (nama pengirim), .message-content]
  * Avatar & nama dari state terpusat (profile/bot dinamis, tidak hardcode).
  */
-function messageNode(role, content, isError, showName, imageUrl, mid, file) {
+/* ============================================================
+   KARTU DOWNLOADER (TikTok / Instagram)
+   Thumbnail + tombol unduh. Link TikTok lewat proxy /api/dl
+   (CDN-nya cuma mau "diputar", bukan diunduh); link Instagram
+   dipakai langsung (rapidcdn sudah memaksa unduh).
+   ============================================================ */
+
+function dlDownloadHref(dl, url, name) {
+  if (dl.platform === 'ig') return url;
+  const sid = getSessionId();
+  return '/api/dl?url=' + encodeURIComponent(url)
+    + '&name=' + encodeURIComponent(name)
+    + (sid ? '&sid=' + encodeURIComponent(sid) : '');
+}
+
+function dlBtnNode(dl, kind) {
+  const a = document.createElement('a');
+  a.className = 'dl-btn';
+  a.rel = 'noopener';
+  if (dl.platform === 'ig') a.target = '_blank';
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('class', 'icon');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.innerHTML = '<use href="components/icons.svg#download" />';
+  const label = document.createElement('span');
+  if (kind === 'mp4') {
+    label.textContent = 'MP4';
+    a.href = dlDownloadHref(dl, dl.video,
+      (dl.platform === 'tiktok' ? 'tiktok-' + (dl.id || 'video') : 'instagram-video') + '.mp4');
+    a.setAttribute('aria-label', 'Unduh video MP4');
+  } else {
+    label.textContent = 'MP3';
+    a.href = dlDownloadHref(dl, dl.music, (dl.platform === 'tiktok' ? 'tiktok-audio' : 'instagram-audio') + '.mp3');
+    a.setAttribute('aria-label', 'Unduh audio MP3');
+  }
+  a.append(icon, label);
+  return a;
+}
+
+function buildDlCard(dl) {
+  const card = document.createElement('div');
+  card.className = 'dl-card';
+
+  // Kepala kartu: badge platform + judul (+ penulis)
+  const head = document.createElement('div');
+  head.className = 'dl-head';
+  const badge = document.createElement('span');
+  badge.className = 'dl-badge';
+  badge.textContent = dl.platform === 'tiktok' ? 'TikTok' : 'Instagram';
+  const title = document.createElement('span');
+  title.className = 'dl-title';
+  title.textContent = dl.title || (dl.type === 'video' ? 'Video' : 'Foto');
+  head.append(badge, title);
+  card.appendChild(head);
+  if (dl.author) {
+    const sub = document.createElement('div');
+    sub.className = 'dl-sub';
+    sub.textContent = 'by ' + dl.author + (dl.music_title ? ' · ' + dl.music_title : '');
+    card.appendChild(sub);
+  }
+
+  if (dl.type === 'video' && dl.video) {
+    const thumb = document.createElement('img');
+    thumb.className = 'dl-thumb';
+    thumb.src = dl.cover || '';
+    thumb.alt = 'Thumbnail video';
+    thumb.loading = 'lazy';
+    // Link CDN kedaluwarsa saat history dibuka lama → sembunyikan, kartu tetap berguna
+    thumb.onerror = () => thumb.remove();
+    if (dl.cover) card.appendChild(thumb);
+    const btns = document.createElement('div');
+    btns.className = 'dl-btns';
+    btns.appendChild(dlBtnNode(dl, 'mp4'));
+    if (dl.music) btns.appendChild(dlBtnNode(dl, 'mp3'));
+    card.appendChild(btns);
+  } else {
+    // Slide foto: grid thumbnail — klik = unduh/buka ukuran asli
+    const grid = document.createElement('div');
+    grid.className = 'dl-imgs';
+    const imgs = Array.isArray(dl.images) ? dl.images.slice(0, 12) : [];
+    imgs.forEach((u, i) => {
+      const a = document.createElement('a');
+      a.className = 'dl-img-link';
+      a.href = dlDownloadHref(dl, u,
+        (dl.platform === 'tiktok' ? 'tiktok-' + (dl.id || 'img') : 'instagram-img') + '-' + (i + 1) + '.jpg');
+      a.rel = 'noopener';
+      if (dl.platform === 'ig') a.target = '_blank';
+      const im = document.createElement('img');
+      im.className = 'dl-img';
+      im.src = u;
+      im.alt = 'Foto ' + (i + 1);
+      im.loading = 'lazy';
+      im.onerror = () => a.remove();
+      a.appendChild(im);
+      grid.appendChild(a);
+    });
+    if (grid.children.length) card.appendChild(grid);
+    if (dl.music) {
+      const btns = document.createElement('div');
+      btns.className = 'dl-btns';
+      btns.appendChild(dlBtnNode(dl, 'mp3'));
+      card.appendChild(btns);
+    }
+  }
+  return card;
+}
+
+function messageNode(role, content, isError, showName, imageUrl, mid, file, dl) {
   const row = document.createElement('div');
   row.className = 'message-row ' + (role === 'user' ? 'user' : 'assistant') + (isError ? ' error' : '');
   if (mid) row.dataset.mid = mid;   // id pesan server → aksi menu (copy/delete/edit/regen)
@@ -186,6 +312,9 @@ function messageNode(role, content, isError, showName, imageUrl, mid, file) {
     }
   }
 
+  // Kartu downloader (TikTok/IG): thumbnail + tombol unduh MP4/MP3/gambar
+  if (dl) contentEl.appendChild(buildDlCard(dl));
+
   body.append(header, contentEl);
 
   if (role === 'user') {
@@ -217,11 +346,11 @@ function refreshLabels() {
   }
 }
 
-function appendMessage(role, content, isError = false, imageUrl = null, mid = null, file = null) {
+function appendMessage(role, content, isError = false, imageUrl = null, mid = null, file = null, dl = null) {
   const wasNearBottom = nearBottom;
   els.welcome.hidden = true;
   const showName = role !== lastRole;   // nama hanya saat ganti peran
-  const row = messageNode(role, content, isError, showName, imageUrl, mid, file);
+  const row = messageNode(role, content, isError, showName, imageUrl, mid, file, dl);
   els.column.appendChild(row);
   lastRole = role;
 
@@ -254,6 +383,16 @@ function typingRow() {
 // Indikator khusus "sedang mengedit foto" — proses edit butuh puluhan
 // detik, jadi label eksplisit + ikon foto berdenyut supaya user tahu
 // ini bukan sekadar mengetik (dan tidak mengira aplikasinya nge-hang).
+function downloadingRow() {
+  const row = messageNode('assistant', '', false, false);
+  row.classList.add('editing');   // gaya indikator sama (ikon + label + dots)
+  row.querySelector('.message-content').innerHTML =
+    '<svg class="icon edit-ic" aria-hidden="true"><use href="components/icons.svg#download" /></svg>'
+    + '<span class="edit-label">lagi nyariin file-nya</span>'
+    + '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+  return row;
+}
+
 function editingRow() {
   const editing = messageNode('assistant', '', false, false);
   editing.classList.add('editing');
@@ -370,7 +509,7 @@ async function loadConversation(id) {
     for (const m of loaded.slice(firstHidden)) {
       const showName = m.role === 'assistant' && m.role !== prev;
       fragment.appendChild(
-        messageNode(m.role, m.content, false, showName, m.image || m.image_url || null, m.message_id, fileOf(m))
+        messageNode(m.role, m.content, false, showName, m.image || m.image_url || null, m.message_id, fileOf(m), dlOf(m))
       );
       prev = m.role;
     }
@@ -406,7 +545,7 @@ function prependBatch() {
   for (const m of slice) {
     const showName = m.role === 'assistant' && m.role !== prev;
     fragment.appendChild(
-      messageNode(m.role, m.content, false, showName, m.image || m.image_url || null, m.message_id, fileOf(m))
+      messageNode(m.role, m.content, false, showName, m.image || m.image_url || null, m.message_id, fileOf(m), dlOf(m))
     );
     prev = m.role;
   }
@@ -581,7 +720,8 @@ async function submit() {
   // ±40 detik), selain itu titik mengetik biasa. Deteksi regex sama
   // dengan server (server tetap pemutus rute).
   const wantsEdit = !!(img && text && EDIT_TRIGGER_RE.test(text));
-  const typing = wantsEdit ? editingRow() : typingRow();
+  const wantsDl = !img && !wantsEdit && !!matchDlTarget(text);
+  const typing = wantsEdit ? editingRow() : (wantsDl ? downloadingRow() : typingRow());
   els.column.appendChild(typing);
   scrollToBottom(true);
 
@@ -609,8 +749,10 @@ async function submit() {
         trackMessage('user', text, data.user_message_id, img?.thumb || null);
       }
       trackMessage('assistant', data.text, data.assistant_message_id);
-      // Hasil edit foto: gambar + tombol unduh + metadata unduhan
-      if (data.image_url) {
+      // Hasil downloader: kartu thumbnail + tombol unduh MP4/MP3/gambar
+      if (data.dl) {
+        appendMessage('assistant', data.text, false, null, data.assistant_message_id, null, data.dl);
+      } else if (data.image_url) {
         const file = {
           url: data.image_url,
           name: data.image_name,

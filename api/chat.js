@@ -31,6 +31,7 @@ const LIMITS = {
   maxMessages: 100,       // batas isi percakapan yang disimpan
   contextSend: 8,         // pesan terakhir yang dikirim sebagai konteks
   editTimeout: 52_000,    // API edit foto eksternal (terukur: ±41 detik)
+  downloadTimeout: 30_000, // API downloader eksternal (tiktok/ig)
   tempInputTtl: 3600,     // gambar masukan di-host 1 jam (cukup untuk 1x proses)
   tempResultTtl: 259_200, // hasil edit: masa unduh 3 hari
   editResultMax: 10_000_000  // hasil edit maks ~10MB
@@ -412,6 +413,85 @@ async function chatGemini(input, instruction) {
 const EDIT_TRIGGER_RE = /\b(edit(?:in|kan|ed|an)?|ubah(?:in)?|ganti(?:in)?|hias(?:in)?|rapikan|perjelas(?:kan)?|perbaiki(?:k)?(?:in|kan)?|hilangkan|hapus(?:in)?|tambah(?:in|kan)?|jadikan|warnain|warnai|warna(?:kan)?|colori[sz]e|retouch|remove|restore)\b/i;
 
 const EDIT_API = 'https://api-faa.my.id/faa/editfoto';
+
+/* ------------------------------------------------------------
+   MODE DOWNLOADER (TikTok / Instagram)
+   Terpicu bila pesan teks (tanpa gambar) berisi link TikTok
+   atau Instagram → panggil API api-faa, hasilnya dirender
+   sebagai kartu unduhan (thumbnail + tombol MP4/MP3/gambar).
+   ------------------------------------------------------------ */
+const DL_TIKTOK_API = 'https://api-faa.my.id/faa/tiktok';
+const DL_IG_API = 'https://api-faa.my.id/faa/igdl';
+
+/** Ambil URL TikTok/IG pertama dari sebuah teks (atau null). */
+function matchDownloadTarget(text) {
+  const urls = String(text || '').match(/https?:\/\/[^\s<>"')\]]+/gi) || [];
+  for (const raw of urls) {
+    let u;
+    try {
+      u = new URL(raw.replace(/[.,;!?]+$/, ''));
+    } catch {
+      continue;
+    }
+    const h = u.hostname.replace(/^www\./, '').toLowerCase();
+    if (/(^|\.)tiktok\.com$/.test(h)) return { platform: 'tiktok', url: u.href };
+    if (/(^|\.)instagram\.com$/.test(h)) return { platform: 'ig', url: u.href };
+  }
+  return null;
+}
+
+/** Salin string aman untuk metadata dl (anti payload raksas). */
+function dlClip(v, max) {
+  const t = typeof v === 'string' ? v.trim() : '';
+  return t.slice(0, max) || undefined;
+}
+
+/** Normalisasi respons api-faa (tiktok & ig) → objek dl ringkas
+ *  yang disimpan di pesan assistant. Hanya berisi URL/teks kecil —
+ *  aman untuk history load (tidak ada dataURL besar). */
+function buildDl(platform, result) {
+  if (!result || typeof result !== 'object') return null;
+  const dl = { platform };
+
+  if (platform === 'tiktok') {
+    const isSlide = result.type === 'image' || Array.isArray(result.data);
+    const urls = (strOrArr) => Array.isArray(strOrArr)
+      ? strOrArr.filter((x) => typeof x === 'string' && /^https:/.test(x))
+      : (typeof strOrArr === 'string' && /^https:/.test(strOrArr) ? [strOrArr] : []);
+    dl.id = dlClip(result.id, 32);
+    dl.title = dlClip(result.title, 120);
+    dl.cover = /^https:/.test(result.cover || '') ? result.cover : undefined;
+    if (result.author) {
+      dl.author = dlClip(result.author.nickname || result.author.username, 60);
+    }
+    const music = result.music_info && result.music_info.url;
+    if (/^https:/.test(music || '')) {
+      dl.music = music;
+      dl.music_title = dlClip(result.music_info.title, 80);
+    }
+    if (isSlide) {
+      dl.type = 'image';
+      dl.images = urls(result.data).slice(0, 12);
+    } else {
+      dl.type = 'video';
+      // utama: tanpa watermark; fallback alternatif hd/sd/wm
+      dl.video = dlClip(result.data || (result.alternatives && (result.alternatives.selected || result.alternatives.hd || result.alternatives.sd || result.alternatives.wm)), 1500);
+      if (!/^https:/.test(dl.video || '')) return null;
+    }
+  } else {
+    // Instagram: result.url = daftar link media (rapidcdn, sudah dl=1)
+    const urls = Array.isArray(result.url)
+      ? result.url.filter((x) => typeof x === 'string' && /^https:/.test(x)).slice(0, 12)
+      : [];
+    if (!urls.length) return null;
+    const meta = result.metadata || {};
+    dl.type = meta.isVideo ? 'video' : 'image';
+    dl.title = dlClip(meta.caption, 120);
+    if (dl.type === 'video') dl.video = urls[0];
+    else dl.images = urls;
+  }
+  return dl;
+}
 
 /** Cek magic bytes → { mime, ext } | null (API luar kadang balas
  *  .bin mentah — ekstensi ditentukan dari isi byte, bukan nama). */
@@ -812,6 +892,78 @@ export default async function handler(req, res) {
       image_mime: sniff.mime,
       expires_at: expiresAt
     });
+  }
+
+  // ---------------- MODE DOWNLOADER (TikTok / Instagram) ----------------
+  // Link TikTok/IG di pesan teks (tanpa gambar) → unduh otomatis.
+  if (!imageBuffer && message) {
+    const target = matchDownloadTarget(message);
+    if (target) {
+      const endpoint = (target.platform === 'tiktok' ? DL_TIKTOK_API : DL_IG_API)
+        + '?url=' + encodeURIComponent(target.url);
+
+      let dlRes;
+      try {
+        dlRes = await fetchWithTimeout(endpoint, LIMITS.downloadTimeout);
+      } catch {
+        return res.status(504).json({ error: 'Layanan unduhan sedang tidak bisa dihubungi. Coba lagi ya.' });
+      }
+      let dlJson = null;
+      try { dlJson = await dlRes.json(); } catch { /* bukan JSON */ }
+      const dl = dlRes.ok && dlJson && dlJson.status
+        ? buildDl(target.platform, dlJson.result)
+        : null;
+
+      if (!dl) {
+        console.error('[chat] downloader gagal', dlRes.status, (dlJson && dlJson.result && JSON.stringify(dlJson.result).slice(0, 200)) || '');
+        return res.status(502).json({ error: 'Gagal mengunduh linknya. Pastikan linknya publik dan coba lagi ya.' });
+      }
+
+      const platformLabel = dl.platform === 'tiktok' ? 'TikTok' : 'Instagram';
+      let replyText;
+      if (dl.type === 'video') {
+        replyText = `selesai~ ini dia videonya. tinggal klik tombol unduh di bawah ya${dl.music ? ' (ada audionya juga)' : ''}.`;
+      } else {
+        replyText = `selesai~ ini dia ${dl.images && dl.images.length > 1 ? dl.images.length + ' fotonya' : 'fotonya'}. tinggal klik gambar atau tombol unduhnya ya${dl.music ? ' (ada audionya juga)' : ''}.`;
+      }
+
+      const userMessageId = crypto.randomUUID();
+      const assistantMessageId = crypto.randomUUID();
+      conv.messages.push(
+        { message_id: userMessageId, role: 'user', content: message, timestamp: now },
+        { message_id: assistantMessageId, role: 'assistant', content: replyText, dl, timestamp: now }
+      );
+      if (conv.title === 'Chat baru') {
+        conv.title = (dl.title || ('Unduhan ' + platformLabel)).slice(0, 48);
+      }
+      conv.updated_at = now;
+
+      // PENTING: tulis via conv.conversation_id (bukan convPath awal —
+      // chat baru belum punya ID saat convPath dihitung; bug key kosong).
+      await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'download append');
+      await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+        const items = Array.isArray(current) ? current : [];
+        const entry = {
+          conversation_id: conv.conversation_id,
+          title: conv.title,
+          updated_at: conv.updated_at
+        };
+        const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
+        if (i >= 0) items[i] = entry; else items.unshift(entry);
+        return items;
+      });
+
+      return res.status(200).json({
+        text: replyText,
+        user_message_id: userMessageId,
+        assistant_message_id: assistantMessageId,
+        conversation_id: conv.conversation_id,
+        title: conv.title,
+        provider: 'faa-dl',
+        bot_name: bot.bot_name,
+        dl
+      });
+    }
   }
 
   // ---------------- MODE CHAT NORMAL ----------------
