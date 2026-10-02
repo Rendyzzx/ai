@@ -71,13 +71,21 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
 
 /* ---------------- Teks pesan (inline code + code block) ---------------- */
 
-export function MessageText({ content }: { content: string }) {
+export function MessageText({ content, showCode = true }: { content: string; showCode?: boolean }) {
   const segments = parseMessageText(content);
+  // showCode=false → fence/inline code dirender sebagai teks biasa
+  // (preferensi "Tampilkan blok kode" di Settings > Percakapan).
   return (
     <span className="message-text">
       {segments.map((s, i) => {
-        if (s.kind === "code") return <CodeBlock key={i} lang={s.lang} code={s.code} />;
-        if (s.kind === "inline") return <code key={i} className="inline-code">{s.text}</code>;
+        if (s.kind === "code") {
+          if (!showCode) return <span key={i}>{s.code}</span>;
+          return <CodeBlock key={i} lang={s.lang} code={s.code} />;
+        }
+        if (s.kind === "inline") {
+          if (!showCode) return <span key={i}>{s.text}</span>;
+          return <code key={i} className="inline-code">{s.text}</code>;
+        }
         return <span key={i}>{s.text}</span>;
       })}
     </span>
@@ -242,6 +250,7 @@ export default function MessageRow({
   botAvatar,
   userName,
   botName,
+  showCode,
   editing,
   onEditText,
   onEditCancel,
@@ -250,6 +259,7 @@ export default function MessageRow({
 }: {
   role: Role;
   content: string;
+  showCode?: boolean;
   isError?: boolean;
   showName?: boolean;
   imageUrl?: string | null;
@@ -296,7 +306,7 @@ export default function MessageRow({
           />
         )}
         {content ? (
-          <MessageText content={content} />
+          <MessageText content={content} showCode={showCode} />
         ) : !imageUrl ? null : null}
         {file && file.url && fileAlive && (
           <a

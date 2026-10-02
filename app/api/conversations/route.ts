@@ -41,6 +41,23 @@ export async function GET(req: Request) {
   const uid = session.user_id;
 
   const { searchParams } = new URL(req.url);
+
+  // ?export=1 → unduhan lengkap (Settings > Data). Login wajib (dicek di atas).
+  if (searchParams.get("export") === "1") {
+    const idx = await readIndex(uid);
+    const conversations: Conversation[] = [];
+    for (const item of idx) {
+      const file = await readJson<Conversation>(convPath(uid, item.conversation_id));
+      if (file) {
+        const { geminiSessionId: _gsid, ...safe } = file.data as Conversation & { geminiSessionId?: unknown };
+        safe.messages = (Array.isArray(safe.messages) ? safe.messages : [])
+          .filter((m) => m && typeof m === "object") as Message[];
+        conversations.push(safe);
+      }
+    }
+    return json({ user_id: uid, exported_at: nowIso(), conversations });
+  }
+
   const id = String(searchParams.get("id") || "");
   if (id) {
     if (!/^[a-f0-9-]{8,36}$/.test(id)) {
@@ -127,6 +144,18 @@ export async function DELETE(req: Request) {
   const uid = session.user_id;
 
   const { searchParams } = new URL(req.url);
+
+  // ?all=1 → hapus SEMUA percakapan user. Jalur khusus Settings > Data;
+  // konfirmasi dua-langkah ada di UI, server tetap butuh session valid.
+  if (searchParams.get("all") === "1") {
+    const idx = await readIndex(uid);
+    for (const item of idx) {
+      await deleteJson(convPath(uid, item.conversation_id));
+    }
+    await putJson(idxPath(uid), [], "conversation wipe");
+    return json({ ok: true, deleted: idx.length });
+  }
+
   const id = String(searchParams.get("id") || "");
   if (!/^[a-f0-9-]{8,36}$/.test(id)) {
     return json({ error: "ID tidak valid" }, 400);

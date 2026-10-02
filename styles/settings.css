@@ -46,16 +46,26 @@
 
 .settings-nav-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 2px 6px;
 }
 
-.settings-nav-head h2 {
+.settings-nav-titles {
   flex: 1;
+  min-width: 0;
+}
+
+.settings-nav-head h2 {
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+.settings-nav-head p {
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--text-muted);
 }
 
 .settings-nav-list {
@@ -141,7 +151,8 @@
 
 /* ---------------- Section (FLAT, tanpa kotak) ---------------- */
 /* Pemisah antar kelompok = judul kecil + spacing, bukan card. */
-.section-card {
+.section-card,
+.panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -759,5 +770,501 @@
   .subnav-item {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+
+/* ============================================================
+   KOMPONEN SETTINGS BARU (Tampilan / Percakapan / Data / Akun)
+   Pola: baris (row) + pemisah hairline + kontrol — bukan kartu.
+   ============================================================ */
+
+/* ---------------- Profil mini di kaki navigasi ---------------- */
+
+.settings-nav-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 6px 2px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.nav-foot-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nav-foot-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-foot-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Chevron kategori: hanya di mobile (lihat media query akhir) */
+.nav-chev {
+  display: none;
+}
+
+/* ---------------- Baris setting (label + kontrol) ---------------- */
+
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 0;
+}
+
+.set-row + .set-row {
+  border-top: 1px solid var(--border-soft);
+}
+
+.set-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.set-row-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.set-row-desc {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.set-row-ctl {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------------- Toggle switch ---------------- */
+
+.switch {
+  flex: none;
+  width: 40px;
+  height: 23px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.switch .knob {
+  display: block;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.switch.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch.on .knob {
+  transform: translateX(17px);
+  background: var(--accent-ink);
+}
+
+/* ---------------- Feedback kecil "Tersimpan" ---------------- */
+
+.pref-saved {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ok);
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.pref-saved.show {
+  opacity: 1;
+  transform: none;
+}
+
+.pref-note {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: -4px;
+}
+
+/* ---------------- Preview percakapan live ---------------- */
+/* Semua nilai mengikuti CSS var aktif → otomatis refleksi tema,
+   font, ukuran teks, kerapatan, dan accent yang dipilih. */
+
+.chat-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--wallpaper);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+}
+
+.cp-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cp-body {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--msg-gap) * 0.6);
+}
+
+.cp-row {
+  display: flex;
+}
+
+.cp-row.bot {
+  justify-content: flex-start;
+}
+
+.cp-row.user {
+  justify-content: flex-end;
+}
+
+.cp-bubble {
+  font-size: calc(var(--chat-fs) * 0.9);
+  line-height: var(--msg-lh);
+  padding: calc(var(--msg-pad-y) * 0.7) calc(var(--msg-pad-x) * 0.7);
+  max-width: 82%;
+  overflow-wrap: anywhere;
+}
+
+.cp-row.bot .cp-bubble {
+  background: var(--bubble-bot);
+  border: 1px solid var(--border-soft);
+  border-radius: 3px 10px 10px 10px;
+}
+
+.cp-row.user .cp-bubble {
+  background: var(--bubble-user);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px 3px 10px 10px;
+}
+
+/* ---------------- Pilihan tema (mini preview) ---------------- */
+
+.theme-cards {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.15s;
+}
+
+.theme-card:hover {
+  border-color: var(--text-muted);
+}
+
+.theme-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.tc-mock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 92px;
+  height: 56px;
+  padding: 8px;
+  border-radius: 5px;
+}
+
+/* Mock = gambaran tetap dari tiap tema (bukan token aktif). */
+.tc-dark { background: #111210; border: 1px solid #22231f; }
+.tc-dark .tc-line { background: #201f1d; }
+.tc-dark .tc-line.b { background: #43392c; align-self: flex-end; }
+
+.tc-light { background: #f5f1ea; border: 1px solid #ddd3c0; }
+.tc-light .tc-line { background: #ffffff; }
+.tc-light .tc-line.b { background: #e9dcc0; align-self: flex-end; }
+
+.tc-auto { background: linear-gradient(90deg, #111210 50%, #f5f1ea 50%); border: 1px solid #2a2b26; }
+.tc-auto .tc-line { background: #201f1d; }
+.tc-auto .tc-line.b { background: #43392c; align-self: flex-end; }
+
+.tc-line {
+  height: 8px;
+  width: 64%;
+  border-radius: 3px;
+}
+
+.tc-line.b {
+  width: 44%;
+}
+
+.tc-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.theme-card.active .tc-label {
+  color: var(--text);
+}
+
+/* ---------------- Pilihan font ---------------- */
+
+.font-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.font-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 9px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.font-opt:hover {
+  border-color: var(--text-muted);
+}
+
+.font-opt.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.font-sample {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* ---------------- Slider ukuran teks ---------------- */
+
+.size-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.size-a {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.size-a.big {
+  font-size: 17px;
+}
+
+.size-slider input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  min-width: 90px;
+}
+
+.size-label {
+  flex: none;
+  width: 44px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+/* ---------------- Accent (terbatas, semua hangat) ---------------- */
+
+.accent-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.accent-opt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.accent-opt:hover {
+  border-color: var(--text-muted);
+}
+
+.accent-opt.active {
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.accent-opt .dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+}
+
+/* ---------------- Data page: konfirmasi inline ---------------- */
+
+.confirm-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-danger {
+  padding: 9px 16px;
+  border-radius: var(--radius);
+  background: var(--danger);
+  border: 1px solid var(--danger);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  transition: opacity 0.15s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.wipe-msg {
+  font-size: 12.5px;
+}
+
+.wipe-msg.err {
+  color: var(--danger);
+}
+
+.wipe-msg.ok {
+  color: var(--ok);
+}
+
+/* ---------------- Akun ---------------- */
+
+.account-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.account-hero-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.account-hero-name {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-hero-mail {
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 14px;
+}
+
+/* ---------------- Mobile: baris menumpuk, chevron muncul ---------------- */
+
+@media (max-width: 859px) {
+  .set-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .set-row-ctl {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .nav-chev {
+    display: block;
+    width: 16px;
+    height: 16px;
+    margin-left: auto;
+    color: var(--muted);
+    transform: rotate(180deg);
+  }
+
+  .settings-nav-item.active .nav-chev {
+    color: var(--accent);
+  }
+
+  .font-list {
+    max-width: none;
+  }
+
+  .theme-cards {
+    width: 100%;
+  }
+
+  .settings-nav-foot {
+    display: none;   /* profil sudah terlihat di halaman Akun */
   }
 }

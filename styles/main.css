@@ -25,7 +25,9 @@
   --accent:        #c69a60;
   --accent-hover:  #d3a46c;
   --accent-ink:    #1d150d;
-  --accent-soft:   #2a241a;   /* tint hangat untuk state aktif halus */
+  /* Tint hangat state aktif — diturunkan dari accent+surface aktif,
+     otomatis ikut accent preset & tema (dark/light) tanpa kombinasi manual. */
+  --accent-soft:   color-mix(in srgb, var(--accent) 16%, var(--surface));
   --danger:     #dd7a5f;
 
   /* Bubble chat: kanvas sedikit lebih gelap dari chrome agar
@@ -48,9 +50,46 @@
   --sidebar-w: 262px;
   --shadow-1: none;   /* kompat legacy: kode lama merujuk token ini */
 
-  /* Tipografi sistem (tanpa webfont = fast loading) */
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          "Helvetica Neue", Arial, sans-serif;
+  /* Tipografi — default Manrope (self-hosted via next/font, lihat
+     app/layout.tsx); dipilih user di Settings > Tampilan (lib/prefs.ts).
+     Fallback sistem tetap dipertahankan kalau font gagal load. */
+  --font: var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Kerapatan percakapan (Settings > Tampilan > Kerapatan).
+     Default = Nyaman; diubah via JS (sama seperti --chat-fs). */
+  --msg-gap:    16px;
+  --msg-pad-y:  10px;
+  --msg-pad-x:  14px;
+  --msg-lh:     1.5;
+}
+
+/* ============================================================
+   Tema terang — override token, bukan hardcode per komponen.
+   Semua komponen sudah konsisten memakai var(--...) sehingga
+   satu blok ini cukup untuk mengubah seluruh aplikasi.
+   Palet tetap warm/editorial (bukan putih SaaS generik).
+   ============================================================ */
+html[data-theme="light"] {
+  --bg:         #f5f1ea;
+  --surface:    #ffffff;
+  --surface-2:  #f1ebe0;
+  --surface-3:  #e8e0d1;
+  --border:     #ddd3c0;
+  --input:      #ffffff;
+  --border-soft: rgba(30, 23, 13, 0.08);
+  --text:       #2b2621;
+  --text-muted: #6c6356;
+  --muted:      #8d8475;
+  --accent-ink: #1d150d;
+  --danger:     #b84f39;
+  --ok:         #5f7a4c;
+
+  --wallpaper:  #ece4d4;
+  --bubble-bot: #ffffff;
+  --bubble-user: #e9dcc0;
+
+  --overlay-shadow: 0 12px 32px rgba(40, 30, 16, 0.16), 0 2px 8px rgba(40, 30, 16, 0.1);
 }
 
 /* Fokus keyboard yang jelas dan konsisten (aksesibilitas).
@@ -187,12 +226,22 @@ input, textarea {
   }
 }
 
-/* Hormati preferensi pengguna yang mengurangi animasi */
+/* Hormati preferensi pengguna yang mengurangi animasi, DAN tombol
+   "Animasi antarmuka" manual di Settings > Tampilan (data-anim="off"
+   di <html> — lib/prefs.ts). Keduanya memakai mekanisme sama. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+html[data-anim="off"] *,
+html[data-anim="off"] *::before,
+html[data-anim="off"] *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 

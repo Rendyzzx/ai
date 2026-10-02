@@ -77,6 +77,8 @@ export interface UserProfile {
   bio: string;
   avatar: string | null;
   email?: string;
+  /** true jika akun ditautkan ke Google OAuth (lihat /api/auth/me). */
+  google_linked?: boolean;
 }
 
 /** Konfigurasi karakter companion. */

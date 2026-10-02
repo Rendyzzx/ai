@@ -23,6 +23,7 @@ import ConfirmDialog from "@/components/chat/ConfirmDialog";
 import SettingsView from "@/components/settings/SettingsView";
 import { fileOf, dlOf, musicOf, matchMusicRequest, EDIT_API, EDIT_BROWSER_TIMEOUT, EDIT_RESULT_MAX, EDIT_TRIGGER_RE, matchDlTarget } from "@/lib/chat-utils";
 import { useMusic } from "@/components/music/MusicProvider";
+import { applyAllVisualPrefs, usePref } from "@/lib/prefs";
 import type { BotConfig, ChatResponse, Conversation, ConversationItem, Message, UserProfile } from "@/types";
 
 const RENDER_BATCH = 30;
@@ -34,6 +35,7 @@ const DEFAULT_USER: UserProfile = {
   bio: "",
   avatar: null,
   email: "",
+  google_linked: false,
 };
 
 const DEFAULT_BOT_STATE: BotConfig = {
@@ -130,6 +132,12 @@ export default function ChatApp() {
     setTimeout(() => setToast(null), 1500);
   }, []);
 
+  // Preferensi chat (Settings > Percakapan) — sinkron lintas komponen
+  // dalam tab yang sama via event "aomi:pref" (lihat lib/prefs.ts).
+  const [enterToSend] = usePref("enterToSend");
+  const [autoScroll] = usePref("autoScroll");
+  const [showCode] = usePref("showCode");
+
   const scrollToBottom = useCallback((smooth: boolean) => {
     requestAnimationFrame(() => {
       const el = scrollRef.current;
@@ -188,13 +196,25 @@ export default function ChatApp() {
         else localStorage.removeItem("aomi.cache.userAvatar");
       } catch { /* private mode / quota */ }
 
-      setUser({ ...DEFAULT_USER, ...profile, email: me.user?.email || "" });
+      setUser({
+        ...DEFAULT_USER,
+        ...profile,
+        email: me.user?.email || "",
+        google_linked: Boolean(me.user?.google_linked),
+      });
       setBot({ ...DEFAULT_BOT_STATE, ...botCfg.bot });
 
+      // Migrasi satu-kali: key lama "aomi.fontSize" (2 level) → preferensi
+      // baru "aomi.pref.textSize" (3 level, lihat lib/prefs.ts), lalu
+      // terapkan SEMUA preferensi visual (tema/font/ukuran/kerapatan/accent/animasi).
       try {
-        const fs = localStorage.getItem("aomi.fontSize");
-        if (fs) document.documentElement.style.setProperty("--chat-fs", fs + "px");
+        const legacy = localStorage.getItem("aomi.fontSize");
+        if (legacy && !localStorage.getItem("aomi.pref.textSize")) {
+          localStorage.setItem("aomi.pref.textSize", legacy === "16.5" ? "large" : "medium");
+          localStorage.removeItem("aomi.fontSize");
+        }
       } catch { /* private mode */ }
+      applyAllVisualPrefs();
 
       const convData = await convPromise;
       const bootItems: ConversationItem[] = convData ? convData.items || [] : [];
@@ -732,9 +752,9 @@ export default function ChatApp() {
       } finally {
         loadingRef.current = false;
       }
-      if (ok && nearBottomRef.current) scrollToBottom(true);
+      if (ok && autoScroll && nearBottomRef.current) scrollToBottom(true);
     },
-    [loadConversation, pushMessages, refreshSidebar, runEditJob, scrollToBottom]
+    [loadConversation, pushMessages, refreshSidebar, runEditJob, scrollToBottom, autoScroll]
   );
 
   const doRegenerate = useCallback(
@@ -781,9 +801,9 @@ export default function ChatApp() {
       } finally {
         loadingRef.current = false;
       }
-      if (ok && nearBottomRef.current) scrollToBottom(true);
+      if (ok && autoScroll && nearBottomRef.current) scrollToBottom(true);
     },
-    [loadConversation, pushMessages, refreshSidebar, runEditJob, scrollToBottom]
+    [loadConversation, pushMessages, refreshSidebar, runEditJob, scrollToBottom, autoScroll]
   );
 
   /* ---------------- Long-press (mobile) untuk menu pesan ---------------- */
@@ -863,6 +883,7 @@ export default function ChatApp() {
         key={(m.message_id || "m") + "-" + i + "-" + (m.timestamp || "")}
         role={m.role}
         content={m.content || ""}
+        showCode={showCode}
         isError={Boolean((m as Message & { isErrorHint?: boolean }).isErrorHint)}
         showName={showName}
         imageUrl={m.image || m.image_url || null}
@@ -1125,8 +1146,11 @@ export default function ChatApp() {
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
-                    void send(input);
+                    if (enterToSend) {
+                      e.preventDefault();
+                      void send(input);
+                    }
+                    // OFF → perilaku default textarea: baris baru.
                   }
                 }}
               />
@@ -1186,6 +1210,10 @@ export default function ChatApp() {
           user={user}
           bot={bot}
           onClose={() => setSettingsOpen(false)}
+          onConversationsCleared={() => {
+            resetView();                 // kosongkan jendela chat aktif
+            void refreshSidebar();       // sinkronkan daftar di sidebar
+          }}
           onUserUpdate={(u) => setUser((prev) => ({ ...prev, ...u }))}
           onBotUpdate={(b) => setBot((prev) => ({ ...prev, ...b }))}
           onLogout={handleLogout}

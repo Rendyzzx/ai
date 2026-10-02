@@ -100,7 +100,7 @@
   padding: 0 clamp(14px, 3vw, 24px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--msg-gap, 16px);     /* Settings > Tampilan > Kerapatan */
 }
 
 /* Layar sambutan: preview percakapan personal — avatar karakter +
@@ -291,9 +291,10 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;       /* URL panjang tidak merusak layout */
   font-size: var(--chat-fs, 15px);
+  line-height: var(--msg-lh, 1.5);
   width: fit-content;
   max-width: 100%;
-  padding: 10px 14px;
+  padding: var(--msg-pad-y, 10px) var(--msg-pad-x, 14px); /* Kerapatan */
 }
 
 /* Bubble bot (kiri): sudut "ekor" kecil di dekat avatar (atas-kiri).
