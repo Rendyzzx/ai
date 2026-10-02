@@ -697,9 +697,9 @@
   max-width: 1000px;
   margin: 0 auto;
   display: flex;
-  align-items: flex-end;
+  align-items: center;      /* tombol & textarea satu baris center = simetris atas-bawah */
   gap: 8px;
-  padding: 7px 7px 7px 8px;
+  padding: 7px 8px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -716,7 +716,6 @@
   width: 40px;
   height: 40px;
   flex: none;
-  align-self: flex-end;
   border-radius: var(--radius);
   display: grid;
   place-items: center;
