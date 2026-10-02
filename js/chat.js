@@ -38,7 +38,6 @@ export function initChat() {
   els.earlierWrap = $('#loadEarlierWrap');
   els.title = $('#chatTitle');
   els.charAvatar = $('#charAvatar');
-  els.charStatus = $('#charStatus');
   els.welcomeAvatar = $('#welcomeAvatar');
   els.welcomeSub = $('#welcomeSub');
   els.input = $('#input');
@@ -90,32 +89,9 @@ async function bootstrapOpen() {
   }
 }
 
-// Status pendek dari personality — terasa hidup, bukan "AI ready"
-const STATUS_BY_TRAIT = {
-  playful: 'iseng mode',
-  teasing: 'ngerjain rencana iseng…',
-  caring: 'mikirin kamu',
-  shy: 'ngetik pelan-pelan…',
-  calm: 'online',
-  energetic: 'brimming energi',
-  sarcastic: 'nahan komentar',
-  affectionate: 'thinking about you',
-  reserved: 'online'
-};
-
-function statusText(traits) {
-  const list = Array.isArray(traits) && traits.length ? traits : ['calm'];
-  // ambil status pertama yang punya teks khas; fallback 'online'
-  for (const t of list) {
-    if (STATUS_BY_TRAIT[t] && STATUS_BY_TRAIT[t] !== 'online') return STATUS_BY_TRAIT[t];
-  }
-  return 'online';
-}
-
 function updateCharHead() {
   els.title.textContent = state.bot.bot_name || 'Aomi';
   renderAvatar(els.charAvatar, state.bot.bot_avatar, 'logo');
-  els.charStatus.textContent = statusText(state.bot.traits);
   // welcome personal: avatar karakter, bukan judul/slogan besar
   renderAvatar(els.welcomeAvatar, state.bot.bot_avatar, 'logo');
 }

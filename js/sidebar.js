@@ -24,7 +24,6 @@ export function initSidebar() {
   els.charCard = $('#charCard');
   els.charAvatar = $('#charCardAvatar');
   els.charName = $('#charCardName');
-  els.charStatus = $('#charCardStatus');
 
   bindEvents();
   renderCharCard();
@@ -37,11 +36,6 @@ export function initSidebar() {
 // Kartu karakter di sidebar — identitas utama aplikasi
 function renderCharCard() {
   els.charName.textContent = state.bot.bot_name || 'Aomi';
-  const traits = Array.isArray(state.bot.traits) ? state.bot.traits : [];
-  const tag = { playful: 'iseng mode', caring: 'mikirin kamu', shy: 'pemalu tapi hangat',
-    energetic: 'energik', sarcastic: 'receh', affectionate: 'mesra', reserved: 'pendiam',
-    teasing: 'suka nggodain', calm: 'tenang' }[traits[0] || ''] || 'online';
-  els.charStatus.textContent = tag;
   renderAvatar(els.charAvatar, state.bot.bot_avatar, 'logo');
 }
 
