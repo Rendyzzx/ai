@@ -20,7 +20,13 @@ import MessageRow, {
 } from "@/components/chat/MessageRow";
 import MessageMenu, { type MenuState } from "@/components/chat/MessageMenu";
 import ConfirmDialog from "@/components/chat/ConfirmDialog";
-import SettingsView from "@/components/settings/SettingsView";
+// Settings (±40KB) jarang dibuka → dynamic import, keluar dari
+// initial chat bundle. ssr:false aman: ChatApp sendiri client-only.
+import dynamic from "next/dynamic";
+const SettingsView = dynamic(() => import("@/components/settings/SettingsView"), {
+  ssr: false,
+  loading: () => <div className="chat-gate" aria-hidden="true" />,
+});
 import { fileOf, dlOf, musicOf, matchMusicRequest, EDIT_API, EDIT_BROWSER_TIMEOUT, EDIT_RESULT_MAX, EDIT_TRIGGER_RE, matchDlTarget } from "@/lib/chat-utils";
 import { useMusic } from "@/components/music/MusicProvider";
 import { applyAllVisualPrefs, usePref } from "@/lib/prefs";

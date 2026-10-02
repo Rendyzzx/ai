@@ -3,8 +3,7 @@ import "../styles/sidebar.css";
 import "../styles/chat.css";
 import "../styles/settings.css";
 import "../styles/music.css";
-import ChatApp from "@/components/chat/ChatApp";
-import MusicProvider from "@/components/music/MusicProvider";
+import ChatGate from "@/components/chat/ChatGate";
 
 /** Chat app butuh login → tidak diindeks search engine.
  *  Meta google-site-verification tetap tampil (dari layout). */
@@ -14,9 +13,5 @@ export const metadata: Metadata = {
 };
 
 export default function ChatPage() {
-  return (
-    <MusicProvider>
-      <ChatApp />
-    </MusicProvider>
-  );
+  return <ChatGate />;
 }

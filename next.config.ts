@@ -15,6 +15,20 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Artwork & aset visual — nama file stabil, jarang berubah.
+        // 30 hari: repeat visit tidak download ulang ±967KB aset.
+        source: "/assets/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=2592000, stale-while-revalidate=86400" },
+        ],
+      },
+      {
+        source: "/icons.svg",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=2592000, stale-while-revalidate=86400" },
+        ],
+      },
+      {
         source: "/api/:path*",
         headers: [
           { key: "Cache-Control", value: "no-store" },

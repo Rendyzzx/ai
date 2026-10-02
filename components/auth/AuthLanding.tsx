@@ -17,6 +17,7 @@
    Login/register logic TIDAK diubah — port dari auth.html + js/auth.js.
    ============================================================ */
 
+import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import BrandSplash from "@/components/brand/BrandSplash";
 import { getSessionId, setSessionId, clearSessionId } from "@/lib/session";
@@ -404,7 +405,14 @@ export default function AuthLanding() {
               <div className="hero-visual-move" ref={parallaxRef}>
                 <div className="hero-visual-idle">
                   <figure className="hero-visual-art" aria-hidden="true">
-                    <img src="/assets/auth-hero.png" alt="" />
+                    <Image
+                      src="/assets/auth-hero.png"
+                      alt=""
+                      width={900}
+                      height={1120}
+                      priority
+                      sizes="(max-width: 860px) 88vw, 380px"
+                    />
                   </figure>
                   <div className="hero-chat-card" aria-hidden="true">
                     <div className="hero-chat-card-head">
@@ -711,7 +719,13 @@ export default function AuthLanding() {
               </p>
             </div>
             <figure className="about-art" aria-hidden="true">
-              <img src="/assets/auth-banner-open.png" alt="" />
+              <Image
+                src="/assets/auth-banner-open.png"
+                alt=""
+                width={1200}
+                height={900}
+                sizes="(max-width: 860px) 92vw, 460px"
+              />
             </figure>
           </div>
         </section>
@@ -742,8 +756,8 @@ export default function AuthLanding() {
           <section className="auth-panel">
             {/* Peekaboo: mata terbuka saat isi username/email, nutup saat fokus password */}
             <div className={"peekaboo" + (peeking ? " peeking" : "")} id="peekaboo" aria-hidden="true">
-              <img className="peek-img peek-open" src="/assets/auth-banner-open.png" alt="" />
-              <img className="peek-img peek-closed" src="/assets/auth-banner-closed.png" alt="" />
+              <Image className="peek-img peek-open" src="/assets/auth-banner-open.png" alt="" width={260} height={340} sizes="220px" />
+              <Image className="peek-img peek-closed" src="/assets/auth-banner-closed.png" alt="" width={260} height={340} sizes="220px" />
             </div>
 
             <div className="auth-body">

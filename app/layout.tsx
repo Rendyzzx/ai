@@ -11,10 +11,13 @@ const googleVerification = process.env.GOOGLE_SITE_VERIFICATION || "";
 // bukan dimuat dari CDN runtime — aman & tanpa request eksternal tambahan.
 // Dipasang sebagai CSS var di <html>; var --font aktif dipilih oleh
 // lib/prefs.ts (lihat FONT_STACKS) sesuai preferensi user.
+// Preload HANYA font default (manrope) — 3 font lain di-load on-demand
+// saat user memilihnya di Settings (mengurangi font blocking di first load;
+// sebelumnya 4 family × 2 file ikut di-preload).
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", display: "swap" });
-const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dmsans", display: "swap" });
-const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-plusjakarta", display: "swap" });
-const instrumentSans = Instrument_Sans({ subsets: ["latin"], variable: "--font-instrument", display: "swap" });
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dmsans", display: "swap", preload: false });
+const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-plusjakarta", display: "swap", preload: false });
+const instrumentSans = Instrument_Sans({ subsets: ["latin"], variable: "--font-instrument", display: "swap", preload: false });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),

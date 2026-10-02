@@ -1049,3 +1049,12 @@
     display: grid;
   }
 }
+
+/* Gate senyap saat chat bundle di-load dinamis / redirect ke /auth.
+   Mengikuti tema (bukan putih polos) supaya tanpa flash. */
+.chat-gate {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 0;
+}
