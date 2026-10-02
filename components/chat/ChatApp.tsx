@@ -71,6 +71,8 @@ export default function ChatApp() {
   const [bot, setBot] = useState<BotConfig>(DEFAULT_BOT_STATE);
 
   const [items, setItems] = useState<ConversationItem[]>([]);
+  const [itemsHasMore, setItemsHasMore] = useState(false);
+  const itemsOffsetRef = useRef(0);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Message[]>([]);
   const [firstHidden, setFirstHidden] = useState(0);
@@ -174,7 +176,7 @@ export default function ChatApp() {
     }
 
     try {
-      const convPromise = apiJson<{ items: ConversationItem[] }>("/api/conversations").catch(
+      const convPromise = apiJson<{ items: ConversationItem[]; has_more?: boolean }>("/api/conversations?limit=50").catch(
         () => null
       );
       const [meRes, profileRes, botRes] = await Promise.all([
@@ -219,6 +221,8 @@ export default function ChatApp() {
       const convData = await convPromise;
       const bootItems: ConversationItem[] = convData ? convData.items || [] : [];
       setItems(bootItems);
+      itemsOffsetRef.current = bootItems.length;
+      setItemsHasMore(Boolean((convData as { has_more?: boolean } | null)?.has_more));
 
       // Returning user: langsung buka percakapan terakhir. Belum ada
       // percakapan → biarkan kosong, user yang mulai ngobrol duluan.
@@ -281,10 +285,33 @@ export default function ChatApp() {
 
   const refreshSidebar = useCallback(async () => {
     try {
-      const data = await apiJson<{ items: ConversationItem[] }>("/api/conversations");
+      const data = await apiJson<{ items: ConversationItem[]; has_more?: boolean }>(
+        "/api/conversations?limit=50"
+      );
       setItems(data.items || []);
+      itemsOffsetRef.current = (data.items || []).length;
+      setItemsHasMore(Boolean(data.has_more));
     } catch {
       // Error sesaat → PERTAHANKAN daftar lama.
+    }
+  }, []);
+
+  // Halaman berikutnya (sidebar: "Muat yang lebih lama")
+  const loadMoreItems = useCallback(async () => {
+    try {
+      const data = await apiJson<{ items: ConversationItem[]; has_more?: boolean }>(
+        "/api/conversations?limit=50&offset=" + itemsOffsetRef.current
+      );
+      const page = data.items || [];
+      setItems((prev) => {
+        const seen = new Set(prev.map((c) => c.conversation_id));
+        const merged = [...prev, ...page.filter((c) => !seen.has(c.conversation_id))];
+        itemsOffsetRef.current = merged.length;
+        return merged;
+      });
+      setItemsHasMore(Boolean(data.has_more));
+    } catch {
+      /* gagal load lebih → biarkan tombol tetap ada */
     }
   }, []);
 
@@ -949,6 +976,8 @@ export default function ChatApp() {
       <div className="app">
         <Sidebar
           items={items}
+          hasMore={itemsHasMore}
+          onLoadMore={() => void loadMoreItems()}
           activeId={currentId}
           botName={botName}
           botAvatar={bot.bot_avatar}

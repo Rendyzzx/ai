@@ -6,8 +6,8 @@
 
 import { readJson, putJson } from "@/lib/server/store";
 import { getSession } from "@/lib/server/auth";
-import { allow, clientIp } from "@/lib/server/ratelimit";
-import { json, methodNotAllowed, readBody } from "@/lib/server/http";
+import { allowUser } from "@/lib/server/ratelimit";
+import { json, methodNotAllowed, readBody, forbidden, originOk } from "@/lib/server/http";
 import { DEFAULT_BOT, TRAITS, SPEAKING_STYLES, RELATIONSHIPS } from "@/lib/server/bot-config";
 import type { BotConfig } from "@/types";
 
@@ -53,6 +53,8 @@ export async function GET(req: Request) {
   if (!session) return json({ error: "Sesi berakhir. Silakan login kembali.", code: "SESSION_INVALID" }, 401);
   const uid = session.user_id;
 
+  if (!originOk(req)) return forbidden();
+
   const botPath = `bots/${uid}.json`;
   const existing = await readJson<BotConfig>(botPath);
   const current: BotConfig = { ...DEFAULT_BOT, ...(existing?.data || {}) };
@@ -68,7 +70,7 @@ export async function PUT(req: Request) {
   const existing = await readJson<BotConfig>(botPath);
   const current: BotConfig = { ...DEFAULT_BOT, ...(existing?.data || {}) };
 
-  if (!allow("bot:" + clientIp(req.headers), 10, 60 * 1000)) {
+  if (!allowUser("bot", uid, req, 20, 60 * 1000)) {
     return json({ error: "Terlalu banyak perubahan. Tunggu sebentar." }, 429);
   }
 

@@ -8,7 +8,8 @@
 import crypto from "node:crypto";
 import { readJson, putJson, updateJson, deleteJson, listJsonPaths } from "@/lib/server/store";
 import { getSession } from "@/lib/server/auth";
-import { json, methodNotAllowed, readBody } from "@/lib/server/http";
+import { allowUser } from "@/lib/server/ratelimit";
+import { json, methodNotAllowed, readBody, tooMany, forbidden, originOk } from "@/lib/server/http";
 import type { Conversation, ConversationItem, Message } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,11 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
   // ?export=1 → unduhan lengkap (Settings > Data). Login wajib (dicek di atas).
+  // Ini satu-satunya jalur "mass read" → limit sangat ketat per user.
   if (searchParams.get("export") === "1") {
+    if (!allowUser("convs-export", uid, req, 3, 60 * 60_000)) {
+      return tooMany("Ekspor dibatasi 3x per jam. Tunggu sebentar ya.");
+    }
     const idx = await readIndex(uid);
     const conversations: Conversation[] = [];
     for (const item of idx) {
@@ -66,19 +71,38 @@ export async function GET(req: Request) {
     const file = await readJson<Conversation>(convPath(uid, id));
     if (!file) return json({ error: "Percakapan tidak ditemukan" }, 404);
     // Jangan bocorkan session_id Gemini ke klien
+    if (!allowUser("convs-read", uid, req, 120, 60_000)) {
+      return tooMany();
+    }
     const { geminiSessionId: _gsid, ...safe } = file.data as Conversation & { geminiSessionId?: unknown };
     // Defensif: pesan harus array of object
     safe.messages = (Array.isArray(safe.messages) ? safe.messages : [])
       .filter((m) => m && typeof m === "object") as Message[];
     return json({ conversation: safe });
   }
-  return json({ items: await readIndex(uid) });
+
+  // ---------------- Daftar (paginated) ----------------
+  // Anti-scraping: ukuran halaman DIBATASI server (maks 50) —
+  // ?limit=999999 diabaikan. Offset divalidasi sebagai integer.
+  if (!allowUser("convs-list", uid, req, 120, 60_000)) {
+    return tooMany();
+  }
+  const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "50", 10) || 50, 1), 50);
+  const offset = Math.max(parseInt(searchParams.get("offset") || "0", 10) || 0, 0);
+  const all = await readIndex(uid);
+  const items = all.slice(offset, offset + limit);
+  return json({ items, total: all.length, has_more: offset + items.length < all.length });
 }
 
 export async function POST(req: Request) {
   const session = await getSession(req.headers);
   if (!session) return json({ error: "Belum login", code: "SESSION_INVALID" }, 401);
   const uid = session.user_id;
+
+  if (!originOk(req)) return forbidden();
+  if (!allowUser("convs-write", uid, req, 40, 60_000)) {
+    return tooMany();
+  }
 
   const body = await readBody(req);
 
@@ -143,11 +167,20 @@ export async function DELETE(req: Request) {
   if (!session) return json({ error: "Belum login", code: "SESSION_INVALID" }, 401);
   const uid = session.user_id;
 
+  if (!originOk(req)) return forbidden();
+  if (!allowUser("convs-del", uid, req, 60, 60_000)) {
+    return tooMany();
+  }
+
   const { searchParams } = new URL(req.url);
 
   // ?all=1 → hapus SEMUA percakapan user. Jalur khusus Settings > Data;
   // konfirmasi dua-langkah ada di UI, server tetap butuh session valid.
+  // Destruktif → jauh lebih ketat dari delete biasa.
   if (searchParams.get("all") === "1") {
+    if (!allowUser("convs-wipe", uid, req, 6, 60 * 60_000)) {
+      return tooMany("Hapus massal dibatasi 6x per jam. Tunggu sebentar ya.");
+    }
     const idx = await readIndex(uid);
     for (const item of idx) {
       await deleteJson(convPath(uid, item.conversation_id));

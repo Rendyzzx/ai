@@ -6,6 +6,7 @@
 // ============================================================
 
 import { readJson } from "@/lib/server/store";
+import { allowIp } from "@/lib/server/ratelimit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -19,6 +20,12 @@ interface TempImgRecord {
 }
 
 export async function GET(req: Request) {
+  // Publik by design (dipakai API edit eksternal sebagai sumber gambar),
+  // tapi dibatasi per IP + log untuk memperlambat enumerasi ID.
+  if (!allowIp("tempimg", req, 120, 60_000)) {
+    return Response.json({ error: "Terlalu banyak permintaan." }, { status: 429 });
+  }
+
   const { searchParams } = new URL(req.url);
   const id = String(searchParams.get("id") || "");
   if (!ID_RE.test(id)) {

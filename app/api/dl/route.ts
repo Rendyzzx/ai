@@ -7,7 +7,7 @@
 // ============================================================
 
 import { getSession } from "@/lib/server/auth";
-import { allow, clientIp } from "@/lib/server/ratelimit";
+import { allowUser } from "@/lib/server/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +39,7 @@ export async function GET(req: Request) {
     );
   }
 
-  if (!allow("dl:" + clientIp(req.headers), 15, 60_000)) {
+  if (!allowUser("dl", session.user_id, req, 15, 60_000)) {
     return Response.json({ error: "Terlalu banyak unduhan. Tunggu sebentar." }, { status: 429 });
   }
 

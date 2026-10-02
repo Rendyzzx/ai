@@ -6,7 +6,7 @@
 // ============================================================
 
 import { readJson } from "@/lib/server/store";
-import { allow, clientIp } from "@/lib/server/ratelimit";
+import { allowIp, securityLog, clientIp } from "@/lib/server/ratelimit";
 import {
   verifyPassword,
   verifyCaptcha,
@@ -23,7 +23,7 @@ const GENERIC_FAIL = "Email/username atau password salah.";
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  if (!allow("login:" + ip, 10, 60 * 1000)) {
+  if (!allowIp("login", req, 10, 60 * 1000)) {
     return json({ error: "Terlalu banyak percobaan. Coba lagi nanti." }, 429);
   }
 

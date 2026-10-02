@@ -7,8 +7,8 @@
 
 import { readJson, putJson, updateJson } from "@/lib/server/store";
 import { getSession } from "@/lib/server/auth";
-import { allow, clientIp } from "@/lib/server/ratelimit";
-import { json, methodNotAllowed, readBody } from "@/lib/server/http";
+import { allowUser } from "@/lib/server/ratelimit";
+import { json, methodNotAllowed, readBody, forbidden, originOk } from "@/lib/server/http";
 import type { UserProfile } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +68,8 @@ export async function GET(req: Request) {
   if (!session) return json({ error: "Sesi berakhir. Silakan login kembali.", code: "SESSION_INVALID" }, 401);
   const uid = session.user_id;
 
+  if (!originOk(req)) return forbidden();
+
   const userFile = await readJson<StoredUser>(`users/${uid}.json`);
   if (!userFile) return json({ error: "User tidak ditemukan", code: "SESSION_INVALID" }, 401);
   const user = userFile.data;
@@ -89,7 +91,7 @@ export async function PUT(req: Request) {
   if (!userFile) return json({ error: "User tidak ditemukan", code: "SESSION_INVALID" }, 401);
   const user = userFile.data;
 
-  if (!allow("profile:" + clientIp(req.headers), 10, 60 * 1000)) {
+  if (!allowUser("profile", uid, req, 20, 60 * 1000)) {
     return json({ error: "Terlalu banyak perubahan. Tunggu sebentar." }, 429);
   }
 

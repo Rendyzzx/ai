@@ -491,3 +491,23 @@
 .confirm-ok:hover {
   filter: brightness(1.08);
 }
+
+/* Tombol muat halaman percakapan berikutnya (pagination server 50/page) */
+.sb-loadmore {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 6px 8px 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+  background: none;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  text-align: center;
+  transition: color 0.14s, border-color 0.14s;
+}
+
+.sb-loadmore:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}

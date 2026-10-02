@@ -7,7 +7,7 @@
 
 import crypto from "node:crypto";
 import { readJson, putJson, updateJson } from "@/lib/server/store";
-import { allow, clientIp } from "@/lib/server/ratelimit";
+import { allowIp, securityLog, clientIp } from "@/lib/server/ratelimit";
 import {
   hashPassword,
   validateCredentials,
@@ -25,7 +25,7 @@ interface UserIndex {
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  if (!allow("register:" + ip, 5, 10 * 60 * 1000)) {
+  if (!allowIp("register", req, 5, 10 * 60 * 1000)) {
     return json({ error: "Terlalu banyak percobaan. Coba lagi nanti." }, 429);
   }
 

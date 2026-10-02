@@ -28,3 +28,38 @@ export async function readBody(req: Request): Promise<Record<string, unknown>> {
     return {};
   }
 }
+
+/** 429 Too Many Requests — dengan Retry-After standar. */
+export function tooMany(message = "Terlalu banyak permintaan. Tunggu sebentar."): NextResponse {
+  const res = NextResponse.json({ error: message }, { status: 429 });
+  res.headers.set("Retry-After", "30");
+  res.headers.set("Cache-Control", "no-store");
+  return res;
+}
+
+/** 403 — permintaan ditolak (origin/state tidak sah). */
+export function forbidden(message = "Permintaan ditolak."): NextResponse {
+  const res = NextResponse.json({ error: message }, { status: 403 });
+  res.headers.set("Cache-Control", "no-store");
+  return res;
+}
+
+/**
+ * Defense-in-depth CSRF/origin check untuk request state-changing.
+ * Sesi Aomi dikirim via header kustom (bukan cookie), sehingga CSRF
+ * klasik sudah tidak mungkin; pemeriksaan ini menolak request
+ * cross-origin yang menyertakan Origin (mis. form lintas situs).
+ * Origin absen (curl, server-to-server) tetap boleh — autentikasi
+ * session tetap menjadi gerbang utama.
+ */
+export function originOk(req: Request): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return true; // non-browser / same-origin tanpa Origin header
+  try {
+    const o = new URL(origin);
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
+    return o.host === host;
+  } catch {
+    return false;
+  }
+}

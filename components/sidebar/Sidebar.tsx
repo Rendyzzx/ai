@@ -34,6 +34,8 @@ function groupByTime(list: ConversationItem[]): Group[] {
 
 export default function Sidebar({
   items,
+  hasMore,
+  onLoadMore,
   activeId,
   botName,
   botAvatar,
@@ -51,6 +53,8 @@ export default function Sidebar({
   onRecover,
 }: {
   items: ConversationItem[];
+  hasMore?: boolean;
+  onLoadMore?: () => void;
   activeId: string | null;
   botName: string;
   botAvatar: string | null;
@@ -196,7 +200,8 @@ export default function Sidebar({
               )}
             </>
           ) : (
-            groups.map((group) => (
+            <>
+              {groups.map((group) => (
               <div className="sb-group" key={group.label + group.items[0].conversation_id}>
                 <div className="sb-group-label">{group.label}</div>
                 {group.items.map((conv) => (
@@ -224,7 +229,17 @@ export default function Sidebar({
                   </div>
                 ))}
               </div>
-            ))
+              ))}
+              {hasMore && onLoadMore && (
+                <button
+                  type="button"
+                  className="sb-loadmore"
+                  onClick={onLoadMore}
+                >
+                  Muat yang lebih lama
+                </button>
+              )}
+            </>
           )}
           <div ref={sentinelRef} data-sentinel="" />
         </nav>

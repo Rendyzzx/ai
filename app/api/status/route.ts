@@ -17,7 +17,7 @@
 // ============================================================
 
 import { json } from "@/lib/server/http";
-import { allow, clientIp } from "@/lib/server/ratelimit";
+import { allowIp, clientIp } from "@/lib/server/ratelimit";
 import { readJson, USE_REDIS } from "@/lib/server/store";
 import { APP_VERSION } from "@/lib/server/version";
 
@@ -70,7 +70,7 @@ export async function GET(req: Request) {
   // Publik tanpa login → rate limit per IP agar tidak disalahgunakan
   // untuk membebani ping database / cek AI.
   const ip = clientIp(req.headers);
-  if (!allow("status:" + ip, 30, 60_000)) {
+  if (!allowIp("status", req, 30, 60_000)) {
     return json({ error: "Terlalu banyak permintaan. Coba lagi sebentar." }, 429);
   }
 

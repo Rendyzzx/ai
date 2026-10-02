@@ -14,7 +14,7 @@
 // ============================================================
 
 import { getSession } from "@/lib/server/auth";
-import { allow, clientIp } from "@/lib/server/ratelimit";
+import { allowUser } from "@/lib/server/ratelimit";
 import { savetubeAudio, MusicError } from "@/lib/server/music";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
 
   // ---------------- Resolve: link audio segar untuk player ----------------
   if (action === "resolve") {
-    if (!allow("musicres:" + clientIp(req.headers), 20, 60_000)) {
+    if (!allowUser("musicres", session.user_id, req, 20, 60_000)) {
       return errorJson("Terlalu banyak permintaan. Tunggu sebentar.", 429);
     }
     try {
@@ -74,7 +74,7 @@ export async function GET(req: Request) {
 
   // ---------------- DL: proxy audio sebagai file unduhan ----------------
   if (action === "dl") {
-    if (!allow("musicdl:" + clientIp(req.headers), 15, 60_000)) {
+    if (!allowUser("musicdl", session.user_id, req, 15, 60_000)) {
       return errorJson("Terlalu banyak unduhan. Tunggu sebentar.", 429);
     }
 
