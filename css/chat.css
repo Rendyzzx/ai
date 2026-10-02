@@ -296,11 +296,20 @@
   max-width: min(280px, 100%);
   max-height: 320px;
   border-radius: 10px;
-  margin-bottom: 4px;
+  margin: 0 auto 8px;            /* center otomatis saat bubble lebih lebar
+                                     dari gambar (mis. teks caption panjang) */
 }
 
 .message-content:has(.message-image) {
   padding: 5px;
+}
+
+/* Teks caption di bawah gambar butuh jarak sendiri dari padding 5px
+   milik gambar — block (bukan inline) biar padding konsisten di
+   setiap baris saat teks wrap, bukan cuma baris pertama/terakhir. */
+.message-content:has(.message-image) .message-text {
+  display: block;
+  padding: 2px 9px 4px;
 }
 
 .message-row.error .message-content {
