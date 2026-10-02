@@ -1063,16 +1063,15 @@ h1, h2, h3 {
     gap: 36px;
   }
   .hero-actions { margin-bottom: 0; }
-  /* Artwork nempel ke tepi kiri layar (bleed 24px = padding halaman) —
-     framing asimetris, kartu chat overlap dari kanan. Bukan poster
-     rapi di tengah. */
+  /* Artwork ditengahkan dengan jarak simetris ke kiri/kanan (dalam
+     padding halaman 24px) — kartu chat overlap dari kanan bawah. */
   .hero-visual {
     max-width: 430px;
     width: 100%;
-    margin: 0 0 0 -24px;
+    margin: 0 auto;
     padding-bottom: 52px;
   }
-  .hero-chat-card { left: auto; right: 16px; }
+  .hero-chat-card { left: auto; right: 0; }
   .hero-feats { gap: 6px 20px; padding-top: 16px; }
 
   .personal-grid { grid-template-columns: 1fr; gap: 32px; }
