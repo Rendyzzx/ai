@@ -603,7 +603,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Thumbnail tidak valid' });
     }
     target.image = thumb;
-    await putJson(convPath, conv, 'edit result thumb');
+    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'edit result thumb');
     return res.status(200).json({ ok: true });
   }
 
@@ -680,7 +680,7 @@ export default async function handler(req, res) {
     conv.updated_at = new Date().toISOString();
     if (regOut.geminiSid) conv.geminiSessionId = regOut.geminiSid;
 
-    await putJson(convPath, conv, 'message regenerate/edit');
+    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'message regenerate/edit');
     await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
       const items = Array.isArray(current) ? current : [];
       const entry = {
@@ -790,7 +790,7 @@ export default async function handler(req, res) {
     if (conv.title === 'Chat baru') conv.title = message.slice(0, 48) || 'Edit foto';
     conv.updated_at = now;
 
-    await putJson(convPath, conv, 'photo edit append');
+    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'photo edit append');
     await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
       const items = Array.isArray(current) ? current : [];
       const entry = { conversation_id: conv.conversation_id, title: conv.title, updated_at: conv.updated_at };
