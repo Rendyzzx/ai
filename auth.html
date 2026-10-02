@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#151413" />
+  <meta name="theme-color" content="#131211" />
   <meta name="robots" content="noindex" />
   <title>Masuk — Aomi</title>
-  <link rel="icon" href="assets/favicon.svg?v=b58dc0bf65" type="image/svg+xml" />
-  <link rel="stylesheet" href="css/main.css?v=b58dc0bf65" />
-  <link rel="stylesheet" href="css/auth.css?v=b58dc0bf65" />
+  <link rel="icon" href="assets/favicon.svg?v=60b1f9982d" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/main.css?v=60b1f9982d" />
+  <link rel="stylesheet" href="css/auth.css?v=60b1f9982d" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!-- Font non-blocking: tidak menahan render halaman login (display=swap, FOUT singkat ok) -->
@@ -20,7 +20,7 @@
   <!-- Opening animation: overlay visual saja, aplikasi dirender di belakang -->
   <div id="app-intro" aria-hidden="true">
     <div class="intro-content">
-      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg?v=b58dc0bf65#logo" /></svg>
+      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#logo" /></svg>
       <div class="intro-name">Aomi</div>
       <div class="intro-sub">seseorang menunggumu di sini</div>
     </div>
@@ -28,35 +28,24 @@
 
   <main class="auth-shell">
     <!-- ============ PANEL BRAND (desktop) ============ -->
+    <!-- Bentuk organik (blob) + pesan sambutan + CTA yang benar-benar
+         beraksi (pindah ke tab Daftar) — bukan dekorasi kosong. -->
     <section class="auth-brand" aria-hidden="true">
+      <div class="auth-blobs">
+        <span class="blob blob-1"></span>
+        <span class="blob blob-2"></span>
+        <span class="blob blob-3"></span>
+      </div>
       <div class="auth-brand-inner">
         <div class="brand-wordmark">
           <span class="bw-title">Aomi</span>
           <span class="bw-kicker">Asisten</span>
         </div>
-        <div class="auth-visual">
-          <div class="mock-msg bot">
-            <span>musik favorit kamu apa?</span>
-          </div>
-          <div class="mock-msg user">
-            <span>love, wave earth</span>
-          </div>
-          <div class="mock-msg bot">
-            <span>:D</span>
-          </div>
-          <div class="mock-msg user">
-            <span>kalau kamu?</span>
-          </div>
-          <div class="mock-msg bot">
-            <span>rahasia wlee</span>
-          </div>
-          <div class="mock-msg user">
-            <span>amboy</span>
-          </div>
-          <div class="mock-msg bot typing">
-            <span class="mock-dots"><i></i><i></i><i></i></span>
-          </div>
+        <div class="brand-copy">
+          <h3 id="brandHeadline">Dia menunggumu di seberang sini.</h3>
+          <p id="brandSub">Masuk untuk lanjut ceritamu, atau mulai yang baru.</p>
         </div>
+        <button type="button" class="brand-cta" id="brandCta">Buat akun baru</button>
       </div>
     </section>
 
@@ -64,7 +53,8 @@
     <section class="auth-panel-wrap">
       <div class="auth-panel">
         <header class="auth-head">
-          <svg class="icon auth-mobile-logo"><use href="components/icons.svg?v=b58dc0bf65#logo" /></svg>
+          <svg class="icon auth-mobile-logo"><use href="components/icons.svg?v=60b1f9982d#logo" /></svg>
+          <span class="auth-head-mark" aria-hidden="true"></span>
           <h2 id="authHeading">Selamat datang kembali</h2>
           <p id="authSubtitle">Dia menunggumu di seberang sini.</p>
         </header>
@@ -78,23 +68,29 @@
         <form class="auth-form" id="formLogin" novalidate>
           <label class="auth-field">
             <span>Email atau username</span>
-            <input type="text" name="identifier" autocomplete="username" required />
+            <div class="input-pill">
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#mail" /></svg>
+              <span class="input-pill-bar" aria-hidden="true"></span>
+              <input type="text" name="identifier" autocomplete="username" required />
+            </div>
           </label>
 
           <label class="auth-field">
             <span>Password</span>
-            <span class="pw-wrap">
+            <div class="input-pill">
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#key" /></svg>
+              <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="password" name="password" id="loginPw" autocomplete="current-password" required />
               <button type="button" class="pw-toggle" data-target="loginPw" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg?v=b58dc0bf65#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#eye" /></svg>
               </button>
-            </span>
+            </div>
           </label>
 
           <label class="auth-check">
             <input type="checkbox" name="remember" class="auth-check-input" />
             <span class="auth-check-box" aria-hidden="true">
-              <svg class="icon"><use href="components/icons.svg?v=b58dc0bf65#check" /></svg>
+              <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#check" /></svg>
             </span>
             <span>Ingat saya selama 30 hari</span>
           </label>
@@ -107,12 +103,15 @@
               <input type="text" id="capAnsLogin" inputmode="numeric" maxlength="4"
                      autocomplete="off" placeholder="Ketik angka" aria-label="Ketik angka verifikasi" />
               <button type="button" class="verify-refresh" data-which="login" aria-label="Angka baru">
-                <svg class="icon"><use href="components/icons.svg?v=b58dc0bf65#chevron-down" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#chevron-down" /></svg>
               </button>
             </div>
           </div>
 
-          <button class="auth-submit" id="loginSubmit" type="submit">Masuk</button>
+          <button class="auth-submit" id="loginSubmit" type="submit">
+            <svg class="icon auth-submit-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#logout" /></svg>
+            <span>Masuk</span>
+          </button>
           <p class="auth-error" id="errLogin" hidden></p>
         </form>
 
@@ -120,34 +119,46 @@
         <form class="auth-form" id="formRegister" hidden novalidate>
           <label class="auth-field">
             <span>Username</span>
-            <input type="text" name="username" autocomplete="username" maxlength="20"
-                   placeholder="3-20 karakter" required />
+            <div class="input-pill">
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#user" /></svg>
+              <span class="input-pill-bar" aria-hidden="true"></span>
+              <input type="text" name="username" autocomplete="username" maxlength="20"
+                     placeholder="3-20 karakter" required />
+            </div>
           </label>
 
           <label class="auth-field">
             <span>Email</span>
-            <input type="email" name="email" autocomplete="email" required />
+            <div class="input-pill">
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#mail" /></svg>
+              <span class="input-pill-bar" aria-hidden="true"></span>
+              <input type="email" name="email" autocomplete="email" required />
+            </div>
           </label>
 
           <label class="auth-field">
             <span>Password</span>
-            <span class="pw-wrap">
+            <div class="input-pill">
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#key" /></svg>
+              <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="password" name="password" id="regPw" autocomplete="new-password"
                      placeholder="Minimal 8 karakter" required />
               <button type="button" class="pw-toggle" data-target="regPw" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg?v=b58dc0bf65#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#eye" /></svg>
               </button>
-            </span>
+            </div>
           </label>
 
           <label class="auth-field">
             <span>Konfirmasi password</span>
-            <span class="pw-wrap">
+            <div class="input-pill">
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#key" /></svg>
+              <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="password" id="regPw2" autocomplete="new-password" required />
               <button type="button" class="pw-toggle" data-target="regPw2" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg?v=b58dc0bf65#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#eye" /></svg>
               </button>
-            </span>
+            </div>
           </label>
 
           <div class="verify">
@@ -158,12 +169,15 @@
               <input type="text" id="capAnsRegister" inputmode="numeric" maxlength="4"
                      autocomplete="off" placeholder="Ketik angka" aria-label="Ketik angka verifikasi" />
               <button type="button" class="verify-refresh" data-which="register" aria-label="Angka baru">
-                <svg class="icon"><use href="components/icons.svg?v=b58dc0bf65#chevron-down" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#chevron-down" /></svg>
               </button>
             </div>
           </div>
 
-          <button class="auth-submit" id="registerSubmit" type="submit">Buat akun</button>
+          <button class="auth-submit" id="registerSubmit" type="submit">
+            <svg class="icon auth-submit-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#user" /></svg>
+            <span>Buat akun</span>
+          </button>
           <p class="auth-error" id="errRegister" hidden></p>
         </form>
 
@@ -172,7 +186,7 @@
     </section>
   </main>
 
-  <script type="module" src="js/auth.js?v=b58dc0bf65"></script>
+  <script type="module" src="js/auth.js?v=60b1f9982d"></script>
 
 <script>
   // Opening intro: PURE UI overlay — tidak pernah memicu navigasi/reload/
@@ -198,6 +212,15 @@
       if (e.animationName === 'intro-out') kill();
     });
     setTimeout(kill, 1900); // fallback sekali saja — element dibuang dari DOM
+  })();
+
+  // CTA panel brand -> pindah ke tab "Buat akun" (reuse logika tab asli
+  // di js/auth.js, cukup klik tombol tab yang sudah ada handler-nya).
+  (function () {
+    var cta = document.getElementById('brandCta');
+    var tabRegister = document.getElementById('tabRegister');
+    if (!cta || !tabRegister) return;
+    cta.addEventListener('click', function () { tabRegister.click(); });
   })();
 </script>
 </body>
