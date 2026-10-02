@@ -24,8 +24,8 @@ html, body {
 .auth-brand {
   display: grid;
   place-items: center;
-  padding: clamp(24px, 5vw, 64px);
-  border-right: 1px solid var(--border);
+  padding: clamp(24px, 5vw, 72px);
+  background: var(--surface);
 }
 
 .auth-brand-inner {
@@ -84,7 +84,13 @@ html, body {
 
 .auth-panel {
   width: min(100%, 24rem);
-  padding: 12px 0 24px;
+  padding: 12px 0 28px;
+  animation: auth-in 0.35s ease-out both;
+}
+
+@keyframes auth-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .auth-mobile-logo {
@@ -92,49 +98,52 @@ html, body {
 }
 
 .auth-head h2 {
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 650;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .auth-head p {
-  margin-top: 4px;
-  font-size: 14px;
+  margin-top: 5px;
+  font-size: 13.5px;
   color: var(--text-muted);
+  line-height: 1.5;
 }
 
-/* Tabs */
+/* Tabs: underline tenang — bukan pill segmented ala template builder */
 .auth-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  margin: 20px 0;
-  padding: 4px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  display: flex;
+  gap: 24px;
+  margin: 28px 0 26px;
+  border-bottom: 1px solid var(--border);
 }
 
 .auth-tab {
-  padding: 9px;
-  border-radius: 8px;
+  padding: 2px 1px 13px;
+  margin-bottom: -1px;
+  min-height: auto;
   font-size: 14px;
   font-weight: 500;
   color: var(--text-muted);
-  min-height: 44px;
-  transition: background 0.15s, color 0.15s;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.auth-tab:hover {
+  color: var(--text);
 }
 
 .auth-tab.active {
-  background: var(--surface-2);
   color: var(--text);
+  font-weight: 600;
+  border-color: var(--accent);
 }
 
 /* Form */
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .auth-field {
@@ -153,12 +162,17 @@ html, body {
   padding: 12px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   outline: 0;
   width: 100%;
   color: var(--text);
   font-size: 14.5px;
   transition: border-color 0.15s;
+}
+
+.auth-field input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 .auth-field input:focus {
@@ -190,6 +204,7 @@ html, body {
   place-items: center;
   color: var(--text-muted);
   border-radius: 8px;
+  transition: color 0.15s;
 }
 
 .pw-toggle:hover {
@@ -201,19 +216,53 @@ html, body {
   height: 17px;
 }
 
+/* Checkbox custom (bukan kotak native browser) — box kecil
+   rounded, terisi warna aksen + ikon check saat ditandai. */
 .auth-check {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   font-size: 13.5px;
   color: var(--text-muted);
   min-height: 24px;
+  cursor: pointer;
 }
 
-.auth-check input {
-  accent-color: var(--accent);
-  width: 16px;
-  height: 16px;
+.auth-check-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.auth-check-box {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: transparent;
+  background: var(--surface);
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.auth-check-box .icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 3;
+}
+
+.auth-check-input:checked + .auth-check-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.auth-check-input:focus-visible + .auth-check-box {
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 /* ---------------- Verifikasi manusia (angka acak) ---------------- */
@@ -225,84 +274,109 @@ html, body {
 }
 
 .verify-label {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-muted);
 }
 
+/* Satu pill menyatu: kode | pembatas tipis | input | refresh —
+   bukan tiga kotak lepas yang terasa tidak nyambung. */
 .verify-row {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 10px;
+  display: flex;
   align-items: center;
-}
-
-.verify-num {
-  padding: 10px 16px;
-  min-width: 84px;
-  text-align: center;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: 0.3em;
-  font-variant-numeric: tabular-nums;
-  user-select: none;
-}
-
-.verify-row input {
-  padding: 12px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  outline: 0;
-  text-align: center;
-  font-size: 15px;
-  letter-spacing: 0.2em;
-  color: var(--text);
-  min-width: 0;
+  border-radius: var(--radius);
   transition: border-color 0.15s;
 }
 
-.verify-row input:focus {
+.verify-row:focus-within {
   border-color: var(--accent);
 }
 
+.verify-num {
+  flex: none;
+  padding: 0 16px;
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.verify-divider {
+  width: 1px;
+  height: 22px;
+  flex: none;
+  background: var(--border);
+}
+
+.verify-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 10px;
+  background: none;
+  border: 0;
+  outline: 0;
+  text-align: center;
+  font-size: 14.5px;
+  letter-spacing: 0.1em;
+  color: var(--text);
+}
+
+.verify-row input::placeholder {
+  letter-spacing: normal;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
 .verify-refresh {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  min-height: 46px;
+  flex: none;
   display: grid;
   place-items: center;
   color: var(--text-muted);
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  transition: color 0.15s, background 0.15s;
 }
 
 .verify-refresh:hover {
   color: var(--text);
+  background: var(--surface-2);
 }
 
 .verify-refresh .icon {
   transform: rotate(180deg);
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 /* ---------------- Submit ---------------- */
 
 .auth-submit {
+  margin-top: 4px;
   min-height: 48px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
   font-size: 15px;
-  transition: background 0.15s;
+  letter-spacing: -0.005em;
+  transition: background 0.15s, opacity 0.15s;
 }
 
 .auth-submit:hover:not(:disabled) {
   background: var(--accent-hover);
+}
+
+.auth-submit:active:not(:disabled) {
+  opacity: 0.92;
 }
 
 .auth-submit:disabled {
@@ -329,10 +403,11 @@ html, body {
 }
 
 .auth-note {
-  margin-top: 18px;
+  margin-top: 20px;
   font-size: 12px;
   color: var(--text-muted);
   text-align: center;
+  line-height: 1.5;
 }
 
 /* ============================================================
@@ -350,19 +425,27 @@ html, body {
 
   .auth-mobile-logo {
     display: block;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     color: var(--accent);
-    margin-bottom: 14px;
+    margin-bottom: 16px;
   }
 
   .auth-panel-wrap {
-    padding: 24px 20px calc(32px + env(safe-area-inset-bottom));
+    padding: 32px 22px calc(32px + env(safe-area-inset-bottom));
     align-items: start;
+  }
+
+  .auth-panel {
+    padding-top: 4px;
   }
 
   .auth-head h2 {
     font-size: 20px;
+  }
+
+  .auth-tabs {
+    margin: 26px 0 24px;
   }
 }
 
