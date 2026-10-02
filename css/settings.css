@@ -286,6 +286,7 @@
 
 .subnav-item {
   flex: 1;
+  min-width: 0;
   padding: 9px 10px;
   min-height: 40px;
   border-radius: 8px;
@@ -448,6 +449,7 @@
 }
 
 .seg-btn {
+  min-width: 0;
   padding: 9px 10px;
   min-height: 40px;
   border-radius: 8px;
@@ -651,6 +653,46 @@
 
   .preset-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Tab (.subnav) & segmented control (.seg): di layar sempit, 5 opsi
+     dengan label kata tunggal (Identitas/Personality/Perilaku/Memory/
+     Advanced, Singkat banget/Ekspresif/Datar/Playful/Cerewet) TIDAK
+     cukup ruang untuk tampil penuh berdampingan. Tanpa penanganan ini
+     baris memaksa dirinya lebih lebar dari viewport, dan karena baris
+     ini berbagi satu scroll container dengan seluruh halaman
+     (.settings-main), menggesernya menyeret SEMUA konten lain ikut
+     terpotong kiri-kanan — bukan cuma baris tab itu sendiri.
+     Perbaikan: jadikan baris ini scroll horizontal MANDIRI (overflow
+     tidak lagi 'visible' → kontribusi ukurannya ke induk otomatis 0,
+     tidak pernah mendorong .settings-main melebar lagi). */
+  .subnav,
+  .seg {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .subnav::-webkit-scrollbar,
+  .seg::-webkit-scrollbar {
+    display: none;
+  }
+
+  .subnav-item {
+    flex: none;
+    white-space: nowrap;
+    padding: 9px 14px;
+  }
+
+  .seg {
+    grid-auto-columns: max-content;
+    justify-content: flex-start;
+  }
+
+  .seg-btn {
+    white-space: nowrap;
+    padding: 9px 16px;
   }
 }
 

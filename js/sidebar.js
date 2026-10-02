@@ -6,7 +6,7 @@
    IntersectionObserver, pencarian debounce, hapus via API.
    ============================================================ */
 
-import { $, debounce, api, apiJson, emit, on, state, renderAvatar, confirmDialog } from './app.js?v=e48f028345';
+import { $, debounce, api, apiJson, emit, on, state, renderAvatar, confirmDialog } from './app.js?v=2caa38045a';
 
 const BATCH = 12;
 

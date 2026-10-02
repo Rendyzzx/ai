@@ -7,7 +7,7 @@
    diambil dari state (settings.js bisa mengubahnya kapan pun).
    ============================================================ */
 
-import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state, confirmDialog } from './app.js?v=e48f028345';
+import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state, confirmDialog } from './app.js?v=2caa38045a';
 
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
