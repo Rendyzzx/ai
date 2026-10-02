@@ -268,7 +268,7 @@ input, textarea {
   display: grid;
   place-items: center;
   background: var(--bg);
-  animation: intro-out 0.8s cubic-bezier(0.22, 1, 0.36, 1) 2.2s forwards;
+  animation: intro-out 0.5s cubic-bezier(0.22, 1, 0.36, 1) 1s forwards;
 }
 
 .intro-content {
@@ -289,21 +289,21 @@ input, textarea {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-  animation: intro-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+  animation: intro-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
 }
 
 .intro-name {
   font-size: 22px;
   font-weight: 700;
   letter-spacing: 0.2px;
-  animation: intro-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+  animation: intro-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
 }
 
 /* Subtitle kecil: fade pendek setelah nama tampak */
 .intro-sub {
   font-size: 13px;
   color: var(--text-muted);
-  animation: intro-fade 0.5s ease-out 1s both;
+  animation: intro-fade 0.4s ease-out 0.55s both;
 }
 
 @keyframes intro-in {

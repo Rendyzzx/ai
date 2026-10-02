@@ -6,19 +6,21 @@
   <meta name="theme-color" content="#151413" />
   <meta name="robots" content="noindex" />
   <title>Masuk — Aomi</title>
-  <link rel="icon" href="assets/favicon.svg?v=1764d59c65" type="image/svg+xml" />
-  <link rel="stylesheet" href="css/main.css?v=1764d59c65" />
-  <link rel="stylesheet" href="css/auth.css?v=1764d59c65" />
+  <link rel="icon" href="assets/favicon.svg?v=ae957e7c85" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/main.css?v=ae957e7c85" />
+  <link rel="stylesheet" href="css/auth.css?v=ae957e7c85" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet"
+  <!-- Font non-blocking: tidak menahan render halaman login (display=swap, FOUT singkat ok) -->
+  <link rel="stylesheet" media="print" onload="this.media='all'"
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" /></noscript>
 </head>
 <body>
   <!-- Opening animation: overlay visual saja, aplikasi dirender di belakang -->
   <div id="app-intro" aria-hidden="true">
     <div class="intro-content">
-      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg?v=1764d59c65#logo" /></svg>
+      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg?v=ae957e7c85#logo" /></svg>
       <div class="intro-name">Aomi</div>
       <div class="intro-sub">seseorang menunggumu di sini</div>
     </div>
@@ -62,7 +64,7 @@
     <section class="auth-panel-wrap">
       <div class="auth-panel">
         <header class="auth-head">
-          <svg class="icon auth-mobile-logo"><use href="components/icons.svg?v=1764d59c65#logo" /></svg>
+          <svg class="icon auth-mobile-logo"><use href="components/icons.svg?v=ae957e7c85#logo" /></svg>
           <h2 id="authHeading">Selamat datang kembali</h2>
           <p id="authSubtitle">Dia menunggumu di seberang sini.</p>
         </header>
@@ -84,7 +86,7 @@
             <span class="pw-wrap">
               <input type="password" name="password" id="loginPw" autocomplete="current-password" required />
               <button type="button" class="pw-toggle" data-target="loginPw" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg?v=1764d59c65#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=ae957e7c85#eye" /></svg>
               </button>
             </span>
           </label>
@@ -92,7 +94,7 @@
           <label class="auth-check">
             <input type="checkbox" name="remember" class="auth-check-input" />
             <span class="auth-check-box" aria-hidden="true">
-              <svg class="icon"><use href="components/icons.svg?v=1764d59c65#check" /></svg>
+              <svg class="icon"><use href="components/icons.svg?v=ae957e7c85#check" /></svg>
             </span>
             <span>Ingat saya selama 30 hari</span>
           </label>
@@ -105,7 +107,7 @@
               <input type="text" id="capAnsLogin" inputmode="numeric" maxlength="4"
                      autocomplete="off" placeholder="Ketik angka" aria-label="Ketik angka verifikasi" />
               <button type="button" class="verify-refresh" data-which="login" aria-label="Angka baru">
-                <svg class="icon"><use href="components/icons.svg?v=1764d59c65#chevron-down" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=ae957e7c85#chevron-down" /></svg>
               </button>
             </div>
           </div>
@@ -133,7 +135,7 @@
               <input type="password" name="password" id="regPw" autocomplete="new-password"
                      placeholder="Minimal 8 karakter" required />
               <button type="button" class="pw-toggle" data-target="regPw" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg?v=1764d59c65#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=ae957e7c85#eye" /></svg>
               </button>
             </span>
           </label>
@@ -143,7 +145,7 @@
             <span class="pw-wrap">
               <input type="password" id="regPw2" autocomplete="new-password" required />
               <button type="button" class="pw-toggle" data-target="regPw2" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg?v=1764d59c65#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=ae957e7c85#eye" /></svg>
               </button>
             </span>
           </label>
@@ -156,7 +158,7 @@
               <input type="text" id="capAnsRegister" inputmode="numeric" maxlength="4"
                      autocomplete="off" placeholder="Ketik angka" aria-label="Ketik angka verifikasi" />
               <button type="button" class="verify-refresh" data-which="register" aria-label="Angka baru">
-                <svg class="icon"><use href="components/icons.svg?v=1764d59c65#chevron-down" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=ae957e7c85#chevron-down" /></svg>
               </button>
             </div>
           </div>
@@ -170,7 +172,7 @@
     </section>
   </main>
 
-  <script type="module" src="js/auth.js?v=1764d59c65"></script>
+  <script type="module" src="js/auth.js?v=ae957e7c85"></script>
 
 <script>
   // Opening intro: PURE UI overlay — tidak pernah memicu navigasi/reload/
@@ -195,7 +197,7 @@
     intro.addEventListener('animationend', function (e) {
       if (e.animationName === 'intro-out') kill();
     });
-    setTimeout(kill, 3400); // fallback sekali saja — element dibuang dari DOM
+    setTimeout(kill, 1900); // fallback sekali saja — element dibuang dari DOM
   })();
 </script>
 </body>

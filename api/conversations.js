@@ -99,12 +99,15 @@ export default async function handler(req, res) {
       geminiSessionId: null,
       messages: []
     };
-    await putJson(convPath(uid, conv.conversation_id), conv, 'conversation create');
-    await updateJson(idxPath(uid), 'conversation index', (current) => {
-      const items = Array.isArray(current) ? current : [];
-      items.push(indexEntry(conv));
-      return items;
-    });
+    // 2 file berbeda (percakapan & index) tidak saling bergantung → paralel
+    await Promise.all([
+      putJson(convPath(uid, conv.conversation_id), conv, 'conversation create'),
+      updateJson(idxPath(uid), 'conversation index', (current) => {
+        const items = Array.isArray(current) ? current : [];
+        items.push(indexEntry(conv));
+        return items;
+      })
+    ]);
     return res.status(201).json({
       conversation_id: conv.conversation_id,
       title: conv.title

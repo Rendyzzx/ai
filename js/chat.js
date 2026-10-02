@@ -7,7 +7,7 @@
    diambil dari state (settings.js bisa mengubahnya kapan pun).
    ============================================================ */
 
-import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state, confirmDialog, getSessionId } from './app.js?v=1764d59c65';
+import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state, confirmDialog, getSessionId } from './app.js?v=ae957e7c85';
 
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
@@ -58,7 +58,7 @@ let firstHidden = 0;
 let nearBottom = true;
 let lastRole = null;       // peran pesan terakhir yang dirender (untuk header nama)
 
-export function initChat() {
+export function initChat(initialItems) {
   els.scroll = $('#chatScroll');
   els.column = $('#chatColumn');
   els.welcome = $('#welcome');
@@ -98,21 +98,26 @@ export function initChat() {
 
   // Returning user: langsung buka percakapan terakhir. Belum pernah
   // ngobrol → karakter menyapa duluan (bukan welcome screen statis).
-  bootstrapOpen();
+  bootstrapOpen(initialItems);
 }
 
-async function bootstrapOpen() {
-  try {
-    const data = await apiJson('/api/conversations');
-    const items = data.items || [];
-    if (items.length > 0) {
-      loadConversation(items[0].conversation_id);
-    } else {
-      resetView(true);
+async function bootstrapOpen(initialItems) {
+  let items = initialItems;
+  if (!Array.isArray(items)) {
+    // boot tidak menyertakan data (fetch conversations gagal sesaat) →
+    // coba sendiri sekali; gagal lagi → welcome statis.
+    try {
+      const data = await apiJson('/api/conversations');
+      items = data.items || [];
+    } catch {
+      resetView(false);
+      return;
     }
-  } catch {
-    // gagal memuat indeks → welcome statis (tetap bisa ketik via suggestion)
-    resetView(false);
+  }
+  if (items.length > 0) {
+    loadConversation(items[0].conversation_id);
+  } else {
+    resetView(true);
   }
 }
 

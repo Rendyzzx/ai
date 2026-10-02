@@ -257,13 +257,13 @@ function bindViewport() {
 
 // ---------------- Gerbang auth + bootstrap ----------------
 
-import { initSidebar } from './sidebar.js?v=1764d59c65';
-import { initChat } from './chat.js?v=1764d59c65';
+import { initSidebar } from './sidebar.js?v=ae957e7c85';
+import { initChat } from './chat.js?v=ae957e7c85';
 
 // Settings dimuat LAZY: baru di-import saat pertama kali dibuka
 let settingsMod = null;
 async function openSettings(category) {
-  if (!settingsMod) settingsMod = await import('./settings.js?v=1764d59c65');
+  if (!settingsMod) settingsMod = await import('./settings.js?v=ae957e7c85');
   settingsMod.openSettings(category);
 }
 
@@ -316,36 +316,29 @@ async function boot() {
     if (cachedUser) renderAvatar($('#sidebarAvatar'), cachedUser, 'user');
   } catch { /* private mode / storage diblokir */ }
 
-  // STEP 1-3 — validasi session: SERVER satu-satunya sumber kebenaran.
-  // /api/auth/me menolak (401) bila sid salah, session expired, atau
-  // APP_VERSION beda (deployment baru → session dihancurkan server,
-  // client di-teardown oleh handleAuthInvalid). Versi TIDAK dicek di
-  // client — pengecekan versi lokal hanya menambah jalur redirect
-  // tanpa menghapus sid, dan itu penyebab bounce '/' <-> '/auth.html'.
-  let me;
+  // STEP 1-4 (PARALEL) — me, profile, bot, conversations DI-FIRE
+  // BERSAMAAN. Waterfall lama me → (profile+bot) → conversations×2 →
+  // pesan terakhir = 4 round-trip beruntun; sekarang 1 batch + 1 fetch
+  // pesan. /api/auth/me tetap satu-satunya sumber kebenaran session:
+  // 401 pada request MANA PUN memicu handleAuthInvalid (guarded, sekali).
+  // conversations = soft-fail: error sesaat tidak membatalkan boot.
+  const convPromise = apiJson('/api/conversations').catch(() => null);
   try {
     const sid0 = getSessionId();
     dbg('SESSION', 'validating session id=' + (sid0 ? sid0.slice(0, 8) + '…' : 'none'));
-    const meRes = await api('/api/auth/me');
-    me = await meRes.json();
+    const [meRes, profileRes, botRes] = await Promise.all([
+      api('/api/auth/me'),
+      api('/api/profile'),
+      api('/api/bot')
+    ]);
+    const [me, profile, botCfg] = await Promise.all([
+      meRes.json(), profileRes.json(), botRes.json()
+    ]);
     dbg('SESSION', 'valid — server menerima session');
     dbg('VERSION', 'server app_version=' + (me.app_version || '(kosong)'));
     // simpan versi hanya untuk info/diagnostik — TIDAK untuk navigasi
     try { localStorage.setItem('aomi.appVersion', me.app_version || ''); } catch { /* pv */ }
-  } catch (err) {
-    if (err.message === 'unauthorized') return; // teardown + login berjalan
-    showBootError();
-    return;
-  }
 
-  // STEP 4 — session valid → baru muat data user (profil + personality)
-  try {
-    const [profileRes, botRes] = await Promise.all([
-      api('/api/profile'),
-      api('/api/bot')
-    ]);
-    const profile = await profileRes.json();
-    const botCfg = await botRes.json();
     Object.assign(state.user, profile);
     Object.assign(state.bot, botCfg.bot);
 
@@ -376,8 +369,13 @@ async function boot() {
     if (fs) document.documentElement.style.setProperty('--chat-fs', fs + 'px');
   } catch { /* private mode */ }
 
-  initSidebar();
-  initChat();
+  // Data conversations sudah datang bersamaan dengan me/profile/bot —
+  // serahkan ke sidebar & chat: tidak ada fetch /api/conversations
+  // kedua (dulu sidebar & chat masing-masing fetch yang sama).
+  const convData = await convPromise;
+  const bootItems = convData ? (convData.items || []) : null;
+  initSidebar(bootItems || []);
+  initChat(bootItems);
   dbg('AUTH', 'boot selesai → TETAP di chatbox (tidak ada redirect)');
 
   $('#settingsBtn').addEventListener('click', () => openSettings());
@@ -391,7 +389,7 @@ async function boot() {
   const preload = window.requestIdleCallback
     ? (cb) => window.requestIdleCallback(cb, { timeout: 2000 })
     : (cb) => setTimeout(cb, 600);
-  preload(() => { import('./settings.js?v=1764d59c65').catch(() => {}); });
+  preload(() => { import('./settings.js?v=ae957e7c85').catch(() => {}); });
 
   watchSession();
 }

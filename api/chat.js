@@ -640,8 +640,9 @@ export default async function handler(req, res) {
     if (conv.title === 'Chat baru') conv.title = greet.slice(0, 48);
     conv.updated_at = now;
 
-    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'greeting append');
-    await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+    await Promise.all([
+      putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'greeting append'),
+      updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
       const items = Array.isArray(current) ? current : [];
       const entry = {
         conversation_id: conv.conversation_id,
@@ -651,7 +652,8 @@ export default async function handler(req, res) {
       const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
       if (i >= 0) items[i] = entry; else items.unshift(entry);
       return items;
-    });
+    })
+    ]);
 
     return res.status(200).json({
       text: greet,
@@ -760,8 +762,9 @@ export default async function handler(req, res) {
     conv.updated_at = new Date().toISOString();
     if (regOut.geminiSid) conv.geminiSessionId = regOut.geminiSid;
 
-    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'message regenerate/edit');
-    await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+    await Promise.all([
+      putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'message regenerate/edit'),
+      updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
       const items = Array.isArray(current) ? current : [];
       const entry = {
         conversation_id: conv.conversation_id,
@@ -771,7 +774,8 @@ export default async function handler(req, res) {
       const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
       if (i >= 0) items[i] = entry; else items.unshift(entry);
       return items;
-    });
+    })
+    ]);
 
     return res.status(200).json({
       text: regOut.reply,
@@ -813,14 +817,16 @@ export default async function handler(req, res) {
     if (conv.title === 'Chat baru') conv.title = message.slice(0, 48) || 'Edit foto';
     conv.updated_at = now;
 
-    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'photo edit start');
-    await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+    await Promise.all([
+      putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'photo edit start'),
+      updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
       const items = Array.isArray(current) ? current : [];
       const entry = { conversation_id: conv.conversation_id, title: conv.title, updated_at: conv.updated_at };
       const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
       if (i >= 0) items[i] = entry; else items.unshift(entry);
       return items;
-    });
+    })
+    ]);
 
     // Balasan cepat: browser lanjut menembak API edit sendiri (CORS terbuka),
     // lalu hasilnya dikirim balik lewat action 'edit-save'.
@@ -870,14 +876,16 @@ export default async function handler(req, res) {
     });
     conv.updated_at = now;
 
-    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'photo edit append');
-    await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+    await Promise.all([
+      putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'photo edit append'),
+      updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
       const items = Array.isArray(current) ? current : [];
       const entry = { conversation_id: conv.conversation_id, title: conv.title, updated_at: conv.updated_at };
       const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
       if (i >= 0) items[i] = entry; else items.unshift(entry);
       return items;
-    });
+    })
+    ]);
 
     return res.status(200).json({
       text: replyText,
@@ -901,14 +909,16 @@ export default async function handler(req, res) {
       timestamp: now
     });
     conv.updated_at = now;
-    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'photo edit fail');
-    await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+    await Promise.all([
+      putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'photo edit fail'),
+      updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
       const items = Array.isArray(current) ? current : [];
       const entry = { conversation_id: conv.conversation_id, title: conv.title, updated_at: conv.updated_at };
       const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
       if (i >= 0) items[i] = entry; else items.unshift(entry);
       return items;
-    });
+    })
+    ]);
     return res.status(200).json({ ok: true });
   }
 
@@ -958,8 +968,9 @@ export default async function handler(req, res) {
 
       // PENTING: tulis via conv.conversation_id (bukan convPath awal —
       // chat baru belum punya ID saat convPath dihitung; bug key kosong).
-      await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'download append');
-      await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+      await Promise.all([
+        putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'download append'),
+        updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
         const items = Array.isArray(current) ? current : [];
         const entry = {
           conversation_id: conv.conversation_id,
@@ -969,7 +980,8 @@ export default async function handler(req, res) {
         const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
         if (i >= 0) items[i] = entry; else items.unshift(entry);
         return items;
-      });
+      })
+      ]);
 
       return res.status(200).json({
         text: replyText,
@@ -1018,8 +1030,9 @@ export default async function handler(req, res) {
   conv.updated_at = now;
   if (newGeminiSid) conv.geminiSessionId = newGeminiSid;
 
-  await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'chat append');
-  await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+  await Promise.all([
+    putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'chat append'),
+    updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
     const items = Array.isArray(current) ? current : [];
     const entry = {
       conversation_id: conv.conversation_id,
@@ -1030,7 +1043,8 @@ export default async function handler(req, res) {
     if (i >= 0) items[i] = entry;
     else items.unshift(entry);
     return items;
-  });
+  })
+  ]);
 
   return res.status(200).json({
     text: reply,

@@ -6,7 +6,7 @@
    IntersectionObserver, pencarian debounce, hapus via API.
    ============================================================ */
 
-import { $, debounce, api, apiJson, emit, on, state, renderAvatar, confirmDialog } from './app.js?v=1764d59c65';
+import { $, debounce, api, apiJson, emit, on, state, renderAvatar, confirmDialog } from './app.js?v=ae957e7c85';
 
 const BATCH = 12;
 
@@ -16,7 +16,7 @@ let filtered = [];
 let rendered = 0;
 let query = '';
 
-export function initSidebar() {
+export function initSidebar(initialItems) {
   els.sidebar = $('#sidebar');
   els.backdrop = $('#backdrop');
   els.history = $('#history');
@@ -30,7 +30,7 @@ export function initSidebar() {
   on('chat:updated', refresh);
   on('settings:updated', renderCharCard);
   on('chat:activated', ({ id }) => setActive(id));
-  refresh();
+  refresh(initialItems);
 }
 
 // Kartu karakter di sidebar — identitas utama aplikasi
@@ -39,13 +39,19 @@ function renderCharCard() {
   renderAvatar(els.charAvatar, state.bot.bot_avatar, 'logo');
 }
 
-async function refresh() {
-  try {
-    const data = await apiJson('/api/conversations');
-    items = data.items || [];
-  } catch {
-    // Error sesaat (cold start / server sibuk / jaringan) → PERTAHANKAN
-    // daftar lama. Jangan kosongkan riwayat hanya karena 1 fetch gagal.
+async function refresh(initialItems) {
+  if (Array.isArray(initialItems)) {
+    // Data dari boot (di-fetch paralel dengan me/profile/bot) — jangan
+    // fetch ulang. Detail event 'chat:updated' bukan array → jalur fetch.
+    items = initialItems;
+  } else {
+    try {
+      const data = await apiJson('/api/conversations');
+      items = data.items || [];
+    } catch {
+      // Error sesaat (cold start / server sibuk / jaringan) → PERTAHANKAN
+      // daftar lama. Jangan kosongkan riwayat hanya karena 1 fetch gagal.
+    }
   }
   applyFilter();
 }
