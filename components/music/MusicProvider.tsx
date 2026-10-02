@@ -76,6 +76,37 @@ function PauseIcon({ size = 20 }: { size?: number }) {
   );
 }
 
+function SkipIcon({ dir }: { dir: -1 | 1 }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width="19"
+      height="19"
+      aria-hidden="true"
+    >
+      <path d={dir === -1 ? "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" : "M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"} />
+      <path d={dir === -1 ? "M3 3v5h5" : "M21 3v5h-5"} />
+      <text x="12" y="16.5" fontSize="7.5" fontFamily="sans-serif" fontWeight="bold" stroke="none" fill="currentColor" textAnchor="middle">
+        10
+      </text>
+    </svg>
+  );
+}
+
+/** Equalizer 3 bar kecil — id-indikator lagu lagi jalan. */
+function Eq({ on }: { on: boolean }) {
+  return (
+    <span className={"music-eq" + (on ? " on" : "")} aria-hidden="true">
+      <i /><i /><i />
+    </span>
+  );
+}
+
 /* ---------------- context ---------------- */
 
 interface MusicApi {
@@ -205,7 +236,10 @@ export default function MusicProvider({ children }: { children: ReactNode }) {
   const seek = useCallback((sec: number) => {
     const a = audioRef.current;
     if (!a) return;
-    const total = Number.isFinite(a.duration) && a.duration > 0 ? a.duration : trackRef.current?.duration || 0;
+    const total =
+      Number.isFinite(a.duration) && a.duration > 0
+        ? a.duration
+        : trackRef.current?.duration || 0;
     if (total <= 0) return;
     const t = Math.max(0, Math.min(total, Number(sec) || 0));
     a.currentTime = t;
@@ -295,14 +329,25 @@ function MusicPopup({
     return res;
   }, [lines, time]);
 
-  // auto-scroll lirik ke baris aktif
+  // auto-scroll lirik ke baris aktif.
+  // Posisi dihitung relatif ke KOTAK LIRIK (bukan parent luar) —
+  // inilah yang dulu bikin lirik loncat ke bawah.
   useEffect(() => {
     if (minimized) return;
     const cont = lyricsRef.current;
+    if (!cont) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const behavior: ScrollBehavior = reduce ? "auto" : "smooth";
+    if (activeIdx < 0) {
+      cont.scrollTo({ top: 0, behavior }); // intro — tetap di atas
+      return;
+    }
     const el = lineRefs.current[activeIdx];
-    if (!cont || !el) return;
-    const target = el.offsetTop - cont.clientHeight / 2 + el.offsetHeight / 2;
-    cont.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+    if (!el) return;
+    const top =
+      el.getBoundingClientRect().top - cont.getBoundingClientRect().top + cont.scrollTop;
+    const target = top - cont.clientHeight / 2 + el.offsetHeight / 2;
+    cont.scrollTo({ top: Math.max(0, target), behavior });
   }, [activeIdx, minimized]);
 
   // ---- geser popup (pointer di header) ----
@@ -345,7 +390,7 @@ function MusicPopup({
     seekingRef.current = false;
   };
 
-  // ---------------- mini bar (music tetap jalan) ----------------
+  // ---------------- mini bar (minimize — musik tetap jalan) ----------------
   if (minimized) {
     return (
       <div className="music-mini" role="complementary" aria-label="Musik diputar">
@@ -356,8 +401,9 @@ function MusicPopup({
             <span className="music-mini-artist">{track.artist}</span>
           </span>
         </button>
+        <Eq on={playing} />
         <button type="button" className="music-mini-btn" onClick={togglePlay} aria-label={playing ? "Pause" : "Putar"}>
-          {playing ? <PauseIcon /> : <PlayIcon />}
+          {playing ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
         </button>
         <button type="button" className="music-mini-btn" onClick={stopMusic} aria-label="Stop musik">
           <Icon id="close" />
@@ -377,126 +423,105 @@ function MusicPopup({
       role="complementary"
       aria-label="Music player"
     >
-      {/* ambient background dari cover */}
-      <img className="music-bg" src={track.thumbnail} alt="" aria-hidden="true" />
-      <div className="music-veil" aria-hidden="true" />
-
-      <div className="music-content">
-        {/* header — draggable */}
-        <div className="music-head" onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}>
-          <span className="music-head-label">
-            <Icon id="music" />
-            Now playing
-          </span>
-          <span className="music-head-actions">
-            <button type="button" className="music-head-btn" onClick={minimize} aria-label="Kecilkan (musik tetap jalan)" title="Kecilkan — musik tetap jalan">
-              <Icon id="chevron-down" />
-            </button>
-            <button type="button" className="music-head-btn" onClick={stopMusic} aria-label="Stop musik" title="Stop">
-              <Icon id="close" />
-            </button>
-          </span>
-        </div>
-
-        <div className="music-poster">
-          <img src={track.thumbnail} alt={track.title} />
-        </div>
-
-        <div className="music-info">
-          <div className="music-info-names">
-            <div className="music-title">{track.title}</div>
-            <div className="music-artist">{track.artist}</div>
-          </div>
-          <span className={"music-eq" + (playing ? " on" : "")} aria-hidden="true">
-            <i /><i /><i />
-          </span>
-        </div>
-
-        {/* lirik sinkron — klik baris untuk lompat ke waktunya */}
-        <div className="music-lyrics" ref={lyricsRef}>
-          {lines.length ? (
-            <>
-              {lines.map((l, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  ref={(el) => { lineRefs.current[i] = el; }}
-                  className={"music-lyric" + (i === activeIdx ? " active" : "")}
-                  onClick={() => seek(l.time)}
-                >
-                  {l.text}
-                </button>
-              ))}
-              {track.lyrics_estimated ? (
-                <div className="music-lyrics-note">sinkronisasi lirik perkiraan</div>
-              ) : null}
-            </>
-          ) : (
-            <div className="music-lyrics-empty">lirik belum tersedia untuk lagu ini.</div>
-          )}
-        </div>
-
-        {/* progres */}
-        <div
-          className="music-bar"
-          ref={barRef}
-          onPointerDown={onSeekDown}
-          onPointerMove={onSeekMove}
-          onPointerUp={onSeekUp}
-          onPointerCancel={onSeekUp}
-          role="slider"
-          aria-label="Posisi lagu"
-          aria-valuemin={0}
-          aria-valuemax={Math.round(dur)}
-          aria-valuenow={Math.round(time)}
-        >
-          <div className="music-bar-fill" style={{ width: pct + "%" }} />
-          <div className="music-bar-dot" style={{ left: pct + "%" }} />
-        </div>
-        <div className="music-time">
-          <span>{fmtTime(time)}</span>
-          <span>{fmtTime(dur)}</span>
-        </div>
-
-        {/* kontrol */}
-        <div className="music-controls">
-          <button
-            type="button"
-            className="music-ctrl"
-            onClick={() => seek(time - 10)}
-            aria-label="Mundur 10 detik"
-            title="Mundur 10 detik"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20" aria-hidden="true">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-              <text x="12" y="16.5" fontSize="7.5" fontFamily="sans-serif" fontWeight="bold" stroke="none" fill="currentColor" textAnchor="middle">10</text>
-            </svg>
+      {/* header — area drag */}
+      <div
+        className="music-head"
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+      >
+        <span className="music-head-label">
+          <Icon id="music" />
+          Now playing
+        </span>
+        <span className="music-head-actions">
+          <button type="button" className="music-head-btn" onClick={minimize} aria-label="Kecilkan (musik tetap jalan)" title="Kecilkan — musik tetap jalan">
+            <Icon id="chevron-down" />
           </button>
-          <button type="button" className="music-play" onClick={togglePlay} aria-label={playing ? "Pause" : "Putar"}>
-            {playing ? <PauseIcon size={24} /> : <PlayIcon size={24} />}
+          <button type="button" className="music-head-btn" onClick={stopMusic} aria-label="Stop musik" title="Stop">
+            <Icon id="close" />
           </button>
-          <button
-            type="button"
-            className="music-ctrl"
-            onClick={() => seek(time + 10)}
-            aria-label="Maju 10 detik"
-            title="Maju 10 detik"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20" aria-hidden="true">
-              <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-              <path d="M21 3v5h-5" />
-              <text x="12" y="16.5" fontSize="7.5" fontFamily="sans-serif" fontWeight="bold" stroke="none" fill="currentColor" textAnchor="middle">10</text>
-            </svg>
-          </button>
-        </div>
-
-        {/* unduh — di bawah player */}
-        <a className="music-dl" href={musicDownloadHref(track, sid)} download>
-          <Icon id="download" />
-          <span>Unduh lagu</span>
-        </a>
+        </span>
       </div>
+
+      {/* lagu — cover kecil + judul (layout pendek, flat) */}
+      <div className="music-track">
+        <img className="music-cover" src={track.thumbnail} alt={track.title} />
+        <div className="music-track-meta">
+          <div className="music-title">{track.title}</div>
+          <div className="music-artist">
+            {track.artist}
+            {track.duration ? " · " + fmtTime(track.duration) : ""}
+          </div>
+          <Eq on={playing} />
+        </div>
+      </div>
+
+      {/* lirik sinkron — klik baris untuk lompat ke waktunya */}
+      <div className="music-lyrics" ref={lyricsRef}>
+        {lines.length ? (
+          <>
+            {lines.map((l, i) => (
+              <button
+                key={i}
+                type="button"
+                ref={(el) => { lineRefs.current[i] = el; }}
+                className={"music-lyric" + (i === activeIdx ? " active" : "")}
+                onClick={() => seek(l.time)}
+              >
+                {l.text}
+              </button>
+            ))}
+            {track.lyrics_estimated ? (
+              <div className="music-lyrics-note">sinkronisasi lirik perkiraan</div>
+            ) : null}
+          </>
+        ) : (
+          <div className="music-lyrics-empty">lirik belum tersedia untuk lagu ini.</div>
+        )}
+      </div>
+
+      {/* progres */}
+      <div
+        className="music-bar"
+        ref={barRef}
+        onPointerDown={onSeekDown}
+        onPointerMove={onSeekMove}
+        onPointerUp={onSeekUp}
+        onPointerCancel={onSeekUp}
+        role="slider"
+        aria-label="Posisi lagu"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(dur)}
+        aria-valuenow={Math.round(time)}
+      >
+        <div className="music-bar-fill" style={{ width: pct + "%" }} />
+        <div className="music-bar-dot" style={{ left: pct + "%" }} />
+      </div>
+      <div className="music-time">
+        <span>{fmtTime(time)}</span>
+        <span>{fmtTime(dur)}</span>
+      </div>
+
+      {/* kontrol */}
+      <div className="music-controls">
+        <button type="button" className="music-ctrl" onClick={() => seek(time - 10)} aria-label="Mundur 10 detik" title="Mundur 10 detik">
+          <SkipIcon dir={-1} />
+        </button>
+        <button type="button" className="music-play" onClick={togglePlay} aria-label={playing ? "Pause" : "Putar"}>
+          {playing ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
+        </button>
+        <button type="button" className="music-ctrl" onClick={() => seek(time + 10)} aria-label="Maju 10 detik" title="Maju 10 detik">
+          <SkipIcon dir={1} />
+        </button>
+      </div>
+
+      {/* unduh — di bawah player */}
+      <a className="music-dl" href={musicDownloadHref(track, sid)} download>
+        <Icon id="download" />
+        <span>Unduh lagu</span>
+      </a>
     </div>
   );
 }
