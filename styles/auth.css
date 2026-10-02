@@ -1074,7 +1074,14 @@ h1, h2, h3 {
     margin: 0 auto;
     padding-bottom: 52px;
   }
-  .hero-chat-card { left: auto; right: 0; }
+  /* Kartu chat DITENGAHKAN di atas artwork — jarak kiri/kanan sama.
+     Dulu nempel ke kanan (8px) sementara kiri 64px → komposisi
+     hero terlihat miring/miring ke kanan di mobile & tablet. */
+  .hero-chat-card {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
   .hero-feats { gap: 6px 20px; padding-top: 16px; }
 
   .personal-grid { grid-template-columns: 1fr; gap: 32px; }
@@ -1097,7 +1104,9 @@ h1, h2, h3 {
   .btn-quiet { width: 100%; justify-content: center; }
   .hero-actions { gap: 12px; }
   .hero-visual { padding-bottom: 46px; }
-  .hero-chat-card { right: 8px; width: calc(100% - 40px); max-width: 240px; }
+  /* center (left:50% + translateX) diwarisi dari breakpoint 900px;
+     di sini cuma atur lebar. Tanpa right:8px — itu bikin asimetris. */
+  .hero-chat-card { width: calc(100% - 40px); max-width: 240px; }
 
   .cando-row { grid-template-columns: 1fr; gap: 6px; padding: 20px 0; }
   .coding-grid { grid-template-columns: 1fr; gap: 32px; }
