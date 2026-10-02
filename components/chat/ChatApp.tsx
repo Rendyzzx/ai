@@ -198,11 +198,10 @@ export default function ChatApp() {
       const bootItems: ConversationItem[] = convData ? convData.items || [] : [];
       setItems(bootItems);
 
-      // Returning user: langsung buka percakapan terakhir; kosong → sapaan.
+      // Returning user: langsung buka percakapan terakhir. Belum ada
+      // percakapan → biarkan kosong, user yang mulai ngobrol duluan.
       if (bootItems.length > 0) {
         void loadConversation(bootItems[0].conversation_id);
-      } else {
-        void requestGreeting(true);
       }
       setBoot("ready");
     } catch (err) {
@@ -245,61 +244,6 @@ export default function ChatApp() {
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
-
-  /* ---------------- Greeting (karakter menyapa duluan) ---------------- */
-
-  const requestGreeting = useCallback(
-    async (greet: boolean) => {
-      if (!greet || loadingRef.current) return;
-      loadingRef.current = true;
-      setIndicator("typing");
-
-      try {
-        const res = await api("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ greeting: true }),
-        });
-        const data = (await res.json().catch(() => null)) as ChatResponse | null;
-        setIndicator(null);
-
-        if (res.ok && data?.text && !data.already) {
-          setCurrentId(data.conversation_id || null);
-          pushMessages([
-            { message_id: data.message_id!, role: "assistant", content: data.text, timestamp: new Date().toISOString() },
-          ]);
-          refreshSidebar();
-        } else if (data?.already) {
-          if (data.conversation_id) void loadConversation(data.conversation_id);
-        } else {
-          pushMessages([
-            {
-              message_id: "",
-              role: "assistant",
-              content: data?.error || "Dia sepertinya sedang sibuk sebentar. Coba lagi nanti.",
-              timestamp: new Date().toISOString(),
-            },
-          ]);
-        }
-      } catch (err) {
-        setIndicator(null);
-        if ((err as Error).message !== "unauthorized") {
-          pushMessages([
-            {
-              message_id: "",
-              role: "assistant",
-              content: "Koneksi sedang bermasalah. Coba lagi nanti ya.",
-              timestamp: new Date().toISOString(),
-            },
-          ]);
-        }
-      } finally {
-        loadingRef.current = false;
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pushMessages]
-  );
 
   /* ---------------- Refresh sidebar ---------------- */
 
@@ -714,14 +658,11 @@ export default function ChatApp() {
         return;
       }
       setLoaded((prev) => {
-        if (prev.length === 0) {
-          resetView();
-          void requestGreeting(true);
-        }
+        if (prev.length === 0) resetView();
         return prev;
       });
     },
-    [confirmDialog, loadConversation, resetView, requestGreeting]
+    [confirmDialog, loadConversation, resetView]
   );
 
   const saveEdit = useCallback(
@@ -980,7 +921,6 @@ export default function ChatApp() {
           onNewChat={() => {
             setSidebarOpen(false);
             resetView();
-            void requestGreeting(true);
           }}
           onOpenCharacter={() => {
             setSidebarOpen(false);
@@ -1003,10 +943,7 @@ export default function ChatApp() {
             try {
               await api("/api/conversations?id=" + encodeURIComponent(id), { method: "DELETE" });
             } catch { /* sudah dialihkan bila 401 */ }
-            if (currentIdRef.current === id) {
-              resetView();
-              void requestGreeting(true);
-            }
+            if (currentIdRef.current === id) resetView();
           }}
           onRecover={async () => {
             try {
