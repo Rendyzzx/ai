@@ -7,7 +7,7 @@
    diambil dari state (settings.js bisa mengubahnya kapan pun).
    ============================================================ */
 
-import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state } from './app.js?v=41a3dc4524';
+import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state, confirmDialog } from './app.js?v=9f91c9d375';
 
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
@@ -40,10 +40,13 @@ export function initChat() {
   els.attachPreview = $('#attachPreview');
   els.attachPreviewImg = $('#attachPreviewImg');
   els.attachRemove = $('#attachRemove');
+  els.menu = $('#msgMenu');
+  els.toast = $('#copyToast');
 
   bindComposer();
   bindScroll();
   bindSuggestions();
+  bindMessageActions();
   updateCharHead();
 
   // `greet: true` → karakter menyapa duluan (chat baru / pertama kali)
@@ -127,9 +130,10 @@ function labelFor(role) {
  * .message-body > [.message-header (nama pengirim), .message-content]
  * Avatar & nama dari state terpusat (profile/bot dinamis, tidak hardcode).
  */
-function messageNode(role, content, isError, showName, imageUrl) {
+function messageNode(role, content, isError, showName, imageUrl, mid) {
   const row = document.createElement('div');
   row.className = 'message-row ' + (role === 'user' ? 'user' : 'assistant') + (isError ? ' error' : '');
+  if (mid) row.dataset.mid = mid;   // id pesan server → aksi menu (copy/delete/edit/regen)
 
   // Avatar dinamis dari state (user: profile.avatar, bot: bot.avatar)
   const avatar = document.createElement('div');
@@ -207,11 +211,12 @@ function refreshLabels() {
   }
 }
 
-function appendMessage(role, content, isError = false, imageUrl = null) {
+function appendMessage(role, content, isError = false, imageUrl = null, mid = null) {
   const wasNearBottom = nearBottom;
   els.welcome.hidden = true;
   const showName = role !== lastRole;   // nama hanya saat ganti peran
-  els.column.appendChild(messageNode(role, content, isError, showName, imageUrl));
+  const row = messageNode(role, content, isError, showName, imageUrl, mid);
+  els.column.appendChild(row);
   lastRole = role;
 
   const nodes = els.column.querySelectorAll(':scope > .message-row');
@@ -221,6 +226,23 @@ function appendMessage(role, content, isError = false, imageUrl = null) {
     updateEarlierButton();
   }
   if (wasNearBottom) scrollToBottom(false);
+  return row;
+}
+
+// Pesan yang dikirim/generate juga dicatat ke `loaded` agar aksi
+// delete/edit/regenerate tetap konsisten dengan server tanpa reload.
+function trackMessage(role, content, mid, image) {
+  if (!mid) return;
+  loaded.push({ message_id: mid, role, content, image, timestamp: new Date().toISOString() });
+}
+
+// Indikator "sedang mengetik" — satu bentuk untuk semua alur
+function typingRow() {
+  const typing = messageNode('assistant', '', false, false);
+  typing.classList.add('typing');
+  typing.querySelector('.message-content').innerHTML =
+    '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+  return typing;
 }
 
 function resetView(greet) {
@@ -248,10 +270,7 @@ async function requestGreeting() {
 
   // indikator "dia sedang mengetik" (welcome disembunyikan)
   els.welcome.hidden = true;
-  const typing = messageNode('assistant', '', false, false);
-  typing.classList.add('typing');
-  typing.querySelector('.message-content').innerHTML =
-    '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+  const typing = typingRow();
   els.column.appendChild(typing);
   scrollToBottom(true);
 
@@ -266,7 +285,8 @@ async function requestGreeting() {
     typing.remove();
     if (res.ok && data?.text && !data.already) {
       currentId = data.conversation_id || null;
-      appendMessage('assistant', data.text);
+      trackMessage('assistant', data.text, data.message_id);
+      appendMessage('assistant', data.text, false, null, data.message_id);
       emit('chat:updated');        // sidebar: percakapan baru muncul
       emit('chat:activated', { id: currentId });
     } else if (data?.already) {
@@ -304,7 +324,7 @@ async function loadConversation(id) {
     let prev = firstHidden > 0 ? loaded[firstHidden - 1].role : null;
     for (const m of loaded.slice(firstHidden)) {
       const showName = m.role === 'assistant' && m.role !== prev;
-      fragment.appendChild(messageNode(m.role, m.content, false, showName, m.image || null));
+      fragment.appendChild(messageNode(m.role, m.content, false, showName, m.image || null, m.message_id));
       prev = m.role;
     }
     els.column.appendChild(fragment);
@@ -501,7 +521,7 @@ async function submit() {
   els.sendBtn.disabled = true;
 
   // Render optimistik untuk pesan user (gambar + caption)
-  appendMessage('user', text, false, img?.thumb || null);
+  const userRow = appendMessage('user', text, false, img?.thumb || null);
 
   els.input.value = '';
   els.input.style.height = 'auto';
@@ -509,10 +529,7 @@ async function submit() {
   els.input.focus();
 
   // Indikator mengetik (dengan avatar bot, tanpa nama)
-  const typing = messageNode('assistant', '', false, false);
-  typing.classList.add('typing');
-  typing.querySelector('.message-content').innerHTML =
-    '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+  const typing = typingRow();
   els.column.appendChild(typing);
   scrollToBottom(true);
 
@@ -534,7 +551,13 @@ async function submit() {
       currentId = data.conversation_id || currentId;
       updateCharHead();
       typing.remove();
-      appendMessage('assistant', data.text, false);
+      // id pesan baru dari server → aktifkan aksi menu pada kedua bubble
+      if (data.user_message_id) {
+        userRow.dataset.mid = data.user_message_id;
+        trackMessage('user', text, data.user_message_id, img?.thumb || null);
+      }
+      trackMessage('assistant', data.text, data.assistant_message_id);
+      appendMessage('assistant', data.text, false, null, data.assistant_message_id);
       emit('chat:updated');   // sidebar refresh (judul/urutan baru)
       emit('chat:activated', { id: currentId });
     } else {
@@ -548,6 +571,352 @@ async function submit() {
   } finally {
     loading = false;
     els.sendBtn.disabled = els.input.value.trim() === '';
+  }
+  if (ok && nearBottom) scrollToBottom(true);
+}
+
+/* ============================================================
+   AKSI PESAN — menu konteks: klik kanan (desktop) / long-press
+   (mobile). SATU set listener delegated di #chatColumn untuk semua
+   pesan (tanpa listener per-bubble); menu DOM tunggal dipakai ulang.
+   Aksi: Copy, Edit (user), Regenerate (assistant terakhir), Delete —
+   semua konsisten dengan history server via message_id.
+   ============================================================ */
+
+let menuRow = null;      // baris pemilik menu yang sedang terbuka
+let editBoxOpen = null;  // baris yang sedang diedit inline
+let toastTimer = null;
+
+function bindMessageActions() {
+  // --- Desktop: klik kanan pada bubble ---
+  els.column.addEventListener('contextmenu', (e) => {
+    const row = e.target.closest('.message-row');
+    if (!row || row.classList.contains('typing')) return;
+    e.preventDefault();               // ganti menu native browser
+    openMenu(row, e.clientX, e.clientY);
+  });
+
+  // --- Mobile: long-press ~480ms; batal saat jari bergeser (scroll
+  //     tetap lancar). Listener passive — tidak mengganggu scroll. ---
+  let lpTimer = null, lpRow = null, lpX = 0, lpY = 0;
+  const LP_MS = 480;
+  const cancelLp = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
+  els.column.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    lpRow = e.target.closest('.message-row');
+    if (!lpRow || lpRow.classList.contains('typing') || editBoxOpen) return;
+    lpX = t.clientX; lpY = t.clientY;
+    lpTimer = setTimeout(() => {
+      lpTimer = null;
+      try { window.getSelection()?.removeAllRanges(); } catch { /* ios lama */ }
+      navigator.vibrate?.(8);
+      openMenu(lpRow, lpX, lpY);
+    }, LP_MS);
+  }, { passive: true });
+  els.column.addEventListener('touchmove', (e) => {
+    if (!lpTimer) return;
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - lpX) > 8 || Math.abs(t.clientY - lpY) > 8) cancelLp();
+  }, { passive: true });
+  els.column.addEventListener('touchend', cancelLp, { passive: true });
+  els.column.addEventListener('touchcancel', cancelLp, { passive: true });
+
+  // --- Aksi menu: delegation satu listener ---
+  els.menu.addEventListener('click', (e) => {
+    const btn = e.target.closest('.msg-menu-item');
+    if (!btn || !menuRow) return;
+    const row = menuRow;
+    closeMenu();
+    const act = btn.dataset.act;
+    if (act === 'copy') doCopy(row);
+    else if (act === 'delete') doDelete(row);
+    else if (act === 'edit') startEdit(row);
+    else if (act === 'regenerate') doRegenerate(row);
+  });
+
+  // --- Tutup menu: sentuh/klik di luar, Escape, scroll, resize ---
+  document.addEventListener('pointerdown', (e) => {
+    if (!els.menu.hidden && !els.menu.contains(e.target)) closeMenu();
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !els.menu.hidden) closeMenu();
+  });
+  els.scroll.addEventListener('scroll', () => {
+    if (!els.menu.hidden) closeMenu();
+  }, { passive: true, capture: true });
+  window.addEventListener('resize', () => {
+    if (!els.menu.hidden) closeMenu();
+  });
+}
+
+function openMenu(row, x, y) {
+  const textEl = row.querySelector('.message-text');
+  const text = textEl ? textEl.textContent : '';
+  const isUser = row.classList.contains('user');
+  const isErr = row.classList.contains('error');
+  const mid = row.dataset.mid || '';
+  const rows = els.column.querySelectorAll(':scope > .message-row');
+  const isLast = rows.length > 0 && rows[rows.length - 1] === row;
+
+  // Susun item sesuai jenis pesan
+  els.menu.querySelector('[data-act="copy"]').hidden = !text;
+  els.menu.querySelector('[data-act="edit"]').hidden = !(isUser && mid && !isErr);
+  els.menu.querySelector('[data-act="regenerate"]').hidden = !(!isUser && mid && !isErr && isLast);
+  els.menu.querySelector('[data-act="delete"]').hidden = !(mid && !isErr);
+
+  menuRow = row;
+  els.menu.hidden = false;
+
+  // Posisikan dekat titik tekan, selalu dalam viewport
+  const mw = els.menu.offsetWidth, mh = els.menu.offsetHeight;
+  const left = Math.min(Math.max(8, x - mw / 2), window.innerWidth - mw - 8);
+  const above = y - mh - 10;
+  const top = above >= 8 ? above : Math.min(y + 14, window.innerHeight - mh - 8);
+  els.menu.style.left = left + 'px';
+  els.menu.style.top = top + 'px';
+}
+
+function closeMenu() {
+  els.menu.hidden = true;
+  menuRow = null;
+}
+
+/* ---------------- Copy + toast "Copied ✓" ---------------- */
+
+async function doCopy(row) {
+  const textEl = row.querySelector('.message-text');
+  const text = textEl ? textEl.textContent : '';
+  if (!text) return;
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    ok = true;
+  } catch {
+    // fallback konteks non-secure / browser lama
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+    document.body.appendChild(ta);
+    ta.select();
+    try { ok = document.execCommand('copy'); } catch { /* gagal total */ }
+    ta.remove();
+  }
+  if (ok) showToast('Copied ✓');
+}
+
+function showToast(msg) {
+  els.toast.textContent = msg;
+  els.toast.hidden = false;
+  requestAnimationFrame(() => els.toast.classList.add('show'));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    els.toast.classList.remove('show');
+    setTimeout(() => { els.toast.hidden = true; }, 220);
+  }, 1500);
+}
+
+/* ---------------- Delete (UI + history server) ---------------- */
+
+async function doDelete(row) {
+  const mid = row.dataset.mid;
+  const cid = currentId;
+  if (!mid || !cid || loading) return;
+  const ok = await confirmDialog('Delete this message?', 'Delete', 'Cancel');
+  if (!ok) return;
+
+  // update state lokal dulu (instan), lalu sinkron ke server
+  const idx = loaded.findIndex((m) => m && m.message_id === mid);
+  if (idx >= 0) {
+    loaded.splice(idx, 1);
+    if (idx < firstHidden) firstHidden = Math.max(0, firstHidden - 1);
+  }
+  row.remove();
+  updateEarlierButton();
+
+  let serverOk = false;
+  try {
+    const res = await api('/api/conversations?id=' + encodeURIComponent(cid) +
+      '&message_id=' + encodeURIComponent(mid), { method: 'DELETE' });
+    serverOk = res.ok;
+  } catch { serverOk = false; }
+
+  if (!serverOk) {
+    loadConversation(cid);   // gagal sinkron → muat ulang state server
+    return;
+  }
+  if (loaded.length === 0 && firstHidden === 0) resetView(false);
+}
+
+/* ---------------- Edit (user) — inline, re-run dari titik itu ---------------- */
+
+function startEdit(row) {
+  if (loading || !currentId) return;
+  if (editBoxOpen) cancelEdit(editBoxOpen);
+  const textEl = row.querySelector('.message-text');
+  const contentEl = row.querySelector('.message-content');
+  if (!textEl || !contentEl) return;
+
+  textEl.hidden = true;
+
+  const box = document.createElement('div');
+  box.className = 'edit-box';
+  const ta = document.createElement('textarea');
+  ta.className = 'edit-input';
+  ta.value = textEl.textContent;
+  ta.rows = 2;
+  const actions = document.createElement('div');
+  actions.className = 'edit-actions';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'edit-cancel';
+  cancel.textContent = 'Cancel';
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'edit-save';
+  save.textContent = 'Save';
+  actions.append(cancel, save);
+  box.append(ta, actions);
+  contentEl.appendChild(box);
+  editBoxOpen = row;
+
+  const autoSize = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+  ta.addEventListener('input', autoSize);
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save.click(); }
+    if (e.key === 'Escape') cancelEdit(row);
+  });
+  cancel.addEventListener('click', () => cancelEdit(row));
+  save.addEventListener('click', () => saveEdit(row));
+  requestAnimationFrame(() => {
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    autoSize();
+  });
+}
+
+function cancelEdit(row) {
+  const box = row.querySelector('.edit-box');
+  if (box) box.remove();
+  const textEl = row.querySelector('.message-text');
+  if (textEl) textEl.hidden = false;
+  if (editBoxOpen === row) editBoxOpen = null;
+}
+
+async function saveEdit(row) {
+  const ta = row.querySelector('.edit-input');
+  const mid = row.dataset.mid;
+  const cid = currentId;
+  if (!ta || !mid || !cid || loading) return;
+  const text = sanitizeText(ta.value, 4000);
+  if (!text) return;
+
+  loading = true;
+  els.sendBtn.disabled = true;
+
+  // terapkan teks baru + buang semua baris SETELAH pesan ini
+  const textEl = row.querySelector('.message-text');
+  textEl.textContent = text;
+  textEl.hidden = false;
+  const box = row.querySelector('.edit-box');
+  if (box) box.remove();
+  if (editBoxOpen === row) editBoxOpen = null;
+
+  let sib = row.nextElementSibling;
+  while (sib) {
+    const next = sib.nextElementSibling;
+    if (sib.classList && sib.classList.contains('message-row')) sib.remove();
+    sib = next;
+  }
+
+  // sinkronkan loaded: isi berubah, sisanya dibuang
+  const idx = loaded.findIndex((m) => m && m.message_id === mid);
+  if (idx >= 0) {
+    loaded[idx].content = text;
+    loaded.length = idx + 1;
+  }
+  firstHidden = Math.min(firstHidden, loaded.length);
+  lastRole = 'user';   // jawaban baru menampilkan nama karakter lagi
+
+  const typing = typingRow();
+  els.column.appendChild(typing);
+  scrollToBottom(true);
+
+  let ok = false;
+  try {
+    const res = await api('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'edit', conversation_id: cid, message_id: mid, text })
+    });
+    const data = await res.json().catch(() => null);
+    typing.remove();
+    if (res.ok && data?.text) {
+      ok = true;
+      updateCharHead();
+      trackMessage('assistant', data.text, data.assistant_message_id);
+      appendMessage('assistant', data.text, false, null, data.assistant_message_id);
+      emit('chat:updated');
+    } else {
+      loadConversation(cid);   // server tidak berubah → muat ulang
+    }
+  } catch (err) {
+    typing.remove();
+    if (err.message === 'unauthorized') return;
+    loadConversation(cid);
+  } finally {
+    loading = false;
+    updateSendState();
+  }
+  if (ok && nearBottom) scrollToBottom(true);
+}
+
+/* ---------------- Regenerate (assistant) — ganti, tanpa duplikat ---------------- */
+
+async function doRegenerate(row) {
+  const mid = row.dataset.mid;
+  const cid = currentId;
+  if (!mid || !cid || loading) return;
+
+  loading = true;
+  els.sendBtn.disabled = true;
+
+  // buang bubble lama (selalu baris terakhir) → jawaban baru menggantikan
+  row.remove();
+  const idx = loaded.findIndex((m) => m && m.message_id === mid);
+  if (idx >= 0) loaded.length = idx;
+  firstHidden = Math.min(firstHidden, loaded.length);
+  lastRole = 'user';   // jawaban baru menampilkan nama karakter lagi
+
+  const typing = typingRow();
+  els.column.appendChild(typing);
+  scrollToBottom(true);
+
+  let ok = false;
+  try {
+    const res = await api('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'regenerate', conversation_id: cid })
+    });
+    const data = await res.json().catch(() => null);
+    typing.remove();
+    if (res.ok && data?.text) {
+      ok = true;
+      updateCharHead();
+      trackMessage('assistant', data.text, data.assistant_message_id);
+      appendMessage('assistant', data.text, false, null, data.assistant_message_id);
+      emit('chat:updated');
+    } else {
+      loadConversation(cid);   // server tidak berubah → muat ulang
+    }
+  } catch (err) {
+    typing.remove();
+    if (err.message === 'unauthorized') return;
+    loadConversation(cid);
+  } finally {
+    loading = false;
+    updateSendState();
   }
   if (ok && nearBottom) scrollToBottom(true);
 }

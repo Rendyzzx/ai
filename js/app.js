@@ -178,12 +178,14 @@ export async function apiJson(path, options = {}) {
 // popup "situs menyatakan…") — pakai markup #confirmOverlay di index.html.
 let confirmResolve = null;
 
-export function confirmDialog(message) {
+export function confirmDialog(message, okLabel = 'Hapus', cancelLabel = 'Batal') {
   const overlay = document.getElementById('confirmOverlay');
   const msgEl = document.getElementById('confirmMsg');
   if (!overlay || !msgEl) return Promise.resolve(window.confirm(message)); // jaga-jaga
 
   msgEl.textContent = message;
+  document.getElementById('confirmOk').textContent = okLabel;
+  document.getElementById('confirmCancel').textContent = cancelLabel;
   overlay.hidden = false;
   requestAnimationFrame(() => overlay.classList.add('show'));
 
@@ -227,13 +229,13 @@ function bindViewport() {
 
 // ---------------- Gerbang auth + bootstrap ----------------
 
-import { initSidebar } from './sidebar.js?v=41a3dc4524';
-import { initChat } from './chat.js?v=41a3dc4524';
+import { initSidebar } from './sidebar.js?v=9f91c9d375';
+import { initChat } from './chat.js?v=9f91c9d375';
 
 // Settings dimuat LAZY: baru di-import saat pertama kali dibuka
 let settingsMod = null;
 async function openSettings(category) {
-  if (!settingsMod) settingsMod = await import('./settings.js?v=41a3dc4524');
+  if (!settingsMod) settingsMod = await import('./settings.js?v=9f91c9d375');
   settingsMod.openSettings(category);
 }
 

@@ -510,8 +510,9 @@ export default async function handler(req, res) {
       }
     }
 
+    const greetId = crypto.randomUUID();
     conv.messages.push(
-      { message_id: crypto.randomUUID(), role: 'assistant', content: greet, timestamp: now }
+      { message_id: greetId, role: 'assistant', content: greet, timestamp: now }
     );
     if (conv.title === 'Chat baru') conv.title = greet.slice(0, 48);
     conv.updated_at = now;
@@ -531,10 +532,108 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       text: greet,
+      message_id: greetId,
       conversation_id: conv.conversation_id,
       title: conv.title,
       provider,
       greeting: true,
+      bot_name: bot.bot_name
+    });
+  }
+
+  // ---------------- MODE REGENERATE / EDIT PESAN ----------------
+  // Regenerate: buang jawaban assistant di ujung, jawab ulang pesan
+  // user terakhir (thread Gemini baru + recap → tidak pernah duplikat).
+  // Edit: ubah isi pesan user, buang semua pesan setelahnya, lalu
+  // jawab ulang dari titik tersebut. Keduanya konsisten di history.
+  if (body.action === 'regenerate' || body.action === 'edit') {
+    if (!file) return res.status(404).json({ error: 'Percakapan tidak ditemukan' });
+
+    const editing = body.action === 'edit';
+
+    if (editing) {
+      const mid = String(body.message_id || '');
+      const newText = sanitize(body.text, LIMITS.messageMaxLen);
+      const idx = conv.messages.findIndex(
+        (m) => m && m.message_id === mid && m.role === 'user'
+      );
+      if (idx < 0) return res.status(404).json({ error: 'Pesan tidak ditemukan' });
+      if (!newText && !conv.messages[idx].image) {
+        return res.status(400).json({ error: 'Pesan tidak valid' });
+      }
+      // Update isi pesan + truncate percakapan SETELAH titik ini
+      conv.messages[idx].content = newText;
+      conv.messages = conv.messages.slice(0, idx + 1);
+    } else {
+      // Buang semua assistant message di ujung; sisakan user terakhir
+      while (conv.messages.length && conv.messages[conv.messages.length - 1].role === 'assistant') {
+        conv.messages.pop();
+      }
+      if (!conv.messages.length || conv.messages[conv.messages.length - 1].role !== 'user') {
+        return res.status(400).json({ error: 'Tidak ada pesan untuk dijawab ulang' });
+      }
+    }
+
+    const lastUser = conv.messages[conv.messages.length - 1];
+    const contextBefore = conv.messages.slice(0, -1);
+
+    // Thread Gemini baru: jawaban lama tidak pernah terkirim ulang
+    // (tidak ada duplikat), karakter tetap "ingat" via recap.
+    const recap = buildRecap(contextBefore);
+    const userText = String(lastUser.content || '').trim() || '(aku baru kirim gambar ke kamu)';
+    const regenMessage = recap ? recap + '\n\n' + userText : userText;
+
+    // Gambar tersimpan (thumbnail) → kirim ulang agar vision tetap jalan
+    let regImgBuffer = null, regImgName = null;
+    const gmatch = typeof lastUser.image === 'string'
+      ? lastUser.image.match(/^data:(image\/(?:png|jpeg|jpg|webp|gif));base64,([A-Za-z0-9+\/=]+)$/)
+      : null;
+    if (gmatch) {
+      regImgBuffer = Buffer.from(gmatch[2], 'base64');
+      regImgName = 'image.' + (gmatch[1].split('/')[1] === 'jpeg' ? 'jpg' : gmatch[1].split('/')[1]);
+    }
+
+    const regOut = await askProviders(
+      {
+        message: regenMessage,
+        geminiSessionId: null,
+        messages: contextBefore,
+        imageBuffer: regImgBuffer,
+        imageName: regImgBuffer ? regImgName : null
+      },
+      instruction
+    );
+    if (!regOut.reply) {
+      return res.status(502).json({ error: 'Koneksi sedang bermasalah. Coba lagi nanti ya.' });
+    }
+
+    const assistantId = crypto.randomUUID();
+    conv.messages.push(
+      { message_id: assistantId, role: 'assistant', content: regOut.reply, timestamp: new Date().toISOString() }
+    );
+    conv.updated_at = new Date().toISOString();
+    if (regOut.geminiSid) conv.geminiSessionId = regOut.geminiSid;
+
+    await putJson(convPath, conv, 'message regenerate/edit');
+    await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+      const items = Array.isArray(current) ? current : [];
+      const entry = {
+        conversation_id: conv.conversation_id,
+        title: conv.title,
+        updated_at: conv.updated_at
+      };
+      const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
+      if (i >= 0) items[i] = entry; else items.unshift(entry);
+      return items;
+    });
+
+    return res.status(200).json({
+      text: regOut.reply,
+      assistant_message_id: assistantId,
+      user_message_id: editing ? lastUser.message_id : undefined,
+      conversation_id: conv.conversation_id,
+      title: conv.title,
+      provider: regOut.provider,
       bot_name: bot.bot_name
     });
   }
@@ -557,13 +656,15 @@ export default async function handler(req, res) {
   }
 
   // Simpan pesan ke percakapan user (gambar disimpan sebagai thumbnail)
+  const userMessageId = crypto.randomUUID();
+  const assistantMessageId = crypto.randomUUID();
   conv.messages.push(
     {
-      message_id: crypto.randomUUID(), role: 'user',
+      message_id: userMessageId, role: 'user',
       content: message, image: imageBuffer ? (imageThumb || imageDataUrl) : undefined,
       timestamp: now
     },
-    { message_id: crypto.randomUUID(), role: 'assistant', content: reply, timestamp: now }
+    { message_id: assistantMessageId, role: 'assistant', content: reply, timestamp: now }
   );
   if (conv.title === 'Chat baru') {
     conv.title = message.slice(0, 48) || 'Gambar';
@@ -587,6 +688,8 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     text: reply,
+    user_message_id: userMessageId,
+    assistant_message_id: assistantMessageId,
     conversation_id: conv.conversation_id,
     title: conv.title,
     provider,

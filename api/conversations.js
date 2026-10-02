@@ -78,12 +78,37 @@ export default async function handler(req, res) {
     });
   }
 
-  // ---------------- DELETE: hapus percakapan ----------------
+  // ---------------- DELETE: hapus percakapan / satu pesan ----------------
   if (req.method === 'DELETE') {
     const id = String(req.query?.id || '');
     if (!/^[a-f0-9-]{8,36}$/.test(id)) {
       return res.status(400).json({ error: 'ID tidak valid' });
     }
+
+    // DELETE ?id=conv&message_id=xxx → hapus SATU pesan (history konsisten)
+    const mid = String(req.query?.message_id || '');
+    if (mid) {
+      if (!/^[a-f0-9-]{8,36}$/.test(mid)) {
+        return res.status(400).json({ error: 'ID tidak valid' });
+      }
+      const file = await readJson(convPath(uid, id));
+      if (!file) return res.status(404).json({ error: 'Percakapan tidak ditemukan' });
+      const msgs = Array.isArray(file.data.messages) ? file.data.messages : [];
+      const idx = msgs.findIndex((m) => m && m.message_id === mid);
+      if (idx < 0) return res.status(404).json({ error: 'Pesan tidak ditemukan' });
+      msgs.splice(idx, 1);
+      file.data.messages = msgs;
+      file.data.updated_at = nowIso();
+      await putJson(convPath(uid, id), file.data, 'message delete');
+      await updateJson(idxPath(uid), 'conversation index', (current) => {
+        const items = Array.isArray(current) ? current : [];
+        const i = items.findIndex((c) => c.conversation_id === id);
+        if (i >= 0) items[i] = { ...items[i], updated_at: file.data.updated_at };
+        return items;
+      });
+      return res.status(200).json({ ok: true });
+    }
+
     const file = await readJson(convPath(uid, id));
     if (file) await deleteJson(convPath(uid, id));
     // Bersihkan entri index SELALU, bukan hanya kalau file ketemu — kalau

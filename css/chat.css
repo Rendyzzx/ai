@@ -216,6 +216,7 @@
 
 .message-row {
   display: flex;
+  -webkit-touch-callout: none;
   align-items: flex-start;
   gap: 10px;
   max-width: min(75%, 48rem);   /* desktop: ~75%, tidak memenuhi layar */
@@ -541,6 +542,172 @@
   text-align: center;
   font-size: 11.5px;
   color: var(--text-muted);
+}
+
+/* ---------------- Footer watermark ---------------- */
+/* Kecil, tenang, tidak seperti iklan; "Akira" biru lembut + bisa diklik.
+   Bagian dari komposer-wrap → di mobile tetap di atas keyboard,
+   tidak mengganggu area chat. */
+.app-foot {
+  max-width: 1000px;
+  margin: 8px auto 0;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  transition: opacity 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.app-foot:hover {
+  opacity: 1;
+}
+
+.foot-link {
+  color: #7fa8d8;            /* biru tenang, bukan neon */
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.foot-link:hover {
+  color: #a9c7ec;
+  text-decoration: underline;
+}
+
+/* ---------------- Menu aksi pesan (klik kanan / long-press) ---------------- */
+/* Ringan, rounded, soft shadow, animasi halus 120ms — tanpa glow. */
+.msg-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 172px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: msg-menu-in 0.12s ease-out;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@keyframes msg-menu-in {
+  from { opacity: 0; transform: scale(0.97) translateY(2px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.msg-menu-item {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  transition: background 0.12s;
+}
+
+.msg-menu-item:hover {
+  background: var(--surface-2);
+}
+
+.msg-menu-item.danger {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-menu { animation: none; }
+}
+
+/* Toast "Copied ✓" — kecil, tengah bawah, di atas komposer */
+.copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--text);
+  z-index: 80;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.copy-toast.show {
+  opacity: 1;
+}
+
+/* ---------------- Editor inline (Edit Message) ---------------- */
+.edit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: min(320px, 56vw);
+  margin-top: 8px;
+}
+
+.edit-input {
+  width: 100%;
+  padding: 9px 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.45;
+  resize: vertical;
+  min-height: 58px;
+  max-height: 160px;
+  outline: 0;
+  transition: border-color 0.15s;
+}
+
+.edit-input:focus {
+  border-color: var(--accent);
+}
+
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.edit-save,
+.edit-cancel {
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+}
+
+.edit-save {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.edit-save:hover {
+  background: var(--accent-hover);
+}
+
+.edit-cancel {
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.edit-cancel:hover {
+  color: var(--text);
+  background: var(--surface-2);
 }
 
 /* ---------------- Penyesuaian mobile ---------------- */

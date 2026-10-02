@@ -74,6 +74,26 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* UI chrome tidak bisa diseleksi (efek highlight biru saat tap/geser
+   mengganggu) — tapi ISI PESAN CHAT sengaja TIDAK masuk daftar ini:
+   pengguna tetap bisa memilih & menyalin teks chat (lihat chat.css). */
+button,
+.icon-btn,
+.sidebar,
+.topbar,
+.char-head,
+.app-foot,
+.avatar,
+.brand,
+.side-label,
+.history,
+.h-item,
+.msg-menu,
+.welcome-lines {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 input, textarea {
   font: inherit;
   color: inherit;
