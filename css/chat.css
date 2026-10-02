@@ -116,51 +116,86 @@
   gap: 18px;
 }
 
-/* Layar sambutan (hidden saat percakapan aktif) */
+/* Layar sambutan: preview percakapan personal — avatar karakter +
+   beberapa baris sapaan pendek yang muncul berurutan (bukan
+   judul besar / slogan AI). Murni opacity+transform, murah. */
 .welcome {
   margin: auto;                   /* vertikal tengah di area flex */
   text-align: center;
   padding: 40px 16px;
   max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.welcome-icon {
-  width: 34px;
-  height: 34px;
-  color: var(--accent);
-  margin-bottom: 14px;
+.welcome-avatar {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 22px;
 }
 
-.welcome h1 {
-  font-size: clamp(20px, 4vw, 26px);
-  font-weight: 700;
+.welcome-avatar svg {
+  width: 28px;
+  height: 28px;
 }
 
-.welcome p {
-  margin-top: 6px;
+.welcome-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.w-line {
+  font-size: clamp(21px, 3vw, 26px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  opacity: 0;
+  animation: w-line-in 0.45s ease-out forwards;
+}
+
+.w-line:nth-child(2) { animation-delay: 0.4s; }
+.w-line:nth-child(3) { animation-delay: 0.75s; }
+
+@keyframes w-line-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.welcome-hint {
+  margin-top: 22px;
+  font-size: 13.5px;
   color: var(--text-muted);
+  opacity: 0;
+  animation: w-line-in 0.45s ease-out 1.05s forwards;
 }
 
+/* Saran pembuka: chip tenang tanpa kotak/border */
 .suggestions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
-  gap: 10px;
-  margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 26px;
+  max-width: 480px;
 }
 
 .suggestion {
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  text-align: left;
-  font-size: 13.5px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: 13px;
   color: var(--text-muted);
-  transition: border-color 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .suggestion:hover {
-  border-color: var(--accent);
+  background: var(--surface-2);
   color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .w-line, .welcome-hint { animation: none; opacity: 1; }
 }
 
 /* ---------------- Pesan (renderer .message-row) ---------------- */
@@ -249,7 +284,6 @@
   width: fit-content;
   max-width: 100%;
   padding: 9px 14px;
-  box-shadow: var(--shadow-1);
 }
 
 /* Bubble bot (kiri): "ekor" di pojok dekat avatar (kiri-atas sudut tajam) */

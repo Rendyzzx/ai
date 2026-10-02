@@ -227,13 +227,13 @@ function bindViewport() {
 
 // ---------------- Gerbang auth + bootstrap ----------------
 
-import { initSidebar } from './sidebar.js?v=a975b269f0';
-import { initChat } from './chat.js?v=a975b269f0';
+import { initSidebar } from './sidebar.js?v=febac49bc5';
+import { initChat } from './chat.js?v=febac49bc5';
 
 // Settings dimuat LAZY: baru di-import saat pertama kali dibuka
 let settingsMod = null;
 async function openSettings(category) {
-  if (!settingsMod) settingsMod = await import('./settings.js?v=a975b269f0');
+  if (!settingsMod) settingsMod = await import('./settings.js?v=febac49bc5');
   settingsMod.openSettings(category);
 }
 
@@ -244,8 +244,8 @@ function showBootError() {
   document.body.innerHTML = `
     <div style="min-height:100dvh;display:grid;place-items:center;padding:24px;text-align:center;font-family:${font}">
       <div>
-        <p style="margin-bottom:14px;color:#9b9ba4;font-size:14px;">Tidak bisa menghubungi server. Periksa koneksimu.</p>
-        <button id="retryBoot" style="padding:10px 20px;border-radius:10px;background:#6f7dff;color:#fff;border:0;font-size:14px;cursor:pointer;">Coba lagi</button>
+        <p style="margin-bottom:14px;color:#a3a099;font-size:14px;">Tidak bisa menghubungi server. Periksa koneksimu.</p>
+        <button id="retryBoot" style="padding:10px 20px;border-radius:10px;background:#d29763;color:#1d150d;border:0;font-size:14px;cursor:pointer;">Coba lagi</button>
       </div>
     </div>`;
   document.getElementById('retryBoot').addEventListener('click', () => location.reload());

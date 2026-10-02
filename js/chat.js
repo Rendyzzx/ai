@@ -7,7 +7,7 @@
    diambil dari state (settings.js bisa mengubahnya kapan pun).
    ============================================================ */
 
-import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state } from './app.js?v=a975b269f0';
+import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state } from './app.js?v=febac49bc5';
 
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
@@ -29,7 +29,7 @@ export function initChat() {
   els.title = $('#chatTitle');
   els.charAvatar = $('#charAvatar');
   els.charStatus = $('#charStatus');
-  els.welcomeTitle = $('#welcomeTitle');
+  els.welcomeAvatar = $('#welcomeAvatar');
   els.welcomeSub = $('#welcomeSub');
   els.input = $('#input');
   els.sendBtn = $('#sendBtn');
@@ -103,9 +103,8 @@ function updateCharHead() {
   els.title.textContent = state.bot.bot_name || 'Aomi';
   renderAvatar(els.charAvatar, state.bot.bot_avatar, 'logo');
   els.charStatus.textContent = statusText(state.bot.traits);
-  // welcome terpersonalisasi dengan nama karakter
-  const name = state.bot.bot_name || 'dia';
-  els.welcomeTitle.textContent = `${name} nungguin kamu nih.`;
+  // welcome personal: avatar karakter, bukan judul/slogan besar
+  renderAvatar(els.welcomeAvatar, state.bot.bot_avatar, 'logo');
 }
 
 /* ============================================================

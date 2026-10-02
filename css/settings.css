@@ -134,14 +134,12 @@
 
 /* ---------------- Section card ---------------- */
 
+/* Section: flat tanpa kotak — pemisah adalah judul + spacing,
+   bukan card. (Prinsip: jangan bungkus semuanya dalam card.) */
 .section-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .card-title {
@@ -151,7 +149,6 @@
 }
 
 .card-desc {
-  margin-top: -8px;
   font-size: 12.5px;
   color: var(--text-muted);
 }
@@ -263,10 +260,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  padding: 4px 0;
 }
 
 .bp-name {
@@ -287,7 +281,6 @@
   gap: 4px;
   padding: 4px;
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: 10px;
 }
 
@@ -450,8 +443,7 @@
   grid-auto-columns: 1fr;
   gap: 4px;
   padding: 4px;
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--surface);
   border-radius: 10px;
 }
 
@@ -485,7 +477,7 @@
 }
 
 .save-status.ok {
-  color: #3ddc84;
+  color: #9dc59a;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -503,11 +495,11 @@
   font-weight: 600;
   font-size: 14px;
   min-height: 44px;
-  transition: opacity 0.15s;
+  transition: background 0.15s;
 }
 
 .btn-primary:hover:not(:disabled) {
-  opacity: 0.9;
+  background: var(--accent-hover);
 }
 
 .btn-primary:disabled {
