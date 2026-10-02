@@ -242,6 +242,104 @@ function buildDlCard(dl) {
   return card;
 }
 
+/* ============================================================
+   RENDER TEKS PESAN (aman + code block)
+   - Semua isi pesan (user maupun karakter) masuk lewat
+     textContent / createTextNode → HTML di dalam pesan
+     TIDAK PERNAH dieksekusi; <script> atau <div> tampil
+     sebagai teks biasa. Ini sekaligus jawaban atas "pesan HTML
+     jadi preview": sekarang jadi code block rapi + tombol salin.
+   - ``` fence → code block dengan header bahasa + tombol "Salin"
+   - `inline` → chip kode kecil di dalam teks
+   ============================================================ */
+
+function textSegment(text) {
+  const span = document.createElement('span');
+  span.className = 'message-text';
+  for (const part of String(text).split(/(`[^`\n]+`)/g)) {
+    if (!part) continue;
+    if (part.length > 2 && part.startsWith('`') && part.endsWith('`')) {
+      const code = document.createElement('code');
+      code.className = 'inline-code';
+      code.textContent = part.slice(1, -1);
+      span.appendChild(code);
+    } else {
+      span.appendChild(document.createTextNode(part));
+    }
+  }
+  return span;
+}
+
+function codeBlockNode(lang, code) {
+  const block = document.createElement('div');
+  block.className = 'code-block';
+
+  const head = document.createElement('div');
+  head.className = 'code-head';
+  const langEl = document.createElement('span');
+  langEl.className = 'code-lang';
+  langEl.textContent = lang || 'code';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'code-copy';
+  btn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="components/icons.svg#copy" /></svg><span>Salin</span>';
+  btn.addEventListener('click', async () => {
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(code);
+      ok = true;
+    } catch {
+      // Fallback browser lama / konteks tidak aman
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = code;
+        ta.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      } catch { ok = false; }
+    }
+    btn.classList.toggle('copied', ok);
+    btn.querySelector('span').textContent = ok ? 'Tersalin' : 'Gagal';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.querySelector('span').textContent = 'Salin';
+    }, 1600);
+  });
+  head.append(langEl, btn);
+
+  const pre = document.createElement('pre');
+  const codeEl = document.createElement('code');
+  codeEl.textContent = code;   // ← inti keamanannya: textContent
+  pre.appendChild(codeEl);
+
+  block.append(head, pre);
+  return block;
+}
+
+function renderMessageText(text) {
+  const frag = document.createDocumentFragment();
+  const raw = String(text || '');
+
+  // ```lang\n...``` — fence tanpa penutup dianggap blok sampai akhir
+  const re = /```([a-zA-Z0-9+#._-]*)[^\S\n]*\r?\n([\s\S]*?)(?:```|$)/g;
+  let last = 0, m;
+  while ((m = re.exec(raw))) {
+    if (m.index > last) frag.appendChild(textSegment(raw.slice(last, m.index)));
+    frag.appendChild(codeBlockNode(m[1], m[2].replace(/\n+$/, '')));
+    last = re.lastIndex;
+  }
+  if (last < raw.length) frag.appendChild(textSegment(raw.slice(last)));
+
+  if (!frag.childNodes.length) {
+    const span = document.createElement('span');
+    span.className = 'message-text';
+    frag.appendChild(span);
+  }
+  return frag;
+}
+
 function messageNode(role, content, isError, showName, imageUrl, mid, file, dl) {
   const row = document.createElement('div');
   row.className = 'message-row ' + (role === 'user' ? 'user' : 'assistant') + (isError ? ' error' : '');
@@ -284,10 +382,10 @@ function messageNode(role, content, isError, showName, imageUrl, mid, file, dl) 
     contentEl.appendChild(img);
   }
   if (content) {
-    const txt = document.createElement('span');
-    txt.className = 'message-text';
-    txt.textContent = content;
-    contentEl.appendChild(txt);
+    // Teks + code block (``` ```) + inline code (`x`) — semua isi
+    // dirender via textContent/createTextNode (HTML tidak pernah
+    // dieksekusi, pesan berisi kode tampil sebagai kode, bukan preview).
+    contentEl.appendChild(renderMessageText(content));
   } else if (!imageUrl) {
     contentEl.textContent = content;   // pesan kosong teknis
   }
