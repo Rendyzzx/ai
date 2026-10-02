@@ -1121,8 +1121,12 @@ h1, h2, h3 {
   .auth-body { padding: 24px 20px 24px; }
   .auth-section { padding: 64px 0; }
   .closing { padding: 64px 0 96px; }
-  .foot-inner { flex-wrap: wrap; gap: 8px; }
+  .foot-inner { flex-wrap: wrap; gap: 8px 20px; }
   .foot-line { flex-basis: 100%; order: 3; }
+  /* "margin-left:auto" dulu tetap aktif walau nav links wrap sendiri
+     ke baris baru di mobile — nav jadi ketarik ke kanan, nggak rata
+     kiri sama "Aomi © 2026" di atasnya. Reset supaya rata kiri. */
+  .foot-links { margin-left: 0; flex-basis: 100%; flex-wrap: wrap; gap: 8px 20px; }
 }
 
 
