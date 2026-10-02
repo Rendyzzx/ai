@@ -8,9 +8,8 @@ import { readJson } from '../lib/github.js';
 import { allow, clientIp } from '../lib/ratelimit.js';
 import {
   verifyPassword, verifyCaptcha,
-  createSession, sessionCookie,
-  getLoginLock, recordLoginFail, clearLoginLock,
-  SESSION_LONG_MS
+  createSession,
+  getLoginLock, recordLoginFail, clearLoginLock
 } from '../lib/auth.js';
 
 const GENERIC_FAIL = 'Email/username atau password salah.';
@@ -70,12 +69,12 @@ export default async function handler(req, res) {
 
   // Sukses → bersihkan lock, buat session
   await clearLoginLock(identifier, ip);
+  // Session id dikirim di body → client simpan di sessionStorage.
+  // TIDAK ada cookie autentikasi persisten.
   const session = await createSession(user.id, remember);
-  res.setHeader(
-    'Set-Cookie',
-    sessionCookie(session.session_id, remember, remember ? SESSION_LONG_MS : null)
-  );
   return res.status(200).json({
+    session_id: session.session_id,
+    expires_at: session.expires_at,
     user: { id: user.id, username: user.username, email: user.email }
   });
 }

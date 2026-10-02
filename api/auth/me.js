@@ -11,10 +11,10 @@ export default async function handler(req, res) {
   }
 
   const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: 'Belum login' });
+  if (!session) return res.status(401).json({ error: 'Belum login' , code: 'SESSION_INVALID' });
 
   const userFile = await readJson(`users/${session.user_id}.json`);
-  if (!userFile) return res.status(401).json({ error: 'User tidak ditemukan' });
+  if (!userFile) return res.status(401).json({ error: 'User tidak ditemukan' , code: 'SESSION_INVALID' });
 
   const u = userFile.data;
   return res.status(200).json({

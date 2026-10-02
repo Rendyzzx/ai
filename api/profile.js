@@ -66,11 +66,11 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
   const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: 'Sesi berakhir. Silakan login kembali.' });
+  if (!session) return res.status(401).json({ error: 'Sesi berakhir. Silakan login kembali.' , code: 'SESSION_INVALID' });
   const uid = session.user_id;
 
   const userFile = await readJson(`users/${uid}.json`);
-  if (!userFile) return res.status(401).json({ error: 'User tidak ditemukan' });
+  if (!userFile) return res.status(401).json({ error: 'User tidak ditemukan' , code: 'SESSION_INVALID' });
   const user = userFile.data;
 
   // ---------------- GET ----------------

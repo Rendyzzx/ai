@@ -293,7 +293,7 @@ export default async function handler(req, res) {
 
   // Wajib login → riwayat per akun, tidak pernah tercampur
   const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: 'Sesi berakhir. Silakan login kembali.' });
+  if (!session) return res.status(401).json({ error: 'Sesi berakhir. Silakan login kembali.' , code: 'SESSION_INVALID' });
   const uid = session.user_id;
 
   if (!allow('chat:' + clientIp(req.headers), LIMITS.rateMax, LIMITS.rateWindowMs)) {

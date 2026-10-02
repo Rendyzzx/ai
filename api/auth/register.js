@@ -9,7 +9,7 @@ import { readJson, putJson, updateJson } from '../lib/github.js';
 import { allow, clientIp } from '../lib/ratelimit.js';
 import {
   hashPassword, validateCredentials, verifyCaptcha,
-  createSession, sessionCookie, SESSION_LONG_MS
+  createSession
 } from '../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -65,10 +65,11 @@ export default async function handler(req, res) {
     return data;
   });
 
-  // Auto login setelah register
+  // Auto login setelah register: session id di body (bukan cookie)
   const session = await createSession(userId, true);
-  res.setHeader('Set-Cookie', sessionCookie(session.session_id, true, SESSION_LONG_MS));
   return res.status(201).json({
+    session_id: session.session_id,
+    expires_at: session.expires_at,
     user: { id: userId, username, email }
   });
 }

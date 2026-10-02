@@ -8,7 +8,7 @@
    Semua listener dibind SEKALI (flag `bound`), tanpa leak.
    ============================================================ */
 
-import { $, renderAvatar, api, apiJson, state, emit } from './app.js';
+import { $, renderAvatar, api, apiJson, state, emit, clearSessionId, resetClientState } from './app.js';
 
 const els = {};
 let bound = false;
@@ -151,11 +151,13 @@ function bindOnce() {
     try { localStorage.setItem('aomi.fontSize', btn.dataset.val); } catch { /* private mode */ }
   });
 
-  // Akun
+  // Akun: logout = hapus session server + bersihkan SELURUH state klien
   $('#logoutBtn').addEventListener('click', async () => {
     try {
       await api('/api/auth/logout', { method: 'POST' });
-    } catch { /* lanjut redirect */ }
+    } catch { /* lanjut teardown lokal */ }
+    clearSessionId();
+    resetClientState();
     location.replace('/auth.html');
   });
 }

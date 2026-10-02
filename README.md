@@ -7,7 +7,7 @@ dioptimalkan untuk Vercel Serverless. Riwayat percakapan tersimpan per akun.
 ## Arsitektur
 
 ```
-Browser → /api/* (Vercel Serverless, cookie session HttpOnly)
+Browser → /api/* (Vercel Serverless, session via header X-Session-Id)
               ├── Provider AI (Gemini scraping → Groq → ChatEverywhere)
               └── GitHub private repo sebagai database JSON
 ```
@@ -71,7 +71,13 @@ Development → **Redeploy**.
 ## Keamanan
 
 - Password di-hash **scrypt** + salt, verifikasi timing-safe.
-- Session: token acak 256-bit, cookie **HttpOnly + Secure + SameSite=Lax**.
+- Session: token acak 256-bit dikirim via header **X-Session-Id** (tidak ada cookie auth
+  persisten; client hanya menyimpan session id opaque di sessionStorage — tanpa
+  password/token/API key di browser).
+- Setiap deployment baru (APP_VERSION / SHA commit berubah) otomatis meng-invalid-kan
+  SEMUA session versi lama → semua user logout → login ulang dengan UI versi terbaru.
+- Asset JS/CSS distempel hash versi saat build (?v=…) + HTML no-cache → browser tidak
+  pernah memakai JS/CSS lama setelah redeploy.
 - Masa berlaku session: 12 jam, atau 30 hari dengan "Remember Me"
   (server-side expiry + refresh lazy tiap 6 jam).
 - Verifikasi manusia: soal matematika acak, jawaban dikirim ke browser

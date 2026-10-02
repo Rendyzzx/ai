@@ -1,21 +1,39 @@
 /* ============================================================
    Aomi — auth.js
-   Halaman Masuk/Daftar: cek session (langsung chat bila valid),
-   verifikasi angka, toggle password, state tombol (idle/loading/
-   success), pesan error ramah tanpa membocorkan data akun.
+   Halaman Masuk/Daftar: verifikasi angka, toggle password, state
+   tombol, pesan error ramah. Setelah login: session id OPAQUE
+   (bukan credential) disimpan di sessionStorage — tanpa cookie,
+   tanpa data sensitif di browser. Server selalu memvalidasi.
    ============================================================ */
 
 const $ = (sel) => document.querySelector(sel);
 
+const SID_KEY = 'aomi.sid';
+
+function getSessionId() {
+  try { return sessionStorage.getItem(SID_KEY); } catch { return null; }
+}
+
+function setSessionId(sid) {
+  try { sessionStorage.setItem(SID_KEY, sid); } catch { /* private */ }
+}
+
+function clearSid() {
+  try { sessionStorage.removeItem(SID_KEY); } catch { /* private */ }
+}
+
 const captcha = { login: {}, register: {} };
 
-// ---------------- Session valid → langsung buka chat ----------------
+// ---------------- Session valid di tab ini → langsung buka chat ----------------
 
 (async () => {
+  const sid = getSessionId();
+  if (!sid) return;
   try {
-    const res = await fetch('/api/auth/me');
+    const res = await fetch('/api/auth/me', { headers: { 'X-Session-Id': sid } });
     if (res.ok) location.replace('/');
-  } catch { /* tetap tampilkan halaman login */ }
+    else clearSid(); // session sudah invalid → tetap di halaman login
+  } catch { /* offline: tampilkan halaman login */ }
 })();
 
 // ---------------- Tab Masuk / Daftar ----------------
@@ -80,7 +98,7 @@ document.querySelectorAll('.verify-refresh').forEach((btn) => {
 loadCaptcha('login');
 loadCaptcha('register');
 
-// ---------------- State tombol & error ---------------- */
+// ---------------- State tombol & error ----------------
 
 function setBtn(btn, text, disabled) {
   btn.textContent = text;
@@ -88,9 +106,8 @@ function setBtn(btn, text, disabled) {
 }
 
 function showError(kind, message) {
-  const el = kind === 'login' ? $('#errLogin') : $('#errRegister');
-  el.textContent = message;
-  el.hidden = false;
+  (kind === 'login' ? $('#errLogin') : $('#errRegister')).textContent = message;
+  (kind === 'login' ? $('#errLogin') : $('#errRegister')).hidden = false;
 }
 
 function hideError(kind) {
@@ -98,7 +115,7 @@ function hideError(kind) {
 }
 
 /** Pesan error ramah — tidak pernah menampilkan detail teknis. */
-function friendlyError(status, data, kind) {
+function friendlyError(status, data) {
   if (status === 400) return data?.error?.includes('verifikasi')
     ? data.error : 'Data belum lengkap atau tidak valid.';
   if (status === 401) return 'Email/username atau password salah.';
@@ -122,14 +139,17 @@ async function submitAuth(kind, url, body) {
     });
     const data = await res.json().catch(() => ({}));
 
-    if (res.ok) {
+    if (res.ok && data.session_id) {
       setBtn(btn, kind === 'login' ? 'Berhasil masuk' : 'Akun dibuat', true);
+      // Simpan HANYA session id opaque — bukan password/token/API key.
+      // sessionStorage mati saat tab ditutup: tidak ada auth persisten.
+      setSessionId(data.session_id);
       location.replace('/');
       return;
     }
 
-    setBtn(btn, kind === 'login' ? 'Coba lagi' : 'Coba lagi', false);
-    showError(kind, friendlyError(res.status, data, kind));
+    setBtn(btn, 'Coba lagi', false);
+    showError(kind, friendlyError(res.status, data));
     loadCaptcha(kind);
   } catch {
     setBtn(btn, kind === 'login' ? 'Masuk' : 'Buat akun', false);

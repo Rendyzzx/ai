@@ -98,14 +98,15 @@
 
 /* ---------------- Pesan ---------------- */
 /* Bot: [Avatar][Nama + Konten] rata kiri.
-   User: [Konten][Avatar] rata kanan. */
+   User: [Konten][Avatar] rata kanan.
+   Posisi DITENTUKAN struktur DOM (js/chat.js: user → content lalu
+   avatar; bot → avatar lalu content), bukan CSS order/方向 tricks. */
 
 .msg {
   max-width: min(100%, 48rem);
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  display: flex;
+  align-items: flex-start;
   gap: 10px;
-  align-items: start;
 }
 
 /* --- Bot (kiri) --- */
@@ -132,13 +133,11 @@
 
 /* --- User (kanan): konten dulu, avatar di kanan --- */
 .msg.user {
-  grid-template-columns: minmax(0, 1fr) 32px;
+  display: flex;
+  justify-content: flex-end;      /* sesuai spec requirement 13 */
+  align-items: flex-start;
   margin-left: auto;
   max-width: min(85%, 48rem);      /* bubble tidak memenuhi layar */
-}
-
-.msg.user .msg-content {
-  justify-self: end;
 }
 
 .msg.user .body {
@@ -161,12 +160,10 @@
 
 @media (max-width: 640px) {
   .msg {
-    grid-template-columns: 28px minmax(0, 1fr);
     gap: 8px;
   }
 
   .msg.user {
-    grid-template-columns: minmax(0, 1fr) 28px;
     max-width: 88%;
   }
 

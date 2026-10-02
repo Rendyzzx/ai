@@ -9,8 +9,6 @@ import crypto from 'node:crypto';
 import { readJson, putJson, deleteJson } from './github.js';
 import { APP_VERSION } from './version.js';
 
-export const SESSION_COOKIE = 'aomi_session';
-
 export const SESSION_SHORT_MS = 12 * 3600 * 1000;  // 12 jam
 export const SESSION_LONG_MS = 30 * 24 * 3600 * 1000; // 30 hari (remember me)
 const ACTIVITY_REFRESH_MS = 6 * 3600 * 1000;   // update last_activity max 1x/6 jam
@@ -65,22 +63,19 @@ export async function createSession(userId, remember) {
   return session;
 }
 
-export function sessionCookie(sid, remember, maxAgeMs) {
-  const base = `${SESSION_COOKIE}=${sid}; HttpOnly; Secure; SameSite=Lax; Path=/`;
-  return maxAgeMs ? `${base}; Max-Age=${Math.floor(maxAgeMs / 1000)}` : base;
-}
-
-export function clearSessionCookie() {
-  return `${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
-}
-
-export function parseCookies(header) {
-  const out = {};
-  for (const part of String(header || '').split(';')) {
-    const idx = part.indexOf('=');
-    if (idx > 0) out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
-  }
-  return out;
+/**
+ * Session id OPAQUE dari header — BUKAN cookie.
+ * Serverless stateless: id divalidasi tiap request ke sessions/<sid>.json.
+ * Client hanya menyimpan id ini di sessionStorage (tidak ada credential,
+ * password, token, atau API key di browser).
+ * Menerima: "X-Session-Id: <sid>" atau "Authorization: Bearer <sid>".
+ */
+export function getSessionId(req) {
+  const h = req.headers || {};
+  const raw = h['x-session-id'] ||
+    (String(h.authorization || '').replace(/^Bearer\s+/i, '') || '');
+  const sid = String(raw).trim();
+  return /^[a-f0-9]{64}$/.test(sid) ? sid : null;
 }
 
 /**
@@ -88,9 +83,8 @@ export function parseCookies(header) {
  * last_activity diperbarui ke repo maksimal 1x per 6 jam (hemat penulisan).
  */
 export async function getSession(req) {
-  const cookies = parseCookies(req.headers?.cookie);
-  const sid = cookies[SESSION_COOKIE];
-  if (!sid || !/^[a-f0-9]{64}$/.test(sid)) return null;
+  const sid = getSessionId(req);
+  if (!sid) return null;
 
   const file = await readJson(`sessions/${sid}.json`);
   if (!file) return null;
@@ -119,9 +113,8 @@ export async function getSession(req) {
 }
 
 export async function destroySession(req) {
-  const cookies = parseCookies(req.headers?.cookie);
-  const sid = cookies[SESSION_COOKIE];
-  if (sid && /^[a-f0-9]{64}$/.test(sid)) {
+  const sid = getSessionId(req);
+  if (sid) {
     await deleteJson(`sessions/${sid}.json`).catch(() => {});
   }
 }
