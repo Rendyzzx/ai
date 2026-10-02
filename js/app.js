@@ -190,13 +190,13 @@ function bindViewport() {
 
 // ---------------- Gerbang auth + bootstrap ----------------
 
-import { initSidebar } from './sidebar.js?v=816c275a5c';
-import { initChat } from './chat.js?v=816c275a5c';
+import { initSidebar } from './sidebar.js?v=8e77d9b6f3';
+import { initChat } from './chat.js?v=8e77d9b6f3';
 
 // Settings dimuat LAZY: baru di-import saat pertama kali dibuka
 let settingsMod = null;
 async function openSettings(category) {
-  if (!settingsMod) settingsMod = await import('./settings.js?v=816c275a5c');
+  if (!settingsMod) settingsMod = await import('./settings.js?v=8e77d9b6f3');
   settingsMod.openSettings(category);
 }
 

@@ -78,8 +78,11 @@ for (const html of HTML_FILES) {
   let content;
   try { content = readFileSync(join(ROOT, html), 'utf8'); } catch { continue; }
   const next = content.replace(REF_RE, (m, open, path, rest, close) => {
-    if (rest.startsWith('?v=')) return m; // idempotent
-    return `${open}${path}?v=${VERSION}${rest}${close}`;
+    // Buang stamp LAMA dulu (jika ada) lalu pasang versi baru.
+    // Tanpa ini stamp HTML beku di versi pertama selamanya → browser
+    // terus memakai JS/CSS lama dari cache immutable → "belum keupdate".
+    const tail = rest.replace(/^\?v=[a-f0-9]+/, '');
+    return `${open}${path}?v=${VERSION}${tail}${close}`;
   });
   if (next !== content) {
     writeFileSync(join(ROOT, html), next);

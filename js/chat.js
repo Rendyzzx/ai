@@ -7,7 +7,7 @@
    diambil dari state (settings.js bisa mengubahnya kapan pun).
    ============================================================ */
 
-import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state } from './app.js?v=816c275a5c';
+import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state } from './app.js?v=8e77d9b6f3';
 
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
@@ -15,6 +15,7 @@ const DOM_CAP = 150;       // node pesan maksimum di DOM
 const els = {};
 let currentId = null;      // conversation_id aktif
 let loading = false;
+let pendingImage = null;   // { dataUrl: ≤1024px (untuk AI), thumb: ≤360px (untuk tampilan) }
 let loaded = [];           // pesan yang sedang dirender
 let firstHidden = 0;
 let nearBottom = true;
@@ -34,6 +35,11 @@ export function initChat() {
   els.sendBtn = $('#sendBtn');
   els.composer = $('#composer');
   els.scrollDown = $('#scrollDownBtn');
+  els.attachBtn = $('#attachBtn');
+  els.attachInput = $('#attachInput');
+  els.attachPreview = $('#attachPreview');
+  els.attachPreviewImg = $('#attachPreviewImg');
+  els.attachRemove = $('#attachRemove');
 
   bindComposer();
   bindScroll();
@@ -122,7 +128,7 @@ function labelFor(role) {
  * .message-body > [.message-header (nama pengirim), .message-content]
  * Avatar & nama dari state terpusat (profile/bot dinamis, tidak hardcode).
  */
-function messageNode(role, content, isError, showName) {
+function messageNode(role, content, isError, showName, imageUrl) {
   const row = document.createElement('div');
   row.className = 'message-row ' + (role === 'user' ? 'user' : 'assistant') + (isError ? ' error' : '');
 
@@ -152,7 +158,24 @@ function messageNode(role, content, isError, showName) {
 
   const contentEl = document.createElement('div');
   contentEl.className = 'message-content';
-  contentEl.textContent = content;
+
+  // Gambar (opsional) di dalam bubble — teks jadi caption, boleh kosong
+  if (imageUrl) {
+    const img = document.createElement('img');
+    img.className = 'message-image';
+    img.src = imageUrl;
+    img.alt = 'Gambar terlampir';
+    img.loading = 'lazy';
+    contentEl.appendChild(img);
+  }
+  if (content) {
+    const txt = document.createElement('span');
+    txt.className = 'message-text';
+    txt.textContent = content;
+    contentEl.appendChild(txt);
+  } else if (!imageUrl) {
+    contentEl.textContent = content;   // pesan kosong teknis
+  }
 
   body.append(header, contentEl);
 
@@ -185,11 +208,11 @@ function refreshLabels() {
   }
 }
 
-function appendMessage(role, content, isError = false) {
+function appendMessage(role, content, isError = false, imageUrl = null) {
   const wasNearBottom = nearBottom;
   els.welcome.hidden = true;
   const showName = role !== lastRole;   // nama hanya saat ganti peran
-  els.column.appendChild(messageNode(role, content, isError, showName));
+  els.column.appendChild(messageNode(role, content, isError, showName, imageUrl));
   lastRole = role;
 
   const nodes = els.column.querySelectorAll(':scope > .message-row');
@@ -260,7 +283,7 @@ async function requestGreeting() {
     }
   } finally {
     loading = false;
-    els.sendBtn.disabled = els.input.value.trim() === '';
+    updateSendState();
   }
   if (nearBottom) scrollToBottom(true);
 }
@@ -282,7 +305,7 @@ async function loadConversation(id) {
     let prev = firstHidden > 0 ? loaded[firstHidden - 1].role : null;
     for (const m of loaded.slice(firstHidden)) {
       const showName = m.role === 'assistant' && m.role !== prev;
-      fragment.appendChild(messageNode(m.role, m.content, false, showName));
+      fragment.appendChild(messageNode(m.role, m.content, false, showName, m.image || null));
       prev = m.role;
     }
     els.column.appendChild(fragment);
@@ -307,7 +330,7 @@ function prependBatch() {
   let prev = start > 0 ? loaded[start - 1].role : null;
   for (const m of slice) {
     const showName = m.role === 'assistant' && m.role !== prev;
-    fragment.appendChild(messageNode(m.role, m.content, false, showName));
+    fragment.appendChild(messageNode(m.role, m.content, false, showName, m.image || null));
     prev = m.role;
   }
   const prevHeight = els.scroll.scrollHeight;
@@ -355,14 +378,80 @@ function bindScroll() {
 }
 
 /* ============================================================
+   LAMPIRAN GAMBAR (tombol + di kiri komposer)
+   Dua versi dikompres di klien biar upload & penyimpanan ringan:
+   - dataUrl ≤1024px JPEG (dikirim ke AI vision)
+   - thumb   ≤360px JPEG (pratinjau + disimpan ke percakapan)
+   ============================================================ */
+
+function compressImage(file, maxSide, quality) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Gambar tidak bisa dibaca.')); };
+    img.src = url;
+  });
+}
+
+function clearPendingImage() {
+  pendingImage = null;
+  els.attachPreview.hidden = true;
+  els.attachPreviewImg.removeAttribute('src');
+  els.attachInput.value = '';
+  updateSendState();
+}
+
+async function handleFilePicked() {
+  const file = els.attachInput.files?.[0];
+  if (!file) return;
+  if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) {
+    clearPendingImage();
+    return;
+  }
+  try {
+    pendingImage = {
+      dataUrl: await compressImage(file, 1024, 0.82),
+      thumb: await compressImage(file, 360, 0.68)
+    };
+    els.attachPreviewImg.src = pendingImage.thumb;
+    els.attachPreview.hidden = false;
+    updateSendState();
+  } catch {
+    clearPendingImage();
+    appendMessage('assistant', 'Gagal memproses gambar. Coba file lain ya.', true);
+  }
+}
+
+function bindAttach() {
+  els.attachBtn.addEventListener('click', () => els.attachInput.click());
+  els.attachInput.addEventListener('change', handleFilePicked);
+  els.attachRemove.addEventListener('click', clearPendingImage);
+}
+
+/* ============================================================
    KOMPOSER — tetap di bawah Main Chat, tidak ikut scroll
    ============================================================ */
+
+function updateSendState() {
+  els.sendBtn.disabled = loading || (!els.input.value.trim() && !pendingImage);
+}
 
 function bindComposer() {
   const resize = raf(() => {
     els.input.style.height = 'auto';
     els.input.style.height = els.input.scrollHeight + 'px';
-    els.sendBtn.disabled = loading || els.input.value.trim() === '';
+    updateSendState();
   });
 
   els.input.addEventListener('input', resize);
@@ -378,6 +467,8 @@ function bindComposer() {
     e.preventDefault();
     submit();
   });
+
+  bindAttach();
 }
 
 function bindSuggestions() {
@@ -395,16 +486,18 @@ function bindSuggestions() {
 
 async function submit() {
   const text = sanitizeText(els.input.value, 4000);
-  if (!text || loading) return;
+  const img = pendingImage;
+  if ((!text && !img) || loading) return;
 
   loading = true;
   els.sendBtn.disabled = true;
 
-  // Render optimistik untuk pesan user
-  appendMessage('user', text);
+  // Render optimistik untuk pesan user (gambar + caption)
+  appendMessage('user', text, false, img?.thumb || null);
 
   els.input.value = '';
   els.input.style.height = 'auto';
+  clearPendingImage();
   els.input.focus();
 
   // Indikator mengetik (dengan avatar bot, tanpa nama)
@@ -422,7 +515,8 @@ async function submit() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         conversation_id: currentId,
-        message: text
+        message: text,
+        ...(img ? { image: img.dataUrl, thumb: img.thumb } : {})
       })
     });
     const data = await res.json().catch(() => null);

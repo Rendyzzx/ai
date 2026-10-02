@@ -234,6 +234,49 @@ async function geminiGetCookie() {
   return cookie;
 }
 
+// Upload gambar ke Google (content-push) → media key.
+// Terbukti berfungsi TANPA cookie akun: start → upload URL, finalize → media key.
+async function uploadImageGemini(buffer, filename) {
+  const start = await fetchT(
+    'https://content-push.googleapis.com/upload/',
+    {
+      method: 'POST',
+      headers: {
+        'X-Goog-Upload-Command': 'start',
+        'X-Goog-Upload-Protocol': 'resumable',
+        'X-Goog-Upload-Header-Content-Length': String(buffer.length),
+        'X-Tenant-Id': 'gemini',
+        'Push-Id': 'feeds/mcudyrk2a4khkz',
+        'user-agent': UA,
+        'content-type': 'application/x-www-form-urlencoded'
+      },
+      body: `File name=${encodeURIComponent(filename || 'image.jpg')}`
+    },
+    LIMITS.geminiTimeout
+  );
+  const uploadUrl = start.headers.get('x-goog-upload-url');
+  if (!uploadUrl) throw new Error('upload url kosong');
+
+  const fin = await fetchT(
+    uploadUrl,
+    {
+      method: 'POST',
+      headers: {
+        'X-Goog-Upload-Command': 'upload, finalize',
+        'X-Goog-Upload-Offset': '0',
+        'X-Tenant-Id': 'gemini',
+        'user-agent': UA,
+        'content-type': 'image/jpeg'
+      },
+      body: buffer
+    },
+    LIMITS.geminiTimeout
+  );
+  const key = fin.text.trim();
+  if (!key) throw new Error('media key kosong');
+  return key;
+}
+
 async function chatGemini(input, instruction) {
   let { resumeArray, cookie } = input.geminiSessionId
     ? decodeSessionId(input.geminiSessionId)
@@ -241,8 +284,23 @@ async function chatGemini(input, instruction) {
 
   if (!cookie) cookie = await geminiGetCookie();
 
+  // Lampiran gambar (Gemini vision): upload → media key → posisi 4 pada
+  // array pesan. Posisi ini TERVERIFIKASI: model membaca isi gambar benar.
+  // Gagal upload → chat tetap jalan teks saja (graceful).
+  const firstMsg = [input.message, 0, null, null, null, null, 0];
+  if (input.imageBuffer) {
+    try {
+      const key = await uploadImageGemini(input.imageBuffer, input.imageName);
+      firstMsg[3] = [[[key, 1], input.imageName || 'image.jpg']];
+    } catch (err) {
+      console.error('[chat] upload gambar gemini:', err.message);
+      input = { ...input, message: input.message + '\n(pengguna mengirim gambar, tapi gagal dilampirkan — jawab dari konteks teks saja)' };
+      firstMsg[0] = input.message;
+    }
+  }
+
   const requestBody = [
-    [input.message, 0, null, null, null, null, 0],
+    firstMsg,
     ['en-US'],
     resumeArray || ['', '', '', null, null, null, null, null, null, ''],
     null, null, null, [1], 1, null, null, 1, 0, null, null, null, null, null,
@@ -302,11 +360,24 @@ async function chatGemini(input, instruction) {
 
 async function chatGroq(input, apiKey, instruction) {
   const messages = [{ role: 'system', content: instruction }];
-  messages.push(
-    ...input.messages.slice(-LIMITS.contextSend).map((m) => ({
-      role: m.role, content: m.content
-    }))
-  );
+  const history = input.messages.slice(-LIMITS.contextSend).map((m) => ({
+    role: m.role, content: m.content
+  }));
+
+  // Ada gambar → model multimodal (llama-4-scout), pesan user jadi parts
+  if (input.imageDataUrl) {
+    for (const m of history) messages.push(m);
+    messages.push({
+      role: 'user',
+      content: [
+        { type: 'text', text: input.message },
+        { type: 'image_url', image_url: { url: input.imageDataUrl } }
+      ]
+    });
+  } else {
+    messages.push(...history, { role: 'user', content: input.message });
+  }
+
   const res = await fetchT(
     HOSTS.groq,
     {
@@ -316,7 +387,9 @@ async function chatGroq(input, apiKey, instruction) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: input.imageDataUrl
+          ? 'meta-llama/llama-4-scout-17b-16e-instruct'
+          : 'llama-3.3-70b-versatile',
         temperature: 0.5,
         messages
       })
@@ -348,9 +421,18 @@ async function chatEverywhere(input, instruction) {
           id: 'gpt-3.5-turbo', name: 'GPT-3.5', maxLength: 12000,
           tokenLimit: 4000, completionTokenLimit: 2500, deploymentName: 'gpt-35'
         },
-        messages: input.messages.slice(-LIMITS.contextSend).map((m) => ({
-          pluginId: null, content: m.content, fileList: [], role: m.role
-        })),
+        messages: [
+          // pesan terbaru WAJIB ikut (dulu: hanya riwayat → balasan nyasar)
+          ...input.messages.slice(-LIMITS.contextSend).map((m) => ({
+            pluginId: null, content: m.content, fileList: [], role: m.role
+          })),
+          {
+            pluginId: null,
+            content: input.message,
+            fileList: [],
+            role: 'user'
+          }
+        ],
         prompt: instruction,
         temperature: 0.5,
         enableConversationPrompt: false
@@ -392,7 +474,30 @@ export default async function handler(req, res) {
   const body = req.body || {};
   const greeting = body.greeting === true;   // mode: karakter menyapa duluan
   const message = sanitize(body.message, LIMITS.messageMaxLen);
-  if (!message && !greeting) return res.status(400).json({ error: 'Pesan tidak valid' });
+
+  // Gambar (opsional): dataURL hasil kompresi klien. Dua versi:
+  // - image: ≤1024px (dikirim ke AI vision)
+  // - thumb: ≤360px (disimpan ke percakapan biar JSON tetap ringan)
+  let imageBuffer = null, imageDataUrl = null, imageName = '', imageThumb = null;
+  const imgMatch = typeof body.image === 'string'
+    ? body.image.match(/^data:(image\/(?:png|jpeg|jpg|webp|gif));base64,([A-Za-z0-9+/=]+)$/)
+    : null;
+  if (imgMatch) {
+    imageBuffer = Buffer.from(imgMatch[2], 'base64');
+    if (imageBuffer.length > 4_000_000) {
+      return res.status(413).json({ error: 'Gambar terlalu besar (maks ~4MB). Coba yang lebih kecil.' });
+    }
+    imageDataUrl = body.image;
+    imageName = 'image.' + (imgMatch[1].split('/')[1] === 'jpeg' ? 'jpg' : imgMatch[1].split('/')[1]);
+    imageThumb = typeof body.thumb === 'string' && body.thumb.startsWith('data:image/') ? body.thumb : null;
+  } else if (typeof body.image === 'string' && body.image.length > 0) {
+    return res.status(400).json({ error: 'Format gambar tidak didukung. Gunakan PNG, JPG, WebP, atau GIF.' });
+  }
+
+  // Pesan boleh kosong kalau ada gambar (kirim gambar tanpa teks)
+  if (!message && !greeting && !imageBuffer) {
+    return res.status(400).json({ error: 'Pesan tidak valid' });
+  }
 
   // Muat / buat percakapan milik user ini
   const convId = String(body.conversation_id || '');
@@ -514,9 +619,12 @@ export default async function handler(req, res) {
 
   // ---------------- MODE CHAT NORMAL ----------------
   const input = {
-    message,
+    message: message || '(aku baru kirim gambar ke kamu)',
     geminiSessionId: conv.geminiSessionId,
-    messages: conv.messages
+    messages: conv.messages,
+    imageBuffer,
+    imageName: imageBuffer ? imageName : null,
+    imageDataUrl: imageBuffer ? imageDataUrl : null
   };
   const { reply, provider, geminiSid: newGeminiSid } = await askProviders(input, instruction);
 
@@ -526,13 +634,17 @@ export default async function handler(req, res) {
     });
   }
 
-  // Simpan pesan ke percakapan user
+  // Simpan pesan ke percakapan user (gambar disimpan sebagai thumbnail)
   conv.messages.push(
-    { message_id: crypto.randomUUID(), role: 'user', content: message, timestamp: now },
+    {
+      message_id: crypto.randomUUID(), role: 'user',
+      content: message, image: imageBuffer ? (imageThumb || imageDataUrl) : undefined,
+      timestamp: now
+    },
     { message_id: crypto.randomUUID(), role: 'assistant', content: reply, timestamp: now }
   );
   if (conv.title === 'Chat baru') {
-    conv.title = message.slice(0, 48);
+    conv.title = message.slice(0, 48) || 'Gambar';
   }
   conv.updated_at = now;
   if (newGeminiSid) conv.geminiSessionId = newGeminiSid;
