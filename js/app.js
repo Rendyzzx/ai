@@ -82,6 +82,22 @@ export function clearSessionId() {
   try { sessionStorage.removeItem(SID_KEY); } catch { /* private */ }
 }
 
+// ---------------- Debug logging (development) ----------------
+// Aktif HANYA dengan ?debug=1 di URL atau localStorage 'aomi.debug'='1'.
+// Mati total di production → aman ditinggal. Tidak pernah log password,
+// token, atau session id penuh (hanya 8 karakter pertama sebagai penanda).
+
+const DEBUG = (() => {
+  try {
+    return new URLSearchParams(location.search).get('debug') === '1'
+      || localStorage.getItem('aomi.debug') === '1';
+  } catch { return false; }
+})();
+
+export function dbg(tag, msg) {
+  if (DEBUG) console.log(`[${tag}]`, msg);
+}
+
 // ---------------- Event bus antar modul ----------------
 
 const bus = new EventTarget();
@@ -115,6 +131,7 @@ let tearingDown = false;
 export function handleAuthInvalid() {
   if (tearingDown) return;
   tearingDown = true;
+  dbg('AUTH', 'session invalid → teardown + redirect chat → login');
   Object.assign(state.user, { username: '', display_name: '', bio: '', avatar: null, email: '' });
   Object.assign(state.bot, {
     bot_name: 'Aomi', bot_avatar: null, personality: '', system_prompt: '',
@@ -196,6 +213,7 @@ async function boot() {
   if (window.APP_INITIALIZED) return;
   window.APP_INITIALIZED = true;
 
+  dbg('ROUTER', 'route: / (chatbox) — boot mulai');
   bindViewport();
 
   // STEP 0 — tanpa session identifier → langsung login (UI tidak dirender).
@@ -214,8 +232,12 @@ async function boot() {
   // tanpa menghapus sid, dan itu penyebab bounce '/' <-> '/auth.html'.
   let me;
   try {
+    const sid0 = getSessionId();
+    dbg('SESSION', 'validating session id=' + (sid0 ? sid0.slice(0, 8) + '…' : 'none'));
     const meRes = await api('/api/auth/me');
     me = await meRes.json();
+    dbg('SESSION', 'valid — server menerima session');
+    dbg('VERSION', 'server app_version=' + (me.app_version || '(kosong)'));
     // simpan versi hanya untuk info/diagnostik — TIDAK untuk navigasi
     try { localStorage.setItem('aomi.appVersion', me.app_version || ''); } catch { /* pv */ }
   } catch (err) {
@@ -255,6 +277,7 @@ async function boot() {
 
   initSidebar();
   initChat();
+  dbg('AUTH', 'boot selesai → TETAP di chatbox (tidak ada redirect)');
 
   $('#settingsBtn').addEventListener('click', openSettings);
   watchSession();

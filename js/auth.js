@@ -24,6 +24,17 @@ function clearSid() {
 
 const captcha = { login: {}, register: {} };
 
+// Debug logging (development): aktif hanya dengan ?debug=1 atau
+// localStorage 'aomi.debug'='1'. Mati total di production.
+// Tidak pernah log password/token; session id hanya 8 karakter pertama.
+const DEBUG = (() => {
+  try {
+    return new URLSearchParams(location.search).get('debug') === '1'
+      || localStorage.getItem('aomi.debug') === '1';
+  } catch { return false; }
+})();
+const dbg = (tag, msg) => { if (DEBUG) console.log(`[${tag}]`, msg); };
+
 // ---------------- Session valid di tab ini → langsung buka chat ----------------
 // Redirect GUARDED: maksimal satu navigasi keluar dari halaman ini,
 // tidak peduli berapa banyak trigger (precheck, login, dsb.).
@@ -32,6 +43,7 @@ let isRedirecting = false;
 function goToApp() {
   if (isRedirecting) return;
   isRedirecting = true;
+  dbg('ROUTER', 'redirect login → chatbox (SATU kali, guarded)');
   location.replace('/');
 }
 
@@ -39,10 +51,13 @@ function goToApp() {
   const sid = getSessionId();
   if (!sid) return; // tanpa sid: halaman login TIDAK pernah redirect — tidak ada bounce
   try {
+    dbg('SESSION', 'precheck: validating session id=' + sid.slice(0, 8) + '…');
     const res = await fetch('/api/auth/me', { headers: { 'X-Session-Id': sid } });
     if (res.status === 401) {
+      dbg('SESSION', 'precheck: session invalid → clear sid, TETAP di login');
       clearSid(); // session memang invalid → tetap di login
     } else if (res.ok) {
+      dbg('SESSION', 'precheck: session valid → ke chatbox');
       goToApp();  // session valid → satu kali ke chat
     }
     // status lain (500/429/offline): error sesaat — JANGAN buang sid
@@ -154,6 +169,7 @@ async function submitAuth(kind, url, body) {
     const data = await res.json().catch(() => ({}));
 
     if (res.ok && data.session_id) {
+      dbg('AUTH', 'login/register success — session dibuat server');
       setBtn(btn, kind === 'login' ? 'Berhasil masuk' : 'Akun dibuat', true);
       // Simpan HANYA session id opaque — bukan password/token/API key.
       // sessionStorage mati saat tab ditutup: tidak ada auth persisten.

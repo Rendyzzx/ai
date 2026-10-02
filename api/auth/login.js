@@ -71,7 +71,14 @@ export default async function handler(req, res) {
   await clearLoginLock(identifier, ip);
   // Session id dikirim di body → client simpan di sessionStorage.
   // TIDAK ada cookie autentikasi persisten.
-  const session = await createSession(user.id, remember);
+  let session;
+  try {
+    session = await createSession(user.id, remember);
+  } catch {
+    // JANGAN jawab sukses bila session gagal tersimpan/terbaca —
+    // client akan langsung validasi dan terpental balik ke login (bounce).
+    return res.status(500).json({ error: 'Session gagal dibuat. Coba lagi sebentar.' });
+  }
   return res.status(200).json({
     session_id: session.session_id,
     expires_at: session.expires_at,

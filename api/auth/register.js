@@ -66,7 +66,14 @@ export default async function handler(req, res) {
   });
 
   // Auto login setelah register: session id di body (bukan cookie)
-  const session = await createSession(userId, true);
+  let session;
+  try {
+    session = await createSession(userId, true);
+  } catch {
+    // Akun SUDAH dibuat; hanya auto-login yang gagal (session belum
+    // terbaca). Jangan 201 palsu → client akan bounce. User bisa login manual.
+    return res.status(500).json({ error: 'Akun dibuat, tapi sesi gagal dibuat. Silakan masuk.' });
+  }
   return res.status(201).json({
     session_id: session.session_id,
     expires_at: session.expires_at,
