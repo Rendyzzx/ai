@@ -257,13 +257,13 @@ function bindViewport() {
 
 // ---------------- Gerbang auth + bootstrap ----------------
 
-import { initSidebar } from './sidebar.js?v=60b1f9982d';
-import { initChat } from './chat.js?v=60b1f9982d';
+import { initSidebar } from './sidebar.js?v=c5e240cc12';
+import { initChat } from './chat.js?v=c5e240cc12';
 
 // Settings dimuat LAZY: baru di-import saat pertama kali dibuka
 let settingsMod = null;
 async function openSettings(category) {
-  if (!settingsMod) settingsMod = await import('./settings.js?v=60b1f9982d');
+  if (!settingsMod) settingsMod = await import('./settings.js?v=c5e240cc12');
   settingsMod.openSettings(category);
 }
 
@@ -389,7 +389,7 @@ async function boot() {
   const preload = window.requestIdleCallback
     ? (cb) => window.requestIdleCallback(cb, { timeout: 2000 })
     : (cb) => setTimeout(cb, 600);
-  preload(() => { import('./settings.js?v=60b1f9982d').catch(() => {}); });
+  preload(() => { import('./settings.js?v=c5e240cc12').catch(() => {}); });
 
   watchSession();
 }

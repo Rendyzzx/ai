@@ -30,16 +30,14 @@ html, body {
 .auth-brand {
   position: relative;
   display: grid;
-  place-items: center;
-  padding: clamp(24px, 5vw, 72px);
+  align-items: end;         /* konten overlay nempel di bawah foto */
+  padding: clamp(24px, 5vw, 56px);
   background: var(--surface);
-  overflow: hidden;         /* blob tidak boleh bikin scroll-x */
+  overflow: hidden;         /* foto tidak boleh bikin scroll-x */
 }
 
-/* Bentuk organik: 3 lingkaran besar bertumpuk, warna hangat
-   bertingkat (aksen + bayangan aksen), blur lembut di tepi —
-   satu bahasa visual dengan palet chat, bukan gradien biru
-   generik. Posisi acak-tapi-terencana di sudut-sudut panel. */
+/* Blob hangat sebagai backdrop — background putih foto sudah dihapus,
+   jadi karakter PNG transparan mengambang di atas blob ini. */
 .auth-blobs {
   position: absolute;
   inset: 0;
@@ -87,9 +85,31 @@ html, body {
   opacity: 0.1;
 }
 
+/* Karakter PNG transparan (bukan foto kotak) — cover dari atas supaya
+   wajah selalu terlihat, blob terlihat di sekelilingnya. */
+.auth-hero-img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+/* Scrim gradien di bawah — supaya wordmark & teks sambutan tetap
+   terbaca tanpa kotak solid yang menutupi wajah. */
+.auth-hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(to top, rgba(19,18,17,0.92) 0%, rgba(19,18,17,0.55) 32%, rgba(19,18,17,0) 62%);
+  pointer-events: none;
+}
+
 .auth-brand-inner {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   max-width: 24rem;
   display: flex;
   flex-direction: column;
@@ -204,6 +224,41 @@ html, body {
 
 .auth-mobile-logo {
   display: none;
+}
+
+/* Peekaboo BANNER: karakter PNG transparan (bukan avatar bulat)
+   berdiri di atas form, lebar penuh. Dua state disilangkan lewat
+   opacity — mata terbuka (default, saat isi username/email) vs
+   nutup mata (saat fokus field password). Pemicu: script auth.html. */
+.peekaboo {
+  position: relative;
+  width: 100%;
+  height: 148px;
+  margin: 8px auto 14px;
+  pointer-events: none;
+}
+
+.peek-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.peek-img.peek-open {
+  opacity: 1;
+}
+
+.peekaboo.peeking .peek-img.peek-open {
+  opacity: 0;
+}
+
+.peekaboo.peeking .peek-img.peek-closed {
+  opacity: 1;
 }
 
 /* Tanda kecil di atas judul — penegas hierarki tanpa jadi
@@ -600,6 +655,11 @@ html, body {
     height: 28px;
     color: var(--accent);
     margin-bottom: 16px;
+  }
+
+  .peekaboo {
+    height: 112px;
+    margin-top: 4px;
   }
 
   .auth-panel-wrap {

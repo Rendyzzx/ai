@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#131211" />
   <meta name="robots" content="noindex" />
   <title>Masuk — Aomi</title>
-  <link rel="icon" href="assets/favicon.svg?v=60b1f9982d" type="image/svg+xml" />
-  <link rel="stylesheet" href="css/main.css?v=60b1f9982d" />
-  <link rel="stylesheet" href="css/auth.css?v=60b1f9982d" />
+  <link rel="icon" href="assets/favicon.svg?v=c5e240cc12" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/main.css?v=c5e240cc12" />
+  <link rel="stylesheet" href="css/auth.css?v=c5e240cc12" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!-- Font non-blocking: tidak menahan render halaman login (display=swap, FOUT singkat ok) -->
@@ -20,7 +20,7 @@
   <!-- Opening animation: overlay visual saja, aplikasi dirender di belakang -->
   <div id="app-intro" aria-hidden="true">
     <div class="intro-content">
-      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#logo" /></svg>
+      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg?v=c5e240cc12#logo" /></svg>
       <div class="intro-name">Aomi</div>
       <div class="intro-sub">seseorang menunggumu di sini</div>
     </div>
@@ -28,14 +28,16 @@
 
   <main class="auth-shell">
     <!-- ============ PANEL BRAND (desktop) ============ -->
-    <!-- Bentuk organik (blob) + pesan sambutan + CTA yang benar-benar
-         beraksi (pindah ke tab Daftar) — bukan dekorasi kosong. -->
+    <!-- Foto karakter asli dengan background putih dihapus (PNG transparan)
+         mengambang di atas blob hangat + scrim bawah untuk teks. -->
     <section class="auth-brand" aria-hidden="true">
       <div class="auth-blobs">
         <span class="blob blob-1"></span>
         <span class="blob blob-2"></span>
         <span class="blob blob-3"></span>
       </div>
+      <img class="auth-hero-img" src="assets/auth-hero.png?v=c5e240cc12" alt="" />
+      <div class="auth-hero-scrim"></div>
       <div class="auth-brand-inner">
         <div class="brand-wordmark">
           <span class="bw-title">Aomi</span>
@@ -52,8 +54,15 @@
     <!-- ============ PANEL FORM ============ -->
     <section class="auth-panel-wrap">
       <div class="auth-panel">
+        <!-- Peekaboo banner: karakter di atas form — mata terbuka saat isi
+             username/email, nutup mata saat fokus field password. Dua PNG
+             transparan disilangkan (crossfade). Dipicu fokus input (script bawah). -->
+        <div class="peekaboo" id="peekaboo" aria-hidden="true">
+          <img class="peek-img peek-open" src="assets/auth-banner-open.png?v=c5e240cc12" alt="" />
+          <img class="peek-img peek-closed" src="assets/auth-banner-closed.png?v=c5e240cc12" alt="" />
+        </div>
         <header class="auth-head">
-          <svg class="icon auth-mobile-logo"><use href="components/icons.svg?v=60b1f9982d#logo" /></svg>
+          <svg class="icon auth-mobile-logo"><use href="components/icons.svg?v=c5e240cc12#logo" /></svg>
           <span class="auth-head-mark" aria-hidden="true"></span>
           <h2 id="authHeading">Selamat datang kembali</h2>
           <p id="authSubtitle">Dia menunggumu di seberang sini.</p>
@@ -69,7 +78,7 @@
           <label class="auth-field">
             <span>Email atau username</span>
             <div class="input-pill">
-              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#mail" /></svg>
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=c5e240cc12#mail" /></svg>
               <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="text" name="identifier" autocomplete="username" required />
             </div>
@@ -78,11 +87,11 @@
           <label class="auth-field">
             <span>Password</span>
             <div class="input-pill">
-              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#key" /></svg>
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=c5e240cc12#key" /></svg>
               <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="password" name="password" id="loginPw" autocomplete="current-password" required />
               <button type="button" class="pw-toggle" data-target="loginPw" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=c5e240cc12#eye" /></svg>
               </button>
             </div>
           </label>
@@ -90,7 +99,7 @@
           <label class="auth-check">
             <input type="checkbox" name="remember" class="auth-check-input" />
             <span class="auth-check-box" aria-hidden="true">
-              <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#check" /></svg>
+              <svg class="icon"><use href="components/icons.svg?v=c5e240cc12#check" /></svg>
             </span>
             <span>Ingat saya selama 30 hari</span>
           </label>
@@ -103,13 +112,13 @@
               <input type="text" id="capAnsLogin" inputmode="numeric" maxlength="4"
                      autocomplete="off" placeholder="Ketik angka" aria-label="Ketik angka verifikasi" />
               <button type="button" class="verify-refresh" data-which="login" aria-label="Angka baru">
-                <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#chevron-down" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=c5e240cc12#chevron-down" /></svg>
               </button>
             </div>
           </div>
 
           <button class="auth-submit" id="loginSubmit" type="submit">
-            <svg class="icon auth-submit-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#logout" /></svg>
+            <svg class="icon auth-submit-icon" aria-hidden="true"><use href="components/icons.svg?v=c5e240cc12#logout" /></svg>
             <span>Masuk</span>
           </button>
           <p class="auth-error" id="errLogin" hidden></p>
@@ -120,7 +129,7 @@
           <label class="auth-field">
             <span>Username</span>
             <div class="input-pill">
-              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#user" /></svg>
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=c5e240cc12#user" /></svg>
               <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="text" name="username" autocomplete="username" maxlength="20"
                      placeholder="3-20 karakter" required />
@@ -130,7 +139,7 @@
           <label class="auth-field">
             <span>Email</span>
             <div class="input-pill">
-              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#mail" /></svg>
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=c5e240cc12#mail" /></svg>
               <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="email" name="email" autocomplete="email" required />
             </div>
@@ -139,12 +148,12 @@
           <label class="auth-field">
             <span>Password</span>
             <div class="input-pill">
-              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#key" /></svg>
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=c5e240cc12#key" /></svg>
               <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="password" name="password" id="regPw" autocomplete="new-password"
                      placeholder="Minimal 8 karakter" required />
               <button type="button" class="pw-toggle" data-target="regPw" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=c5e240cc12#eye" /></svg>
               </button>
             </div>
           </label>
@@ -152,11 +161,11 @@
           <label class="auth-field">
             <span>Konfirmasi password</span>
             <div class="input-pill">
-              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#key" /></svg>
+              <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=c5e240cc12#key" /></svg>
               <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="password" id="regPw2" autocomplete="new-password" required />
               <button type="button" class="pw-toggle" data-target="regPw2" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=c5e240cc12#eye" /></svg>
               </button>
             </div>
           </label>
@@ -169,13 +178,13 @@
               <input type="text" id="capAnsRegister" inputmode="numeric" maxlength="4"
                      autocomplete="off" placeholder="Ketik angka" aria-label="Ketik angka verifikasi" />
               <button type="button" class="verify-refresh" data-which="register" aria-label="Angka baru">
-                <svg class="icon"><use href="components/icons.svg?v=60b1f9982d#chevron-down" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=c5e240cc12#chevron-down" /></svg>
               </button>
             </div>
           </div>
 
           <button class="auth-submit" id="registerSubmit" type="submit">
-            <svg class="icon auth-submit-icon" aria-hidden="true"><use href="components/icons.svg?v=60b1f9982d#user" /></svg>
+            <svg class="icon auth-submit-icon" aria-hidden="true"><use href="components/icons.svg?v=c5e240cc12#user" /></svg>
             <span>Buat akun</span>
           </button>
           <p class="auth-error" id="errRegister" hidden></p>
@@ -186,7 +195,7 @@
     </section>
   </main>
 
-  <script type="module" src="js/auth.js?v=60b1f9982d"></script>
+  <script type="module" src="js/auth.js?v=c5e240cc12"></script>
 
 <script>
   // Opening intro: PURE UI overlay — tidak pernah memicu navigasi/reload/
@@ -221,6 +230,20 @@
     var tabRegister = document.getElementById('tabRegister');
     if (!cta || !tabRegister) return;
     cta.addEventListener('click', function () { tabRegister.click(); });
+  })();
+
+  // Peekaboo: mata terbuka (default) saat fokus di username/email,
+  // nutup mata saat fokus di field password mana pun (login/register).
+  // Delegasi di level dokumen — tidak perlu tahu field mana yang ada
+  // di tab mana, cukup cek tipe input yang baru difokus.
+  (function () {
+    var peek = document.getElementById('peekaboo');
+    if (!peek) return;
+    document.addEventListener('focusin', function (e) {
+      var el = e.target;
+      if (!el || !el.matches || !el.matches('.auth-form input')) return;
+      peek.classList.toggle('peeking', el.type === 'password');
+    });
   })();
 </script>
 </body>
