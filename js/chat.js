@@ -12,6 +12,14 @@ import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state, conf
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
 
+// API edit foto — browser menembak LANGSUNG (CORS terbuka), bebas
+// dari batas 60 detik runtime server. Server hanya: host gambar
+// masukan (edit-start), simpan hasil (edit-save), catat kegagalan
+// (edit-fail).
+const EDIT_API = 'https://api-faa.my.id/faa/editfoto';
+const EDIT_BROWSER_TIMEOUT = 120_000; // API eksternal terukur ±40-60s
+const EDIT_RESULT_MAX = 4_000_000;   // hasil maks 4MB (aman untuk body)
+
 // Deteksi permintaan edit foto (gambar terlampir + kata pemicu).
 // SALINAN dari EDIT_TRIGGER_RE di api/chat.js — server tetap yang
 // memutuskan rute; ini hanya memilih animasi loading yang tepat.
@@ -872,6 +880,77 @@ async function submit() {
     });
     const data = await res.json().catch(() => null);
 
+    if (res.ok && data?.edit_job) {
+      // Tahap 1 selesai (server simpan pesan user + host gambar, cepat).
+      // Tahap 2: browser menembak API edit — lama (±40-60 detik) tapi
+      // tidak lagi dibatasi timeout runtime server.
+      ok = true;
+      currentId = data.conversation_id || currentId;
+      updateCharHead();
+      if (data.user_message_id) {
+        userRow.dataset.mid = data.user_message_id;
+        trackMessage('user', text, data.user_message_id, img?.thumb || null);
+      }
+
+      const job = data.edit_job;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), EDIT_BROWSER_TIMEOUT);
+      let blob = null;
+      try {
+        const r = await fetch(
+          `${EDIT_API}?url=${encodeURIComponent(job.input_url)}&prompt=${encodeURIComponent(job.prompt)}`,
+          { signal: ctrl.signal }
+        );
+        clearTimeout(timer);
+        if (!r.ok) throw new Error('edit http ' + r.status);
+        blob = await r.blob();
+        if (blob.size > EDIT_RESULT_MAX) throw new Error('hasil terlalu besar');
+      } catch {
+        clearTimeout(timer);
+        typing.remove();
+        appendMessage('assistant', 'Ngeditnya kelamaan atau gagal. Kirim ulang fotonya bareng instruksinya ya.', true);
+        api('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'edit-fail',
+            conversation_id: currentId,
+            message: 'edit foto tadi gagal (kelamaan/gangguan) — kirim ulang fotonya ya.'
+          })
+        }).catch(() => {});
+        emit('chat:updated');
+        if (nearBottom) scrollToBottom(true);
+        return;
+      }
+
+      // Tahap 3: kirim hasil ke server untuk disimpan → URL unduh 3 hari.
+      const dataUrl = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = reject;
+        fr.readAsDataURL(blob);
+      });
+      const res2 = await api('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'edit-save', conversation_id: currentId, image: dataUrl })
+      });
+      const data2 = await res2.json().catch(() => null);
+      typing.remove();
+      if (res2.ok && data2?.image_url) {
+        const file = { url: data2.image_url, name: data2.image_name, expiresAt: data2.expires_at };
+        appendMessage('assistant', data2.text, false, data2.image_url, data2.assistant_message_id, file);
+        persistEditThumb(data2.image_url, data2.assistant_message_id, data2.conversation_id || currentId);
+        trackMessage('assistant', data2.text, data2.assistant_message_id);
+        emit('chat:updated');
+        emit('chat:activated', { id: currentId });
+      } else {
+        appendMessage('assistant', data2?.error || 'Gagal menyimpan hasil edit. Coba lagi ya.', true);
+      }
+      if (nearBottom) scrollToBottom(true);
+      return;
+    }
+
     if (res.ok && data?.text) {
       ok = true;
       currentId = data.conversation_id || currentId;
@@ -1190,6 +1269,77 @@ async function saveEdit(row) {
     });
     const data = await res.json().catch(() => null);
     typing.remove();
+    if (res.ok && data?.edit_job) {
+      // Tahap 1 selesai (server simpan pesan user + host gambar, cepat).
+      // Tahap 2: browser menembak API edit — lama (±40-60 detik) tapi
+      // tidak lagi dibatasi timeout runtime server.
+      ok = true;
+      currentId = data.conversation_id || currentId;
+      updateCharHead();
+      if (data.user_message_id) {
+        userRow.dataset.mid = data.user_message_id;
+        trackMessage('user', text, data.user_message_id, img?.thumb || null);
+      }
+
+      const job = data.edit_job;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), EDIT_BROWSER_TIMEOUT);
+      let blob = null;
+      try {
+        const r = await fetch(
+          `${EDIT_API}?url=${encodeURIComponent(job.input_url)}&prompt=${encodeURIComponent(job.prompt)}`,
+          { signal: ctrl.signal }
+        );
+        clearTimeout(timer);
+        if (!r.ok) throw new Error('edit http ' + r.status);
+        blob = await r.blob();
+        if (blob.size > EDIT_RESULT_MAX) throw new Error('hasil terlalu besar');
+      } catch {
+        clearTimeout(timer);
+        typing.remove();
+        appendMessage('assistant', 'Ngeditnya kelamaan atau gagal. Kirim ulang fotonya bareng instruksinya ya.', true);
+        api('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'edit-fail',
+            conversation_id: currentId,
+            message: 'edit foto tadi gagal (kelamaan/gangguan) — kirim ulang fotonya ya.'
+          })
+        }).catch(() => {});
+        emit('chat:updated');
+        if (nearBottom) scrollToBottom(true);
+        return;
+      }
+
+      // Tahap 3: kirim hasil ke server untuk disimpan → URL unduh 3 hari.
+      const dataUrl = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = reject;
+        fr.readAsDataURL(blob);
+      });
+      const res2 = await api('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'edit-save', conversation_id: currentId, image: dataUrl })
+      });
+      const data2 = await res2.json().catch(() => null);
+      typing.remove();
+      if (res2.ok && data2?.image_url) {
+        const file = { url: data2.image_url, name: data2.image_name, expiresAt: data2.expires_at };
+        appendMessage('assistant', data2.text, false, data2.image_url, data2.assistant_message_id, file);
+        persistEditThumb(data2.image_url, data2.assistant_message_id, data2.conversation_id || currentId);
+        trackMessage('assistant', data2.text, data2.assistant_message_id);
+        emit('chat:updated');
+        emit('chat:activated', { id: currentId });
+      } else {
+        appendMessage('assistant', data2?.error || 'Gagal menyimpan hasil edit. Coba lagi ya.', true);
+      }
+      if (nearBottom) scrollToBottom(true);
+      return;
+    }
+
     if (res.ok && data?.text) {
       ok = true;
       updateCharHead();
@@ -1240,6 +1390,77 @@ async function doRegenerate(row) {
     });
     const data = await res.json().catch(() => null);
     typing.remove();
+    if (res.ok && data?.edit_job) {
+      // Tahap 1 selesai (server simpan pesan user + host gambar, cepat).
+      // Tahap 2: browser menembak API edit — lama (±40-60 detik) tapi
+      // tidak lagi dibatasi timeout runtime server.
+      ok = true;
+      currentId = data.conversation_id || currentId;
+      updateCharHead();
+      if (data.user_message_id) {
+        userRow.dataset.mid = data.user_message_id;
+        trackMessage('user', text, data.user_message_id, img?.thumb || null);
+      }
+
+      const job = data.edit_job;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), EDIT_BROWSER_TIMEOUT);
+      let blob = null;
+      try {
+        const r = await fetch(
+          `${EDIT_API}?url=${encodeURIComponent(job.input_url)}&prompt=${encodeURIComponent(job.prompt)}`,
+          { signal: ctrl.signal }
+        );
+        clearTimeout(timer);
+        if (!r.ok) throw new Error('edit http ' + r.status);
+        blob = await r.blob();
+        if (blob.size > EDIT_RESULT_MAX) throw new Error('hasil terlalu besar');
+      } catch {
+        clearTimeout(timer);
+        typing.remove();
+        appendMessage('assistant', 'Ngeditnya kelamaan atau gagal. Kirim ulang fotonya bareng instruksinya ya.', true);
+        api('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'edit-fail',
+            conversation_id: currentId,
+            message: 'edit foto tadi gagal (kelamaan/gangguan) — kirim ulang fotonya ya.'
+          })
+        }).catch(() => {});
+        emit('chat:updated');
+        if (nearBottom) scrollToBottom(true);
+        return;
+      }
+
+      // Tahap 3: kirim hasil ke server untuk disimpan → URL unduh 3 hari.
+      const dataUrl = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = reject;
+        fr.readAsDataURL(blob);
+      });
+      const res2 = await api('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'edit-save', conversation_id: currentId, image: dataUrl })
+      });
+      const data2 = await res2.json().catch(() => null);
+      typing.remove();
+      if (res2.ok && data2?.image_url) {
+        const file = { url: data2.image_url, name: data2.image_name, expiresAt: data2.expires_at };
+        appendMessage('assistant', data2.text, false, data2.image_url, data2.assistant_message_id, file);
+        persistEditThumb(data2.image_url, data2.assistant_message_id, data2.conversation_id || currentId);
+        trackMessage('assistant', data2.text, data2.assistant_message_id);
+        emit('chat:updated');
+        emit('chat:activated', { id: currentId });
+      } else {
+        appendMessage('assistant', data2?.error || 'Gagal menyimpan hasil edit. Coba lagi ya.', true);
+      }
+      if (nearBottom) scrollToBottom(true);
+      return;
+    }
+
     if (res.ok && data?.text) {
       ok = true;
       updateCharHead();

@@ -30,7 +30,6 @@ const LIMITS = {
   geminiTimeout: 25_000,
   maxMessages: 100,       // batas isi percakapan yang disimpan
   contextSend: 8,         // pesan terakhir yang dikirim sebagai konteks
-  editTimeout: 52_000,    // API edit foto eksternal (terukur: ±41 detik)
   downloadTimeout: 30_000, // API downloader eksternal (tiktok/ig)
   tempInputTtl: 3600,     // gambar masukan di-host 1 jam (cukup untuk 1x proses)
   tempResultTtl: 259_200, // hasil edit: masa unduh 3 hari
@@ -412,7 +411,8 @@ async function chatGemini(input, instruction) {
    ------------------------------------------------------------ */
 const EDIT_TRIGGER_RE = /\b(edit(?:in|kan|ed|an)?|ubah(?:in)?|ganti(?:in)?|hias(?:in)?|rapikan|perjelas(?:kan)?|perbaiki(?:k)?(?:in|kan)?|hilangkan|hapus(?:in)?|tambah(?:in|kan)?|jadikan|warnain|warnai|warna(?:kan)?|colori[sz]e|retouch|remove|restore)\b/i;
 
-const EDIT_API = 'https://api-faa.my.id/faa/editfoto';
+// (API edit foto dipanggil LANGSUNG dari browser — CORS terbuka;
+// server tidak lagi menunggu API eksternal yang bisa ±60 detik.)
 
 /* ------------------------------------------------------------
    MODE DOWNLOADER (TikTok / Instagram)
@@ -785,9 +785,12 @@ export default async function handler(req, res) {
   }
 
   // ---------------- MODE EDIT FOTO (gambar + instruksi edit) ----------------
+  // Dua tahap. Tahap START (ini): simpan pesan user + host gambar sebagai
+  // URL temp, lalu balas CEPAT dengan job info. Browser yang menembak API
+  // edit eksternal — sebelumnya server menunggu ±40-60s dan sering kena
+  // timeout runtime Vercel 60s ('Ngeditnya kelamaan, waktunya habis').
+  // Tahap SAVE/FAIL: body.action 'edit-save' / 'edit-fail' di bawah.
   if (imageBuffer && message && EDIT_TRIGGER_RE.test(message)) {
-    // a) Host gambar masukan sebagai URL temp — API edit mengambil gambar
-    //    via URL publik, browser hanya punya dataURL.
     const tempId = crypto.randomUUID();
     await putJson(
       `tempimg/${tempId}.json`,
@@ -802,48 +805,55 @@ export default async function handler(req, res) {
     }
     const publicUrl = `https://${host}/api/tempimg?id=${tempId}`;
 
-    // b) Tembak API edit dengan URL gambar + prompt (teks user apa adanya)
-    let editRes;
-    try {
-      editRes = await fetchWithTimeout(
-        `${EDIT_API}?url=${encodeURIComponent(publicUrl)}&prompt=${encodeURIComponent(message)}`,
-        LIMITS.editTimeout
-      );
-    } catch (err) {
-      await deleteJson(`tempimg/${tempId}.json`).catch(() => {});
-      const msg = err.name === 'AbortError'
-        ? 'Ngeditnya kelamaan, waktunya habis. Coba lagi ya.'
-        : 'Layanan edit fotonya sedang tidak bisa dihubungi.';
-      return res.status(504).json({ error: msg });
-    }
+    const userMessageId = crypto.randomUUID();
+    conv.messages.push({
+      message_id: userMessageId, role: 'user', content: message,
+      image: imageThumb || imageDataUrl, timestamp: now
+    });
+    if (conv.title === 'Chat baru') conv.title = message.slice(0, 48) || 'Edit foto';
+    conv.updated_at = now;
 
-    // c) Validasi hasil: API luar kadang balas JSON error / .bin mentah.
-    const raw = Buffer.from(await editRes.arrayBuffer());
-    await deleteJson(`tempimg/${tempId}.json`).catch(() => {});
+    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'photo edit start');
+    await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+      const items = Array.isArray(current) ? current : [];
+      const entry = { conversation_id: conv.conversation_id, title: conv.title, updated_at: conv.updated_at };
+      const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
+      if (i >= 0) items[i] = entry; else items.unshift(entry);
+      return items;
+    });
 
-    if (!editRes.ok || raw.length === 0) {
-      let apiMsg = '';
-      try {
-        const j = JSON.parse(raw.toString('utf8'));
-        apiMsg = j.error || j.message || '';
-      } catch { /* bukan JSON */ }
-      console.error('[chat] editfoto http', editRes.status, apiMsg);
-      return res.status(502).json({ error: 'Gagal mengedit foto. Coba prompt lain ya.' });
+    // Balasan cepat: browser lanjut menembak API edit sendiri (CORS terbuka),
+    // lalu hasilnya dikirim balik lewat action 'edit-save'.
+    return res.status(200).json({
+      edit_job: { input_url: publicUrl, prompt: message },
+      user_message_id: userMessageId,
+      conversation_id: conv.conversation_id,
+      title: conv.title,
+      bot_name: bot.bot_name
+    });
+  }
+
+  // ---------------- EDIT SAVE: browser kirim hasil edit (dataURL) ----------------
+  if (body.action === 'edit-save' && imageBuffer) {
+    // imageBuffer di sini = gambar HASIL edit dari API eksternal
+    if (imageBuffer.length > LIMITS.editResultMax) {
+      return res.status(413).json({ error: 'Hasil edit terlalu besar.' });
     }
-    if (raw.length > LIMITS.editResultMax) {
-      return res.status(502).json({ error: 'Hasil edit terlalu besar.' });
-    }
-    const sniff = sniffImage(raw);
+    const sniff = sniffImage(imageBuffer);
     if (!sniff) {
-      console.error('[chat] editfoto bukan gambar, content-type:', editRes.headers.get('content-type'));
       return res.status(502).json({ error: 'Hasil edit tidak bisa dibaca sebagai gambar. Coba lagi ya.' });
     }
 
-    // d) Simpan hasil sebagai gambar temp (TTL unduh 3 hari) → URL publik.
+    const host = String(req.headers.host || '').replace(/[^a-zA-Z0-9.\-]/g, '');
+    if (!host) {
+      return res.status(500).json({ error: 'Host tidak diketahui. Coba lagi.' });
+    }
+
+    // Simpan hasil sebagai gambar temp (TTL unduh 3 hari) → URL publik
     const resultId = crypto.randomUUID();
     await putJson(
       `tempimg/${resultId}.json`,
-      { b64: raw.toString('base64'), mime: sniff.mime },
+      { b64: imageBuffer.toString('base64'), mime: sniff.mime },
       'edit result'
     );
     await expireJson(`tempimg/${resultId}.json`, LIMITS.tempResultTtl);
@@ -851,23 +861,13 @@ export default async function handler(req, res) {
     const imageName = `aomi-edit-${resultId.slice(0, 8)}.${sniff.ext}`;
     const expiresAt = new Date(Date.now() + LIMITS.tempResultTtl * 1000).toISOString();
 
-    // e) Simpan ke percakapan: user (gambar+instruksi) & hasil edit.
     const replyText = 'selesai~ ini dia hasilnya. kalau masih kurang pas, kirim fotonya lagi bareng instruksinya ya.';
-    const userMessageId = crypto.randomUUID();
     const assistantMessageId = crypto.randomUUID();
-    conv.messages.push(
-      {
-        message_id: userMessageId, role: 'user', content: message,
-        image: imageBuffer ? (imageThumb || imageDataUrl) : undefined,
-        timestamp: now
-      },
-      {
-        message_id: assistantMessageId, role: 'assistant', content: replyText,
-        image_url: resultUrl, image_name: imageName, image_mime: sniff.mime,
-        expires_at: expiresAt, edit: true, timestamp: now
-      }
-    );
-    if (conv.title === 'Chat baru') conv.title = message.slice(0, 48) || 'Edit foto';
+    conv.messages.push({
+      message_id: assistantMessageId, role: 'assistant', content: replyText,
+      image_url: resultUrl, image_name: imageName, image_mime: sniff.mime,
+      expires_at: expiresAt, edit: true, timestamp: now
+    });
     conv.updated_at = now;
 
     await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'photo edit append');
@@ -881,7 +881,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       text: replyText,
-      user_message_id: userMessageId,
       assistant_message_id: assistantMessageId,
       conversation_id: conv.conversation_id,
       title: conv.title,
@@ -889,9 +888,28 @@ export default async function handler(req, res) {
       bot_name: bot.bot_name,
       image_url: resultUrl,
       image_name: imageName,
-      image_mime: sniff.mime,
-      expires_at: expiresAt
+      expires_at: expiresAt,
+      edit: true
     });
+  }
+
+  // ---------------- EDIT FAIL: browser laporkan edit gagal → tetap dicatat ----------------
+  if (body.action === 'edit-fail' && message) {
+    const assistantMessageId = crypto.randomUUID();
+    conv.messages.push({
+      message_id: assistantMessageId, role: 'assistant', content: message,
+      timestamp: now
+    });
+    conv.updated_at = now;
+    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'photo edit fail');
+    await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+      const items = Array.isArray(current) ? current : [];
+      const entry = { conversation_id: conv.conversation_id, title: conv.title, updated_at: conv.updated_at };
+      const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
+      if (i >= 0) items[i] = entry; else items.unshift(entry);
+      return items;
+    });
+    return res.status(200).json({ ok: true });
   }
 
   // ---------------- MODE DOWNLOADER (TikTok / Instagram) ----------------
