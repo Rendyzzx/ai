@@ -92,9 +92,27 @@ locks/login-<hash>.json   { fails, locked_until }   # anti brute force
 | `GITHUB_TOKEN` | Token GitHub dengan akses repo `Rendyzzx/token` (fallback + migrasi data) |
 | `SESSION_SECRET` | String acak bebas (untuk enkripsi captcha & verifikasi token). Jika tidak di-set, fallback ke `GITHUB_TOKEN` |
 | `APP_VERSION` | String versi bebas, contoh: `2026.10.02.001` — HANYA dari env, jangan fallback ke SHA commit |
+| `GOOGLE_CLIENT_ID` | Client ID Google OAuth (buat di [Google Cloud Console](https://console.cloud.google.com/apis/credentials)) |
+| `GOOGLE_CLIENT_SECRET` | Client Secret Google OAuth (server-side only, jangan expose) |
+| `GOOGLE_REDIRECT_URI` | Opsional — override redirect URI auto-detect. Default: `<origin>/api/auth/google/callback` |
 
 Set di: **Settings → Environment Variables** → isi Production, Preview,
 Development → **Redeploy**.
+
+## Login dengan Google (Opsional)
+
+1. Buka [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials).
+2. Buat **OAuth 2.0 Client ID** (type: Web application).
+3. Tambahkan **Authorized redirect URI**:
+   - Production: `https://cyronime.web.id/api/auth/google/callback`
+   - Development: `http://localhost:3000/api/auth/google/callback`
+4. Salin Client ID dan Client Secret → set `GOOGLE_CLIENT_ID` dan
+   `GOOGLE_CLIENT_SECRET` di Environment Variables Vercel → Redeploy.
+
+Flow: klik "Masuk dengan Google" → consent Google → callback → email
+dicocokkan dengan akun yang sudah ada (auto-link via email) atau akun
+baru dibuat → session dibuat → masuk ke Aomi. User existing tetap bisa
+login dengan password seperti biasa.
 
 ## Keamanan
 

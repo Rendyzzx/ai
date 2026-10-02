@@ -50,11 +50,24 @@ function friendlyError(status: number, data: { error?: string }): string {
 
 const LANG_COLORS = ["var(--accent)", "#6f6a56", "#46453d", "var(--border)"];
 
+const GOOGLE_ERRORS: Record<string, string> = {
+  google_cancelled: "Login Google dibatalkan.",
+  google_error: "Gagal masuk dengan Google. Coba lagi.",
+  google_invalid_callback: "Callback Google tidak valid. Coba lagi.",
+  google_state_mismatch: "Verifikasi keamanan Google gagal. Coba lagi.",
+  google_token_failed: "Gagal masuk dengan Google. Coba lagi.",
+  google_userinfo_failed: "Gagal mengambil data Google. Coba lagi.",
+  google_email_not_verified: "Email Google belum terverifikasi.",
+  google_user_not_found: "Akun tidak ditemukan. Coba lagi.",
+  google_session_failed: "Session gagal dibuat. Coba lagi sebentar.",
+};
+
 export default function AuthLanding() {
   const [panel, setPanel] = useState<"login" | "register">("login");
   const [capLogin, setCapLogin] = useState<CapData | null>(null);
   const [capRegister, setCapRegister] = useState<CapData | null>(null);
   const [err, setErr] = useState<{ login: string | null; register: string | null }>({ login: null, register: null });
+  const [googleError, setGoogleError] = useState<string | null>(null);
   const [btnLogin, setBtnLogin] = useState("Masuk");
   const [btnRegister, setBtnRegister] = useState("Buat akun");
   const [busy, setBusy] = useState(false);
@@ -71,9 +84,31 @@ export default function AuthLanding() {
   const registerSectionRef = useRef<HTMLElement>(null);
   const registerTabRef = useRef<HTMLButtonElement>(null);
 
-  // ---------------- Session valid di tab ini → langsung buka chat ----------------
+  // ---------------- Google OAuth callback: sid atau error dari query param ----------------
+
   useEffect(() => {
     (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const sidParam = params.get("sid");
+      const errorParam = params.get("error");
+
+      // Google OAuth sukses → simpan session, redirect ke app
+      if (sidParam && /^[a-f0-9]{64}$/.test(sidParam)) {
+        setSessionId(sidParam);
+        // Bersihkan query param
+        window.history.replaceState(null, "", "/auth");
+        redirectingRef.current = true;
+        window.location.replace("/");
+        return;
+      }
+
+      // Google OAuth error → tampilkan pesan
+      if (errorParam && GOOGLE_ERRORS[errorParam]) {
+        setGoogleError(GOOGLE_ERRORS[errorParam]);
+        window.history.replaceState(null, "", "/auth");
+      }
+
+      // Session valid di tab ini → langsung buka chat
       const sid = getSessionId();
       if (!sid) return; // tanpa sid: halaman login TIDAK pernah redirect
       try {
@@ -670,6 +705,23 @@ export default function AuthLanding() {
                   Buat akun
                 </button>
               </div>
+
+              {/* ===== GOOGLE OAUTH ===== */}
+              <a
+                className="google-btn"
+                href="/api/auth/google"
+                aria-label={panel === "login" ? "Masuk dengan Google" : "Lanjutkan dengan Google"}
+              >
+                <svg className="google-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
+                </svg>
+                {panel === "login" ? "Masuk dengan Google" : "Lanjutkan dengan Google"}
+              </a>
+              <p className="google-error" hidden={!googleError}>{googleError}</p>
+              <div className="auth-divider" role="separator" aria-label="atau">atau</div>
 
               {/* ===== LOGIN ===== */}
               <form
