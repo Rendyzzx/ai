@@ -4,10 +4,7 @@
 // Arsitektur: Browser → Function ini (session wajib) → Provider AI
 //             → pesan tersimpan ke repo database per user.
 //
-// Urutan provider (fallback otomatis):
-//   1. Gemini (scraping internal, tanpa API key)
-//   2. Groq   (env GROQ_API_KEY, opsional)
-//   3. ChatEverywhere (fallback terakhir)
+// Provider: Gemini (scraping internal, tanpa API key)
 //
 // Konteks percakapan: hidup di chats/<userId>/<chatId>.json
 // (termasuk sessionId Gemini) → user bisa lanjut chat lama
@@ -31,18 +28,14 @@ const LIMITS = {
   responseMaxLen: 8000,
   fetchBytes: 100_000,
   geminiTimeout: 25_000,
-  groqTimeout: 20_000,
-  ceTimeout: 15_000,
   maxMessages: 100,       // batas isi percakapan yang disimpan
-  contextSend: 8          // pesan terakhir yang dikirim ke provider fallback
+  contextSend: 8          // pesan terakhir yang dikirim sebagai konteks
 };
 
 const HOSTS = {
   geminiCookie: 'https://gemini.google.com/_/BardChatUi/data/batchexecute',
   geminiChat:
     'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate',
-  groq: 'https://api.groq.com/openai/v1/chat/completions',
-  chatEverywhere: 'https://chateverywhere.app/api/chat/'
 };
 
 const UA =
@@ -356,102 +349,6 @@ async function chatGemini(input, instruction) {
   };
 }
 
-// ---------------- PROVIDER 2 — Groq ----------------
-
-async function chatGroq(input, apiKey, instruction) {
-  const messages = [{ role: 'system', content: instruction }];
-  const history = input.messages.slice(-LIMITS.contextSend).map((m) => ({
-    role: m.role, content: m.content
-  }));
-
-  // Ada gambar → model multimodal (llama-4-scout), pesan user jadi parts
-  if (input.imageDataUrl) {
-    for (const m of history) messages.push(m);
-    messages.push({
-      role: 'user',
-      content: [
-        { type: 'text', text: input.message },
-        { type: 'image_url', image_url: { url: input.imageDataUrl } }
-      ]
-    });
-  } else {
-    messages.push(...history, { role: 'user', content: input.message });
-  }
-
-  const res = await fetchT(
-    HOSTS.groq,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: input.imageDataUrl
-          ? 'meta-llama/llama-4-scout-17b-16e-instruct'
-          : 'llama-3.3-70b-versatile',
-        temperature: 0.5,
-        messages
-      })
-    },
-    LIMITS.groqTimeout
-  );
-  const data = JSON.parse(res.text);
-  if (res.status >= 300) throw new Error('groq ' + res.status);
-  const text = data.choices?.[0]?.message?.content;
-  if (!text) throw new Error('groq kosong');
-  return { text: String(text).slice(0, LIMITS.responseMaxLen) };
-}
-
-// ---------------- PROVIDER 3 — ChatEverywhere ----------------
-
-async function chatEverywhere(input, instruction) {
-  const res = await fetchT(
-    HOSTS.chatEverywhere,
-    {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Origin: 'https://chateverywhere.app'
-      },
-      body: JSON.stringify({
-        model: {
-          id: 'gpt-3.5-turbo', name: 'GPT-3.5', maxLength: 12000,
-          tokenLimit: 4000, completionTokenLimit: 2500, deploymentName: 'gpt-35'
-        },
-        messages: [
-          // pesan terbaru WAJIB ikut (dulu: hanya riwayat → balasan nyasar)
-          ...input.messages.slice(-LIMITS.contextSend).map((m) => ({
-            pluginId: null, content: m.content, fileList: [], role: m.role
-          })),
-          {
-            pluginId: null,
-            content: input.message,
-            fileList: [],
-            role: 'user'
-          }
-        ],
-        prompt: instruction,
-        temperature: 0.5,
-        enableConversationPrompt: false
-      })
-    },
-    LIMITS.ceTimeout
-  );
-  if (res.status >= 300) throw new Error('ce ' + res.status);
-  let text = res.text;
-  try {
-    const data = JSON.parse(res.text);
-    if (data.error) throw new Error('ce error');
-    text = typeof data.text === 'string' ? data.text : res.text;
-  } catch (e) {
-    if (String(e.message) === 'ce error') throw e;
-  }
-  return { text: text.slice(0, LIMITS.responseMaxLen) };
-}
-
 // ---------------- HANDLER ----------------
 
 export default async function handler(req, res) {
@@ -524,36 +421,14 @@ export default async function handler(req, res) {
   const bot = { ...DEFAULT_BOT, ...(botFile?.data || {}) };
   const instruction = buildInstruction(bot);
 
-  // Coba provider berurutan (Gemini → Groq → ChatEverywhere)
   async function askProviders(input, instruction) {
-    let reply = null, provider = null, geminiSid = null;
-
     try {
       const out = await chatGemini(input, instruction);
-      reply = out.text; provider = 'gemini'; geminiSid = out.geminiSessionId;
+      return { reply: out.text, provider: 'gemini', geminiSid: out.geminiSessionId };
     } catch (err) {
       console.error('[chat] gemini:', err.message);
+      return { reply: null, provider: null, geminiSid: null };
     }
-
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!reply && groqKey) {
-      try {
-        const out = await chatGroq(input, groqKey, instruction);
-        reply = out.text; provider = 'groq';
-      } catch (err) {
-        console.error('[chat] groq:', err.message);
-      }
-    }
-
-    if (!reply) {
-      try {
-        const out = await chatEverywhere(input, instruction);
-        reply = out.text; provider = 'chateverywhere';
-      } catch (err) {
-        console.error('[chat] ce:', err.message);
-      }
-    }
-    return { reply, provider, geminiSid };
   }
 
   const now = new Date().toISOString();

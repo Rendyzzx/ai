@@ -8,7 +8,7 @@ dioptimalkan untuk Vercel Serverless. Riwayat percakapan tersimpan per akun.
 
 ```
 Browser → /api/* (Vercel Serverless, session via header X-Session-Id)
-              ├── Provider AI (Gemini scraping → Groq → ChatEverywhere)
+              ├── Provider AI (Gemini scraping)
               └── lib/store.js → Upstash Redis (utama; fallback: GitHub repo)
 ```
 
