@@ -212,12 +212,20 @@
 /* Tombol hapus: muncul saat hover/fokus agar tidak ramai */
 .h-del {
   opacity: 0;
+  position: relative;
   width: 26px;
   height: 26px;
   border-radius: var(--radius-s);
   display: grid;
   place-items: center;
   color: var(--text-muted);
+}
+
+/* Target sentuh 44px: area tak terlihat meluas 9px ke segala arah. */
+.h-del::before {
+  content: "";
+  position: absolute;
+  inset: -9px;
 }
 
 .h-item:hover .h-del,
@@ -410,9 +418,9 @@
 
 .confirm-ok {
   background: var(--danger);
-  color: #ffffff;
+  color: var(--text);
 }
 
 .confirm-ok:hover {
-  background: #e68a70;
+  filter: brightness(1.08);
 }

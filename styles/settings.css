@@ -53,8 +53,9 @@
 
 .settings-nav-head h2 {
   flex: 1;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .settings-nav-list {
@@ -370,6 +371,7 @@
 
 .memory-add {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
 }
@@ -480,8 +482,8 @@
 }
 
 .seg-btn.active {
-  background: var(--surface-2);
-  color: var(--text);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* ---------------- Save row & status ---------------- */
@@ -499,7 +501,7 @@
 }
 
 .save-status.ok {
-  color: #9dc59a;
+  color: var(--ok);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -527,11 +529,11 @@
 }
 
 .btn-primary:active:not(:disabled) {
-  background: #c68750;
+  filter: brightness(0.94);
 }
 
 .btn-primary:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: default;
 }
 
@@ -622,6 +624,7 @@
 .account-value {
   font-size: 14px;
   font-weight: 500;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -672,6 +675,8 @@
 
   .settings-nav-item.active {
     background: none;
+    color: var(--accent);
+    font-weight: 600;
   }
 
   /* Awal: tampilkan list kategori, konten disembunyikan */

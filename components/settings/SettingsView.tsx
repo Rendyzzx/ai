@@ -239,7 +239,7 @@ export default function SettingsView({
       apply();
       setDirty((d) => ({ ...d, [sec]: false }));
       setPhase((p) => ({ ...p, [sec]: "saved" }));
-      setStatus((s) => ({ ...s, [sec]: "Tersimpan ✓" }));
+      setStatus((s) => ({ ...s, [sec]: "Tersimpan" }));
       setStatusCls((s) => ({ ...s, [sec]: "ok" }));
       setTimeout(() => setPhase((p) => ({ ...p, [sec]: "idle" })), 1600);
     } catch (err) {
@@ -389,7 +389,7 @@ export default function SettingsView({
   const saveBtn = (sec: Section) => {
     const p = phase[sec];
     const label =
-      p === "saving" ? "Menyimpan…" : p === "saved" ? "Tersimpan ✓" : p === "failed" ? "Gagal menyimpan" : "Simpan perubahan";
+      p === "saving" ? "Menyimpan…" : p === "saved" ? "Tersimpan" : p === "failed" ? "Gagal menyimpan" : "Simpan perubahan";
     return (
       <button
         className={"btn-primary" + (p === "saving" ? " saving" : "")}
@@ -808,7 +808,7 @@ export default function SettingsView({
                 </div>
                 <ul className="memory-list">
                   {memDraft.length === 0 ? (
-                    <li className="memory-empty">Belum ada apa-apa yang dia ingat.</li>
+                    <li className="memory-empty">Belum ada. Tulis sesuatu di atas — hal yang kamu mau Aomi inget terus, misalnya sifat atau kebiasaanmu.</li>
                   ) : (
                     memDraft.map((text, i) => (
                       <li key={i} className="memory-item">

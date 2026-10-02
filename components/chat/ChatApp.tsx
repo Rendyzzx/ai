@@ -679,7 +679,7 @@ export default function ChatApp() {
         }
         ta.remove();
       }
-      if (ok) showToast("Copied ✓");
+      if (ok) showToast("Tersalin");
     },
     [showToast]
   );
@@ -942,16 +942,7 @@ export default function ChatApp() {
     // Loading state normal & fungsional (tanpa splash animasi):
     // hanya terlihat sekilas sebelum session dicek / redirect ke /auth.
     return (
-      <div
-        aria-busy="true"
-        style={{
-          minHeight: "100dvh",
-          display: "grid",
-          placeItems: "center",
-          color: "#6f706a",
-          fontSize: 14,
-        }}
-      >
+      <div className="boot-loading" aria-busy="true">
         Memuat…
       </div>
     );
@@ -959,23 +950,10 @@ export default function ChatApp() {
 
   if (boot === "error") {
     return (
-      <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24, textAlign: "center" }}>
+      <div className="boot-error">
         <div>
-          <p style={{ marginBottom: 14, color: "#a3a099", fontSize: 14 }}>
-            Tidak bisa menghubungi server. Periksa koneksimu.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              padding: "10px 20px",
-              borderRadius: 10,
-              background: "#d29763",
-              color: "#1d150d",
-              border: 0,
-              fontSize: 14,
-              cursor: "pointer",
-            }}
-          >
+          <p>Tidak bisa menghubungi server. Periksa koneksimu.</p>
+          <button className="boot-retry" onClick={() => window.location.reload()}>
             Coba lagi
           </button>
         </div>

@@ -11,18 +11,21 @@
 :root {
   /* Palet netral hangat, solid, satu aksen tenang.
      Permukaan bertingkat: bg < surface < surface-2 < surface-3. */
-  --bg:         #131211;
-  --surface:    #1a1917;
-  --surface-2:  #211f1c;
-  --surface-3:  #2a2723;
-  --border:     #2c2a26;
+  --bg:         #111210;
+  --surface:    #171815;
+  --surface-2:  #1b1c18;
+  --surface-3:  #22231f;
+  --border:     #2a2b26;
+  --input:      #1b1c18;
+  --ok:         #8ea37a;
   --border-soft: rgba(255, 255, 255, 0.06);
-  --text:       #eae7e2;
-  --text-muted: #a09c94;
-  --accent:        #d29763;
-  --accent-hover:  #dfa877;
+  --text:       #e8e5dc;
+  --text-muted: #9b9a92;
+  --muted:      #6f706a;
+  --accent:        #c69a60;
+  --accent-hover:  #d3a46c;
   --accent-ink:    #1d150d;
-  --accent-soft:   #352d24;   /* tint hangat untuk state aktif halus */
+  --accent-soft:   #2a241a;   /* tint hangat untuk state aktif halus */
   --danger:     #dd7a5f;
 
   /* Bubble chat: kanvas sedikit lebih gelap dari chrome agar

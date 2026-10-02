@@ -39,7 +39,6 @@
 
   --font-display: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
   --font:         "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --font-serif:   "Newsreader", Georgia, serif;
 
   --w: 1120px;
 }
@@ -209,8 +208,8 @@ h1, h2, h3 {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   margin-left: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -278,21 +277,6 @@ h1, h2, h3 {
   grid-template-columns: 1.1fr 0.9fr;
   gap: 56px;
   align-items: center;
-}
-
-.hero-kicker {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-.hero-kicker::before {
-  content: "";
-  width: 24px;
-  height: 1px;
-  background: var(--accent);
 }
 
 .hero-title {
@@ -630,17 +614,6 @@ h1, h2, h3 {
 
 .about-copy h2 { font-size: 24px; margin-bottom: 12px; }
 .about-copy p { color: var(--text-muted); max-width: 480px; }
-
-.about-quote {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 22px;
-  line-height: 1.4;
-  color: var(--text);
-  margin-bottom: 20px;
-}
-
-.about-text { color: var(--text-muted); max-width: 480px; }
 
 .about-art {
   border: 1px solid var(--border);
@@ -1042,6 +1015,18 @@ h1, h2, h3 {
   .nav-links, .nav-right .nav-signin { display: none; }
   .nav-burger { display: flex; }
 
+  /* Navbar mobile — struktur tiga kolom yang benar-benar seimbang.
+     CTA di kolom tengah terpusat pada VIEWPORT, bukan pada sisa
+     ruang antara wordmark dan hamburger (akar masalah "CTA bergeser"). */
+  .nav-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+  }
+  .nav-wordmark { justify-self: start; }
+  .nav-right { justify-self: center; margin-left: 0; }
+  .nav-burger { justify-self: end; margin-left: 0; }
+
   .hero { padding: 40px 0 56px; }
   .hero-grid { grid-template-columns: 1fr; gap: 48px; }
   .hero-visual { max-width: 320px; margin: 0 auto; }
@@ -1058,6 +1043,8 @@ h1, h2, h3 {
 @media (max-width: 640px) {
   .nav-inner { height: 60px; }
   .nav-drawer { inset: 60px 0 0 0; }
+  .nav-wordmark { font-size: 15px; gap: 8px; }
+  .nav-logo { width: 18px; height: 18px; }
 
   .hero-title { font-size: 30px; }
   .hero-actions .btn-primary { width: 100%; justify-content: center; }
@@ -1075,9 +1062,6 @@ h1, h2, h3 {
   .status-metrics { grid-template-columns: repeat(2, 1fr); gap: 16px 12px; }
 
   .about-copy h2 { font-size: 24px; margin-bottom: 12px; }
-.about-copy p { color: var(--text-muted); max-width: 480px; }
-
-.about-quote { font-size: 19px; }
 
   .auth-body { padding: 24px 20px 24px; }
   .auth-section { padding: 64px 0; }
