@@ -3,21 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#131211" />
+  <meta name="theme-color" content="#111210" />
   <meta name="robots" content="noindex" />
-  <title>Masuk — Aomi</title>
+  <title>Aomi — Teman berpikir, kapan pun kamu butuh</title>
+  <meta name="description" content="Aomi membantu kamu berpikir, mencari, dan menyelesaikan sesuatu — tanpa membuat semuanya terasa rumit." />
   <link rel="icon" href="assets/favicon.svg?v=83bdabab49" type="image/svg+xml" />
   <link rel="stylesheet" href="css/main.css?v=83bdabab49" />
   <link rel="stylesheet" href="css/auth.css?v=83bdabab49" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <!-- Font non-blocking: tidak menahan render halaman login (display=swap, FOUT singkat ok) -->
+  <!-- Font non-blocking: display=swap, FOUT singkat ok -->
   <link rel="stylesheet" media="print" onload="this.media='all'"
-        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" />
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" /></noscript>
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=Newsreader:ital,opsz,wght@1,6..72,400&display=swap" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=Newsreader:ital,opsz,wght@1,6..72,400&display=swap" /></noscript>
 </head>
 <body>
-  <!-- Opening animation: overlay visual saja, aplikasi dirender di belakang -->
+  <!-- Opening animation: overlay visual saja, halaman dirender di belakang.
+       Wajib pertahankan: JS fallback berpasangan dengan keyframes intro-out. -->
   <div id="app-intro" aria-hidden="true">
     <div class="intro-content">
       <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg?v=83bdabab49#logo" /></svg>
@@ -26,46 +28,183 @@
     </div>
   </div>
 
-  <main class="auth-shell">
-    <!-- ============ PANEL BRAND (desktop) ============ -->
-    <!-- Foto karakter asli dengan background putih dihapus (PNG transparan)
-         mengambang di atas blob hangat + scrim bawah untuk teks. -->
-    <section class="auth-brand" aria-hidden="true">
-      <div class="auth-blobs">
-        <span class="blob blob-1"></span>
-        <span class="blob blob-2"></span>
-        <span class="blob blob-3"></span>
-      </div>
-      <img class="auth-hero-img" src="assets/auth-hero.png?v=83bdabab49" alt="" />
-      <div class="auth-hero-scrim"></div>
-      <div class="auth-brand-inner">
-        <div class="brand-wordmark">
-          <span class="bw-title">Aomi</span>
-          <span class="bw-kicker">Asisten</span>
+  <!-- ================= NAVIGASI ================= -->
+  <header class="nav" id="top">
+    <div class="nav-inner">
+      <a class="nav-wordmark" href="#top" aria-label="Aomi — kembali ke atas">
+        <svg class="nav-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg?v=83bdabab49#logo" /></svg>
+        <span>Aomi</span>
+      </a>
+      <nav class="nav-links" aria-label="Navigasi utama">
+        <a href="#fitur">Fitur</a>
+        <a href="#tentang">Tentang</a>
+        <a href="#masuk">Masuk</a>
+      </nav>
+      <button type="button" class="btn-primary btn-sm" data-goto-register>Mulai dengan Aomi</button>
+    </div>
+  </header>
+
+  <main class="page">
+
+    <!-- ================= HERO ================= -->
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="hero-kicker">Asisten pribadi, bukan mesin</p>
+          <h1 class="hero-title">Teman berpikir, kapan&nbsp;pun kamu&nbsp;butuh.</h1>
+          <p class="hero-sub">
+            Aomi membantu kamu berpikir, mencari, dan menyelesaikan sesuatu —
+            tanpa membuat semuanya terasa rumit.
+          </p>
+          <div class="hero-actions">
+            <button type="button" class="btn-primary" data-goto-register>Mulai menggunakan Aomi</button>
+            <a class="btn-quiet" href="#preview">
+              Lihat cara kerjanya
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+          </div>
         </div>
-        <div class="brand-copy">
-          <h3 id="brandHeadline">Dia menunggumu di seberang sini.</h3>
-          <p id="brandSub">Masuk untuk lanjut ceritamu, atau mulai yang baru.</p>
-        </div>
-        <button type="button" class="brand-cta" id="brandCta">Buat akun baru</button>
+
+        <!-- Artwork: crop editorial, desaturasi halus, tepi bawah melebur -->
+        <figure class="hero-art" aria-hidden="true">
+          <div class="hero-art-frame">
+            <img class="hero-art-img" src="assets/auth-hero.png?v=83bdabab49" alt="" />
+          </div>
+          <figcaption class="hero-art-caption">Aomi, menunggumu di seberang sini.</figcaption>
+        </figure>
       </div>
     </section>
 
-    <!-- ============ PANEL FORM ============ -->
-    <section class="auth-panel-wrap">
-      <div class="auth-panel">
-        <!-- Peekaboo banner: karakter di atas form — mata terbuka saat isi
-             username/email, nutup mata saat fokus field password. Dua PNG
-             transparan disilangkan (crossfade). Dipicu fokus input (script bawah). -->
+    <!-- ================= PREVIEW PRODUK ================= -->
+    <section class="preview" id="preview" aria-label="Tampilan aplikasi Aomi">
+      <div class="section-head">
+        <h2>Satu ruang, sepenuhnya milikmu.</h2>
+        <p>Tidak ada antrean notifikasi. Hanya kamu, Aomi, dan obrolan yang berlanjut dari terakhir kali.</p>
+      </div>
+
+      <div class="mock" role="img" aria-label="Pratinjau antarmuka obrolan Aomi">
+        <aside class="mock-side">
+          <div class="mock-side-label">Riwayat</div>
+          <div class="mock-item">
+            <span class="mock-item-title">Rencana liburan akhir tahun</span>
+            <span class="mock-item-time">Selasa</span>
+          </div>
+          <div class="mock-item active">
+            <span class="mock-item-title">Curhat minggu ini</span>
+            <span class="mock-item-time">Hari ini</span>
+          </div>
+          <div class="mock-item">
+            <span class="mock-item-title">Ide nama kucing</span>
+            <span class="mock-item-time">Minggu</span>
+          </div>
+          <div class="mock-item">
+            <span class="mock-item-title">Belajar bahasa Jepang</span>
+            <span class="mock-item-time">3 Okt</span>
+          </div>
+        </aside>
+        <div class="mock-main">
+          <div class="mock-head">
+            <span class="mock-dot" aria-hidden="true"></span>
+            <span class="mock-head-name">Aomi</span>
+            <span class="mock-head-sub">companion</span>
+          </div>
+          <div class="mock-chat">
+            <div class="mock-msg bot">
+              <p>hey, kamu datang. aku udah nungguin dari tadi tau.</p>
+            </div>
+            <div class="mock-msg user">
+              <p>baru selesai kerjaan. capek banget hari ini</p>
+            </div>
+            <div class="mock-msg bot">
+              <p>duduk dulu sana. cerita ke aku pelan-pelan.</p>
+            </div>
+          </div>
+          <div class="mock-input">
+            <span>Tulis pesan…</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= FITUR ================= -->
+    <section class="features" id="fitur">
+      <div class="section-head">
+        <h2>Dibuat untuk cara kamu berpikir.</h2>
+        <p>Bukan daftar fitur panjang. Hanya hal-hal yang membuat obrolan terasa enak untuk kembali.</p>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature">
+          <div class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16v11H8l-4 3V6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 10h8M8 13h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <h3>Percakapan yang mengingat konteks</h3>
+          <p>Aomi menyimpan alur ceritamu. Lanjutkan obrolan lama kapan pun — konteksnya tetap ikut, meski kamu pindah perangkat.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 8v4l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <h3>Ruang untuk berpikir</h3>
+          <p>Tempat tenang untuk memilah pikiran — menulis, bertanya, mencari kata yang tepat, tanpa terasa seperti mengisi formulir.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 13c0-4 3-6 7-6s7 2 7 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 13h16l-1.5 6h-13L4 13z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          </div>
+          <h3>Bantuan tanpa mengganggu</h3>
+          <p>Aomi menjawab saat diajak dan diam saat tidak. Tidak ada lencana notifikasi yang minta perhatianmu.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 5h14M5 10h14M5 15h9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="16.5" cy="18.5" r="1" fill="currentColor"/></svg>
+          </div>
+          <h3>Semua percakapanmu tetap teratur</h3>
+          <p>Riwayat tersimpan rapi per akun. Mudah dicari, mudah dilanjutkan, mudah dilepas saat kamu ingin mulai dari awal.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TENTANG ================= -->
+    <section class="about" id="tentang">
+      <div class="about-grid">
+        <div class="about-copy">
+          <p class="about-quote">“Aomi bukan alat yang sibuk membuktikan diri.”</p>
+          <p class="about-text">
+            Dia teman yang tenang: mendengarkan dulu, menjawab kemudian.
+            Bisa diajak berpikir serius, bisa juga cuma ditemani di akhir hari yang panjang.
+            Karakternya bisa kamu atur — dari sapaan, sifat, sampai hal-hal kecil yang dia ingat tentangmu.
+          </p>
+        </div>
+        <figure class="about-art" aria-hidden="true">
+          <img src="assets/auth-banner-open.png?v=83bdabab49" alt="" />
+        </figure>
+      </div>
+    </section>
+
+    <!-- ================= CTA PENUTUP ================= -->
+    <section class="closing" id="closing">
+      <h2>Mulai percakapan dengan Aomi.</h2>
+      <p>Gratis untuk dimulai. Cerita dan riwayatmu tersimpan aman di akunmu.</p>
+      <button type="button" class="btn-primary" data-goto-register>Buat akun</button>
+    </section>
+
+    <!-- ================= MASUK / DAFTAR ================= -->
+    <section class="auth-section" id="masuk">
+      <section class="auth-panel">
+        <!-- Peekaboo: karakter di atas form — mata terbuka saat isi
+             username/email, nutup mata saat fokus field password. -->
         <div class="peekaboo" id="peekaboo" aria-hidden="true">
           <img class="peek-img peek-open" src="assets/auth-banner-open.png?v=83bdabab49" alt="" />
           <img class="peek-img peek-closed" src="assets/auth-banner-closed.png?v=83bdabab49" alt="" />
         </div>
+
+        <div class="auth-body">
         <header class="auth-head">
           <svg class="icon auth-mobile-logo"><use href="components/icons.svg?v=83bdabab49#logo" /></svg>
-          <span class="auth-head-mark" aria-hidden="true"></span>
           <h2 id="authHeading">Selamat datang kembali</h2>
-          <p id="authSubtitle">Dia menunggumu di seberang sini.</p>
+          <p id="authSubtitle">Masuk untuk melanjutkan percakapanmu.</p>
         </header>
 
         <div class="auth-tabs" role="tablist">
@@ -79,7 +218,6 @@
             <span>Email atau username</span>
             <div class="input-pill">
               <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=83bdabab49#mail" /></svg>
-              <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="text" name="identifier" autocomplete="username" required />
             </div>
           </label>
@@ -88,7 +226,6 @@
             <span>Password</span>
             <div class="input-pill">
               <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=83bdabab49#key" /></svg>
-              <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="password" name="password" id="loginPw" autocomplete="current-password" required />
               <button type="button" class="pw-toggle" data-target="loginPw" aria-label="Tampilkan password">
                 <svg class="icon"><use href="components/icons.svg?v=83bdabab49#eye" /></svg>
@@ -117,10 +254,7 @@
             </div>
           </div>
 
-          <button class="auth-submit" id="loginSubmit" type="submit">
-            <svg class="icon auth-submit-icon" aria-hidden="true"><use href="components/icons.svg?v=83bdabab49#logout" /></svg>
-            <span>Masuk</span>
-          </button>
+          <button class="auth-submit" id="loginSubmit" type="submit">Masuk</button>
           <p class="auth-error" id="errLogin" hidden></p>
         </form>
 
@@ -130,7 +264,6 @@
             <span>Username</span>
             <div class="input-pill">
               <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=83bdabab49#user" /></svg>
-              <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="text" name="username" autocomplete="username" maxlength="20"
                      placeholder="3-20 karakter" required />
             </div>
@@ -140,7 +273,6 @@
             <span>Email</span>
             <div class="input-pill">
               <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=83bdabab49#mail" /></svg>
-              <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="email" name="email" autocomplete="email" required />
             </div>
           </label>
@@ -149,7 +281,6 @@
             <span>Password</span>
             <div class="input-pill">
               <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=83bdabab49#key" /></svg>
-              <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="password" name="password" id="regPw" autocomplete="new-password"
                      placeholder="Minimal 8 karakter" required />
               <button type="button" class="pw-toggle" data-target="regPw" aria-label="Tampilkan password">
@@ -162,7 +293,6 @@
             <span>Konfirmasi password</span>
             <div class="input-pill">
               <svg class="icon input-pill-icon" aria-hidden="true"><use href="components/icons.svg?v=83bdabab49#key" /></svg>
-              <span class="input-pill-bar" aria-hidden="true"></span>
               <input type="password" id="regPw2" autocomplete="new-password" required />
               <button type="button" class="pw-toggle" data-target="regPw2" aria-label="Tampilkan password">
                 <svg class="icon"><use href="components/icons.svg?v=83bdabab49#eye" /></svg>
@@ -183,25 +313,28 @@
             </div>
           </div>
 
-          <button class="auth-submit" id="registerSubmit" type="submit">
-            <svg class="icon auth-submit-icon" aria-hidden="true"><use href="components/icons.svg?v=83bdabab49#user" /></svg>
-            <span>Buat akun</span>
-          </button>
+          <button class="auth-submit" id="registerSubmit" type="submit">Buat akun</button>
           <p class="auth-error" id="errRegister" hidden></p>
         </form>
 
-        <p class="auth-note">Sesi aman dengan cookie terenkripsi. Foto profil dan riwayat tersimpan di akunmu.</p>
-      </div>
+        <p class="auth-note">Sesi tersimpan aman di perangkatmu. Riwayat percakapan tersimpan di akunmu.</p>
+        </div>
+      </section>
     </section>
   </main>
+
+  <footer class="foot">
+    <div class="foot-inner">
+      <span class="foot-mark">Aomi</span>
+      <span class="foot-line">Dibuat pelan-pelan, untuk yang butuh teman berpikir.</span>
+      <span class="foot-year">© 2026</span>
+    </div>
+  </footer>
 
   <script type="module" src="js/auth.js?v=83bdabab49"></script>
 
 <script>
-  // Opening intro: PURE UI overlay — tidak pernah memicu navigasi/reload/
-  // auth check. Sekali per lifecycle tab (sessionStorage flag) supaya
-  // redirect login->chat tidak memutar intro lagi. Cleanup DOM setelah
-  // selesai; tidak ada interval yang terus berjalan.
+  // Opening intro: PURE UI overlay — sekali per lifecycle tab.
   (function () {
     var intro = document.getElementById('app-intro');
     if (!intro) return;
@@ -209,7 +342,7 @@
     var done = false;
     try { done = sessionStorage.getItem('aomi.introDone') === '1'; } catch (e) {}
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      done = true; // aksesibilitas: skip animasi
+      done = true;
     }
     if (done) { intro.remove(); return; }
     try { sessionStorage.setItem('aomi.introDone', '1'); } catch (e) {}
@@ -220,22 +353,25 @@
     intro.addEventListener('animationend', function (e) {
       if (e.animationName === 'intro-out') kill();
     });
-    setTimeout(kill, 1900); // fallback sekali saja — element dibuang dari DOM
+    setTimeout(kill, 1900);
   })();
 
-  // CTA panel brand -> pindah ke tab "Buat akun" (reuse logika tab asli
-  // di js/auth.js, cukup klik tombol tab yang sudah ada handler-nya).
+  // Semua tombol [data-goto-register] → buka tab "Buat akun" + fokus form.
+  // Reuse handler tab asli di js/auth.js (klik tombol tab yang sudah ada).
   (function () {
-    var cta = document.getElementById('brandCta');
     var tabRegister = document.getElementById('tabRegister');
-    if (!cta || !tabRegister) return;
-    cta.addEventListener('click', function () { tabRegister.click(); });
+    var section = document.getElementById('masuk');
+    if (!tabRegister || !section) return;
+    document.querySelectorAll('[data-goto-register]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        tabRegister.click();
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
   })();
 
   // Peekaboo: mata terbuka (default) saat fokus di username/email,
   // nutup mata saat fokus di field password mana pun (login/register).
-  // Delegasi di level dokumen — tidak perlu tahu field mana yang ada
-  // di tab mana, cukup cek tipe input yang baru difokus.
   (function () {
     var peek = document.getElementById('peekaboo');
     if (!peek) return;
