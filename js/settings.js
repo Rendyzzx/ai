@@ -8,7 +8,7 @@
    Semua listener dibind SEKALI (flag `bound`), tanpa leak.
    ============================================================ */
 
-import { $, renderAvatar, api, apiJson, state, emit, clearSessionId, resetClientState } from './app.js?v=c5e240cc12';
+import { $, renderAvatar, api, apiJson, state, emit, clearSessionId, resetClientState } from './app.js?v=f41702d5e7';
 
 const els = {};
 let bound = false;
