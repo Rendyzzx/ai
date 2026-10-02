@@ -2,18 +2,18 @@
 
 /* ============================================================
    Aomi — components/auth/AuthLanding.tsx
-   Landing + panel Masuk/Daftar. Redesign v2 (Okt 2026):
-   - navbar seimbang + drawer mobile (bug lama: semua item desktop
-     dipaksa satu baris di mobile → teks CTA kepotong/tumpang tindih)
-   - hero yang langsung menjelaskan kemampuan Aomi, bukan cuma mood
-   - artwork Aomi jadi elemen komposisi (crop kecil + kartu chat
-     overlap), bukan poster besar di bawah
-   - showcase tools yang BENAR-BENAR ada di backend: AI chat
-     (personality/memory), edit foto, downloader TikTok & Instagram
-   - transparansi teknis: komposisi bahasa dihitung dari repo asli
-     (lib/generated/lang-stats.json, dibuat ulang tiap build — lihat
-     scripts/compute-lang-stats.mjs), status sistem dari /api/status
-     (live, bukan angka karangan)
+   Landing + panel Masuk/Daftar. Redesign v3 (Okt 2026, anti-AI-slop):
+   - copy Indonesia natural, langsung nunjukin kemampuan — tanpa
+     kalimat defensif ("bukan sekadar AI", "lebih dari chatbot", dll)
+   - daftar kemampuan gaya editorial (bukan grid kartu seragam)
+   - data project JUJUR: komposisi bahasa dihitung otomatis dari repo
+     (lib/generated/lang-stats.json, regenerasi tiap build), status
+     sistem dari /api/status yang beneran nge-ping database + cek
+     live provider AI. Stack teknologi TIDAK ditampilkan di landing.
+   - contact Akira: hanya channel yang beneran ada di codebase
+     (WhatsApp channel, dipakai footer chat app "Developed by Akira")
+   - fitur yang ditulis = fitur yang beneran ada di backend
+     (diverifikasi dari app/api/chat/route.ts & app/api/dl/route.ts)
    Login/register logic TIDAK diubah — port dari auth.html + js/auth.js.
    ============================================================ */
 
@@ -30,13 +30,14 @@ interface CapData {
 interface StatusPayload {
   status: "operational" | "degraded";
   checked_at: string;
-  platform: string;
-  runtime: string;
-  region: string;
   version: string;
-  database: { provider: string; status: "up" | "down"; latency_ms: number };
-  ai_provider: { name: string; configured: boolean };
+  services: { api: string; database: string; ai: string };
+  database: { provider: string; latency_ms: number };
 }
+
+/** Channel contact Akira — SATU-SATUNYA yang ditemukan di codebase
+ *  (footer chat app: "Developed by Akira"). Jangan tambah yang lain. */
+const AKIRA_WA = "https://whatsapp.com/channel/0029Vb8AgskLY6dCvnTjxU3c";
 
 function friendlyError(status: number, data: { error?: string }): string {
   if (status === 400)
@@ -47,7 +48,7 @@ function friendlyError(status: number, data: { error?: string }): string {
   return "Tidak dapat masuk sekarang. Coba lagi sebentar.";
 }
 
-const LANG_DOT_COLORS = ["var(--accent)", "#6f6a56", "#46453d", "var(--border)"];
+const LANG_COLORS = ["var(--accent)", "#6f6a56", "#46453d", "var(--border)"];
 
 export default function AuthLanding() {
   const [panel, setPanel] = useState<"login" | "register">("login");
@@ -59,7 +60,7 @@ export default function AuthLanding() {
   const [busy, setBusy] = useState(false);
   const [peeking, setPeeking] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
-  const [demoTab, setDemoTab] = useState<"chat" | "edit" | "dl">("chat");
+  const [demoTab, setDemoTab] = useState<"chat" | "code" | "edit" | "dl">("chat");
   const [status, setStatus] = useState<{ loading: boolean; data: StatusPayload | null; error: boolean }>({
     loading: true,
     data: null,
@@ -206,6 +207,11 @@ export default function AuthLanding() {
 
   const langTotalKnown = langStats.languages.reduce((sum: number, l: { percent: number }) => sum + l.percent, 0);
   const langOther = Math.max(0, Math.round((100 - langTotalKnown) * 10) / 10);
+  const buildDate = new Date(langStats.generated_at).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <>
@@ -247,10 +253,11 @@ export default function AuthLanding() {
             <a href="#fitur" onClick={() => setNavOpen(false)}>Fitur</a>
             <a href="#tools" onClick={() => setNavOpen(false)}>Tools</a>
             <a href="#tentang" onClick={() => setNavOpen(false)}>Tentang</a>
+            <a href={AKIRA_WA} target="_blank" rel="noopener noreferrer">Hubungi Akira</a>
             <button type="button" onClick={gotoLogin}>Masuk</button>
             <div className="nav-drawer-cta">
               <button type="button" className="btn-primary" onClick={gotoRegister}>
-                Mulai ngobrol dengan Aomi
+                Mulai ngobrol
               </button>
             </div>
           </nav>
@@ -262,12 +269,10 @@ export default function AuthLanding() {
         <section className="hero">
           <div className="hero-grid">
             <div className="hero-copy">
-              <p className="hero-kicker">Asisten pribadi, bukan mesin layanan</p>
               <h1 className="hero-title">Ngobrol. Bikin. Cari tahu.</h1>
               <p className="hero-sub">
-                Aomi bisa diajak ngobrol soal apa aja, bantu beresin tulisan atau ide,
-                edit foto, sampai download video TikTok dan Instagram. Tinggal bilang
-                kamu butuh apa.
+                Mau ngobrol, cari ide, ngoding, edit gambar, atau pakai salah satu tools?
+                Tinggal bilang ke Aomi.
               </p>
               <div className="hero-actions">
                 <button type="button" className="btn-primary" onClick={gotoRegister}>
@@ -281,10 +286,14 @@ export default function AuthLanding() {
               <div className="hero-tools">
                 <span className="hero-tool-pill">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h16v11H8l-4 3V6z"/></svg>
-                  Ngobrol bebas
+                  Ngobrol
                 </span>
                 <span className="hero-tool-pill">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m8 6-6 6 6 6M16 6l6 6-6 6"/></svg>
+                  Coding
+                </span>
+                <span className="hero-tool-pill">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
                   Edit foto
                 </span>
                 <span className="hero-tool-pill">
@@ -295,7 +304,7 @@ export default function AuthLanding() {
             </div>
 
             {/* Artwork sebagai komposisi: crop portrait kecil + kartu chat
-                mengambang overlap di tepinya — bukan poster penuh. */}
+                overlap — bukan poster penuh di bawah teks. */}
             <div className="hero-visual">
               <figure className="hero-visual-art" aria-hidden="true">
                 <img src="/assets/auth-hero.png" alt="" />
@@ -312,124 +321,84 @@ export default function AuthLanding() {
           </div>
         </section>
 
-        {/* ================= PREVIEW PRODUK ================= */}
-        <section className="preview" id="preview" aria-label="Tampilan aplikasi Aomi">
+        {/* ================= YANG BISA KAMU LAKUKAN ================= */}
+        <section className="cando" id="fitur">
           <div className="section-head">
-            <h2>Satu ruang, sepenuhnya milikmu.</h2>
-            <p>Tidak ada antrean notifikasi. Hanya kamu, Aomi, dan obrolan yang berlanjut dari terakhir kali.</p>
+            <h2>Yang bisa kamu lakukan di Aomi</h2>
+            <p>Bukan daftar panjang — ini yang beneran bisa kamu pakai sekarang.</p>
           </div>
 
-          <div className="mock" role="img" aria-label="Pratinjau antarmuka obrolan Aomi">
-            <aside className="mock-side">
-              <div className="mock-side-label">Riwayat</div>
-              <div className="mock-item">
-                <span className="mock-item-title">Rencana liburan akhir tahun</span>
-                <span className="mock-item-time">Selasa</span>
-              </div>
-              <div className="mock-item active">
-                <span className="mock-item-title">Curhat minggu ini</span>
-                <span className="mock-item-time">Hari ini</span>
-              </div>
-              <div className="mock-item">
-                <span className="mock-item-title">Edit foto buat profil</span>
-                <span className="mock-item-time">Minggu</span>
-              </div>
-              <div className="mock-item">
-                <span className="mock-item-title">Download reel buat referensi</span>
-                <span className="mock-item-time">3 Okt</span>
-              </div>
-            </aside>
-            <div className="mock-main">
-              <div className="mock-head">
-                <span className="mock-dot" aria-hidden="true"></span>
-                <span className="mock-head-name">Aomi</span>
-                <span className="mock-head-sub">companion</span>
-              </div>
-              <div className="mock-chat">
-                <div className="mock-msg bot">
-                  <p>hey, kamu datang. aku udah nungguin dari tadi tau.</p>
-                </div>
-                <div className="mock-msg user">
-                  <p>baru selesai kerjaan. capek banget hari ini</p>
-                </div>
-                <div className="mock-msg bot">
-                  <p>duduk dulu sana. cerita ke aku pelan-pelan.</p>
-                </div>
-              </div>
-              <div className="mock-input">
-                <span>Tulis pesan…</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </div>
+          {/* Editorial list, hairline per baris — bukan grid kartu */}
+          <div className="cando-list">
+            <div className="cando-row">
+              <h3 className="cando-name">AI Chat</h3>
+              <p className="cando-desc">
+                Ngobrol bebas, tanya apa aja, atau brainstorming bareng. Riwayatnya
+                tersimpan di akunmu — bisa dilanjut kapan pun, pindah perangkat juga bisa.
+              </p>
             </div>
-          </div>
-        </section>
-
-        {/* ================= FITUR ================= */}
-        <section className="features" id="fitur">
-          <div className="section-head">
-            <p className="eyebrow" style={{ justifyContent: "center" }}>Yang bisa Aomi bantu</p>
-            <h2>Bukan cuma obrolan.</h2>
-            <p>Empat hal yang paling sering dipakai orang di Aomi.</p>
-          </div>
-
-          <div className="feature-grid">
-            <div className="feature">
-              <div className="feature-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M4 6h16v11H8l-4 3V6z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M8 10h8M8 13h5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-              </div>
-              <h3>Percakapan yang mengingat konteks</h3>
-              <p>Aomi menyimpan alur ceritamu. Lanjutkan obrolan lama kapan pun — konteksnya tetap ikut, meski kamu pindah perangkat.</p>
+            <div className="cando-row">
+              <h3 className="cando-name">Coding</h3>
+              <p className="cando-desc">
+                Tempel kode yang error, minta dijelasin, atau minta dibikinin function.
+                Aomi bantu debug sampai jelas masalahnya di mana.
+              </p>
             </div>
-            <div className="feature">
-              <div className="feature-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
-              </div>
-              <h3>Edit foto, tinggal bilang maunya gimana</h3>
-              <p>Upload gambar, kasih instruksi (&ldquo;perjelas&rdquo;, &ldquo;ganti warna&rdquo;, &ldquo;rapikan&rdquo;) — Aomi yang proses, hasilnya bisa langsung diunduh.</p>
+            <div className="cando-row">
+              <h3 className="cando-name">Edit Foto</h3>
+              <p className="cando-desc">
+                Upload gambar, kasih instruksi — perjelas, ganti warna, rapikan.
+                Hasilnya dikirim balik ke chat, tinggal diunduh.
+              </p>
             </div>
-            <div className="feature">
-              <div className="feature-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><use href="/icons.svg#download" /></svg>
-              </div>
-              <h3>Download TikTok &amp; Instagram</h3>
-              <p>Tempel link video atau foto dari TikTok/Instagram di chat, Aomi ambil versi unduhnya buat kamu — video, audio, atau slide foto.</p>
+            <div className="cando-row">
+              <h3 className="cando-name">Downloader TikTok</h3>
+              <p className="cando-desc">
+                Tempel link video atau foto TikTok di chat. Aomi ambil versi unduhnya,
+                audionya sekalian kalau ada.
+              </p>
             </div>
-            <div className="feature">
-              <div className="feature-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><use href="/icons.svg#sliders" /></svg>
-              </div>
-              <h3>Karakternya bisa kamu atur</h3>
-              <p>Sifat, gaya bicara, dan hal-hal yang dia ingat tentangmu — semua bisa disetel lewat pengaturan karakter, bukan default yang kaku.</p>
+            <div className="cando-row">
+              <h3 className="cando-name">Downloader Instagram</h3>
+              <p className="cando-desc">
+                Sama seperti TikTok — khusus video dan foto Instagram.
+              </p>
+            </div>
+            <div className="cando-row">
+              <h3 className="cando-name">Karakter &amp; memori</h3>
+              <p className="cando-desc">
+                Sifat, gaya bicara, bahasa, sampai hal-hal kecil yang Aomi ingat
+                tentangmu — semuanya bisa kamu atur sendiri.
+              </p>
             </div>
           </div>
         </section>
 
         {/* ================= PRATINJAU INTERAKTIF ================= */}
-        <section className="demo" id="tools" aria-label="Pratinjau cara kerja tools Aomi">
+        <section className="demo" id="tools" aria-label="Pratinjau cara pakai Aomi">
           <div className="section-head">
-            <p className="eyebrow" style={{ justifyContent: "center" }}>Lebih dari sekadar chatbot</p>
-            <h2>Begini kira-kira cara kerjanya.</h2>
-            <p>Pratinjau singkat tiga hal yang paling sering dipakai di Aomi.</p>
+            <h2>Begini kira-kira cara pakainya.</h2>
+            <p>Pilih salah satu — ini pratinjau singkat, bukan chat sungguhan.</p>
           </div>
 
-          <div className="demo-tabs" role="tablist" aria-label="Pilih pratinjau tool">
+          <div className="demo-tabs" role="tablist" aria-label="Pilih pratinjau">
             <button type="button" role="tab" aria-selected={demoTab === "chat"} className={"demo-tab" + (demoTab === "chat" ? " active" : "")} onClick={() => setDemoTab("chat")}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h16v11H8l-4 3V6z"/></svg>
               Ngobrol
             </button>
+            <button type="button" role="tab" aria-selected={demoTab === "code"} className={"demo-tab" + (demoTab === "code" ? " active" : "")} onClick={() => setDemoTab("code")}>
+              Coding
+            </button>
             <button type="button" role="tab" aria-selected={demoTab === "edit"} className={"demo-tab" + (demoTab === "edit" ? " active" : "")} onClick={() => setDemoTab("edit")}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
               Edit Foto
             </button>
             <button type="button" role="tab" aria-selected={demoTab === "dl"} className={"demo-tab" + (demoTab === "dl" ? " active" : "")} onClick={() => setDemoTab("dl")}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><use href="/icons.svg#download" /></svg>
               Downloader
             </button>
           </div>
 
           <div className="demo-stage">
             <div className="demo-stage-head">
-              <span className="mock-dot" aria-hidden="true" style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)" }}></span>
+              <span className="demo-dot" aria-hidden="true"></span>
               Pratinjau — bukan chat sungguhan
             </div>
             <div className="demo-stage-body">
@@ -437,6 +406,12 @@ export default function AuthLanding() {
                 <>
                   <p className="demo-bubble user">lagi overthinking soal kerjaan, bisa nggak sih dibantu urutin pikirannya</p>
                   <p className="demo-bubble bot">bisa. coba ceritain dari yang paling ganggu dulu, kita beresin satu-satu.</p>
+                </>
+              )}
+              {demoTab === "code" && (
+                <>
+                  <p className="demo-bubble user">bantu aku cari bug di kode ini dong</p>
+                  <p className="demo-bubble bot">masalahnya di baris terakhir — kamu pakai <code>hasil</code> tapi belum dideklarasi. tambahin dulu di atasnya, harusnya aman.</p>
                 </>
               )}
               {demoTab === "edit" && (
@@ -465,11 +440,11 @@ export default function AuthLanding() {
         <section className="personal">
           <div className="personal-grid">
             <div className="personal-copy">
-              <h2>Aomi bisa menyesuaikan cara ngobrolnya.</h2>
+              <h2>Ngobrolnya bisa kamu atur.</h2>
               <p>
-                Mau yang santai dan jahil, atau tenang dan kalem — tinggal atur
-                di pengaturan karakter. Hal-hal kecil yang kamu certain juga coba
-                diingat Aomi buat obrolan berikutnya.
+                Mau yang santai dan jahil, atau tenang dan kalem — tinggal atur di
+                pengaturan. Hal-hal kecil yang kamu ceritain juga coba diingat Aomi
+                buat obrolan berikutnya.
               </p>
               <div className="personal-list">
                 <div className="personal-item">
@@ -483,14 +458,14 @@ export default function AuthLanding() {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>
                   <div>
                     <div className="personal-item-title">Memori obrolan</div>
-                    <div className="personal-item-sub">Hal kecil yang kamu certain bisa diingat untuk obrolan selanjutnya.</div>
+                    <div className="personal-item-sub">Hal kecil yang kamu ceritain bisa diingat untuk obrolan selanjutnya.</div>
                   </div>
                 </div>
                 <div className="personal-item">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h7M4 12h16M4 19h10"/></svg>
                   <div>
-                    <div className="personal-item-title">Bahasa &amp; formalitas</div>
-                    <div className="personal-item-sub">Santai atau sedikit lebih sopan — kamu yang nentuin.</div>
+                    <div className="personal-item-title">Bahasa &amp; panjang jawaban</div>
+                    <div className="personal-item-sub">Santai atau sedikit lebih sopan, ringkas atau detail — kamu yang nentuin.</div>
                   </div>
                 </div>
               </div>
@@ -516,17 +491,21 @@ export default function AuthLanding() {
           </div>
         </section>
 
-        {/* ================= TRANSPARANSI TEKNIS ================= */}
-        <section className="tech">
-          <div className="tech-grid">
-            <div className="tech-copy">
-              <p className="eyebrow">Bukan landing page kosong</p>
-              <h2>Aomi aplikasi yang beneran jalan.</h2>
+        {/* ================= CODING + DATA PROJECT ================= */}
+        <section className="coding">
+          <div className="coding-grid">
+            <div className="coding-copy">
+              <h2>Kalau soal coding juga bisa.</h2>
               <p>
-                Angka di samping ini dihitung langsung dari kode sumber Aomi
-                saat website ini di-build — bukan ditulis manual. Kalau
-                project-nya berkembang, komposisinya ikut berubah.
+                Debug error, jelasin kode, bikin function, atau bantu mulai project.
+                Tempel aja kodenya ke chat.
               </p>
+              <p className="coding-note">
+                Aomi sendiri ditulis dan dikembangkan terus — komposisi bahasanya
+                dihitung otomatis dari repository setiap kali website ini di-build,
+                jadi angkanya selalu yang terbaru.
+              </p>
+              <p className="coding-updated">Terakhir di-build: {buildDate}</p>
             </div>
             <div>
               <div className="lang-bar" role="img" aria-label="Komposisi bahasa kode Aomi">
@@ -534,7 +513,7 @@ export default function AuthLanding() {
                   <span
                     key={l.name}
                     className="lang-bar-seg"
-                    style={{ width: l.percent + "%", background: LANG_DOT_COLORS[Math.min(i, LANG_DOT_COLORS.length - 1)] }}
+                    style={{ width: l.percent + "%", background: LANG_COLORS[Math.min(i, LANG_COLORS.length - 1)] }}
                   />
                 ))}
                 {langOther > 0 && <span className="lang-bar-seg" style={{ width: langOther + "%" }} />}
@@ -542,7 +521,7 @@ export default function AuthLanding() {
               <div className="lang-legend">
                 {langStats.languages.map((l: { name: string; percent: number }, i: number) => (
                   <div className="lang-legend-row" key={l.name}>
-                    <span className="lang-legend-dot" style={{ background: LANG_DOT_COLORS[Math.min(i, LANG_DOT_COLORS.length - 1)] }}></span>
+                    <span className="lang-legend-dot" style={{ background: LANG_COLORS[Math.min(i, LANG_COLORS.length - 1)] }}></span>
                     <span className="lang-legend-name">{l.name}</span>
                     <span className="lang-legend-pct">{l.percent}%</span>
                   </div>
@@ -555,52 +534,6 @@ export default function AuthLanding() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ================= TOOLS DIRECTORY ================= */}
-        <section className="tools">
-          <div className="section-head">
-            <h2>Tools yang tersedia sekarang.</h2>
-            <p>Tiga kemampuan inti — bakal nambah seiring Aomi berkembang.</p>
-          </div>
-          <div className="tools-grid">
-            <div className="tool-row">
-              <div className="tool-row-head">
-                <span className="tool-row-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M4 6h16v11H8l-4 3V6z"/></svg>
-                </span>
-                <div>
-                  <div className="tool-row-name">AI Chat</div>
-                  <div className="tool-row-cat">Obrolan</div>
-                </div>
-              </div>
-              <p>Ngobrol bebas, tanya sesuatu, atau sekadar cari teman cerita. Konteks obrolan tersimpan per akun.</p>
-            </div>
-            <div className="tool-row">
-              <div className="tool-row-head">
-                <span className="tool-row-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
-                </span>
-                <div>
-                  <div className="tool-row-name">Edit Foto</div>
-                  <div className="tool-row-cat">Kreatif</div>
-                </div>
-              </div>
-              <p>Upload gambar dan kasih instruksi — Aomi bantu edit, lalu kirim hasilnya balik untuk diunduh.</p>
-            </div>
-            <div className="tool-row">
-              <div className="tool-row-head">
-                <span className="tool-row-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><use href="/icons.svg#download" /></svg>
-                </span>
-                <div>
-                  <div className="tool-row-name">Downloader</div>
-                  <div className="tool-row-cat">Utilitas</div>
-                </div>
-              </div>
-              <p>Tempel link TikTok atau Instagram, Aomi ambil versi unduhnya — video, audio, atau foto.</p>
             </div>
           </div>
         </section>
@@ -622,7 +555,7 @@ export default function AuthLanding() {
                   : status.error
                   ? "Status tidak dapat diambil"
                   : status.data?.status === "operational"
-                  ? "Semua sistem normal"
+                  ? "Semua sistem berjalan normal"
                   : "Ada gangguan"}
               </span>
               <span className="status-label">
@@ -631,9 +564,21 @@ export default function AuthLanding() {
             </div>
             <div className="status-metrics">
               <div>
+                <div className="status-metric-label">API</div>
+                <div className={"status-metric-value" + (status.data ? "" : " pending")}>
+                  {status.data ? (status.data.services.api === "operational" ? "Online" : "Gangguan") : "—"}
+                </div>
+              </div>
+              <div>
                 <div className="status-metric-label">Database</div>
                 <div className={"status-metric-value" + (status.data ? "" : " pending")}>
-                  {status.data ? (status.data.database.status === "up" ? "Operational" : "Gangguan") : "—"}
+                  {status.data ? (status.data.services.database === "operational" ? "Online" : "Gangguan") : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="status-metric-label">AI</div>
+                <div className={"status-metric-value" + (status.data ? "" : " pending")}>
+                  {status.data ? (status.data.services.ai === "operational" ? "Online" : "Gangguan") : "—"}
                 </div>
               </div>
               <div>
@@ -642,25 +587,6 @@ export default function AuthLanding() {
                   {status.data ? status.data.database.latency_ms + " ms" : "—"}
                 </div>
               </div>
-              <div>
-                <div className="status-metric-label">Region</div>
-                <div className={"status-metric-value" + (status.data ? "" : " pending")}>
-                  {status.data?.region || "—"}
-                </div>
-              </div>
-              <div>
-                <div className="status-metric-label">Versi</div>
-                <div className={"status-metric-value" + (status.data ? "" : " pending")}>
-                  {status.data?.version || "—"}
-                </div>
-              </div>
-            </div>
-            <div className="status-updated">
-              {status.data
-                ? `Platform ${status.data.platform} · ${status.data.runtime} · provider AI ${status.data.ai_provider.name} (${status.data.ai_provider.configured ? "terkonfigurasi" : "belum dikonfigurasi"})`
-                : status.error
-                ? "Tidak bisa menghubungi /api/status sekarang. Coba muat ulang halaman."
-                : "Mengambil data langsung dari server…"}
             </div>
           </div>
         </section>
@@ -669,11 +595,10 @@ export default function AuthLanding() {
         <section className="about" id="tentang">
           <div className="about-grid">
             <div className="about-copy">
-              <p className="about-quote">&ldquo;Aomi bukan alat yang sibuk membuktikan diri.&rdquo;</p>
-              <p className="about-text">
-                Dia teman yang tenang: mendengarkan dulu, menjawab kemudian.
-                Bisa diajak berpikir serius, bisa juga cuma ditemani di akhir hari yang panjang.
-                Karakternya bisa kamu atur — dari sapaan, sifat, sampai hal-hal kecil yang dia ingat tentangmu.
+              <h2>Tentang Aomi</h2>
+              <p>
+                Aomi masih terus dikembangkan. Fitur baru, perbaikan, dan eksperimen
+                bakal terus masuk seiring waktu. Kalau ada yang kurang pas, bilang aja.
               </p>
             </div>
             <figure className="about-art" aria-hidden="true">
@@ -682,12 +607,24 @@ export default function AuthLanding() {
           </div>
         </section>
 
+        {/* ================= CONTACT AKIRA ================= */}
+        <section className="contact" aria-label="Hubungi Akira">
+          <div className="contact-inner">
+            <h2>Punya sesuatu buat Aomi?</h2>
+            <p>Kalau nemu bug, punya saran, atau mau ngobrol soal Aomi, hubungi Akira.</p>
+            <a className="btn-ghost btn-contact" href={AKIRA_WA} target="_blank" rel="noopener noreferrer">
+              Hubungi Akira
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </a>
+          </div>
+        </section>
+
         {/* ================= CTA PENUTUP ================= */}
         <section className="closing" id="closing">
-          <h2>Udah ada yang mau diobrolin?</h2>
-          <p>Gratis untuk dimulai. Cerita dan riwayatmu tersimpan aman di akunmu.</p>
+          <h2>Udah kepikiran mau nanya apa?</h2>
+          <p>Gratis buat mulai. Cerita dan riwayatmu tersimpan aman di akunmu.</p>
           <button type="button" className="btn-primary" onClick={gotoRegister}>
-            Mulai ngobrol dengan Aomi
+            Mulai ngobrol
           </button>
         </section>
 
@@ -933,8 +870,13 @@ export default function AuthLanding() {
       <footer className="foot">
         <div className="foot-inner">
           <span className="foot-mark">Aomi</span>
-          <span className="foot-line">Dibuat pelan-pelan, untuk yang butuh teman berpikir.</span>
           <span className="foot-year">© 2026</span>
+          <nav className="foot-links" aria-label="Navigasi footer">
+            <a href="#fitur">Fitur</a>
+            <a href="#tools">Tools</a>
+            <a href="#tentang">Tentang</a>
+            <a href={AKIRA_WA} target="_blank" rel="noopener noreferrer">Hubungi Akira</a>
+          </nav>
         </div>
       </footer>
     </>
