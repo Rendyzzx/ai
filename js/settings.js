@@ -1,43 +1,44 @@
 /* ============================================================
    Aomi — settings.js
-   Settings view (SPA overlay): navigasi kategori, preview bot,
-   preset personality, segmented control, save parsial (hanya
-   field berubah), cache state, tanpa reload aplikasi.
+   Settings view (SPA overlay): navigasi kategori, preview
+   karakter, sifat/memori/advanced, save parsial (hanya field
+   berubah), cache state, tanpa reload aplikasi.
 
    Dimuat lazy: di-import dynamic saat settings pertama dibuka.
    Semua listener dibind SEKALI (flag `bound`), tanpa leak.
    ============================================================ */
 
-import { $, renderAvatar, api, apiJson, state, emit, clearSessionId, resetClientState } from './app.js';
+import { $, renderAvatar, api, apiJson, state, emit, clearSessionId, resetClientState } from './app.js?v=e9aa0007bd';
 
 const els = {};
 let bound = false;
 let pendingAvatar = { user: null, bot: null };
-let dirty = { profile: false, identity: false, personality: false, behavior: false };
+let dirty = { profile: false, identity: false, personality: false, behavior: false, memory: false, advanced: false };
 let closing = false;
 
-const PRESET_TEXT = {
-  friendly: 'Kamu ramah, hangat, dan mudah diajak bicara.',
-  professional: 'Kamu profesional, menjawab jelas, terstruktur, dan formal.',
-  creative: 'Kamu kreatif, imajinatif, dan ekspresif dalam menjawab.'
+// Contoh kalimat preview per gaya bicara — suara karakter, bukan asisten
+const PREVIEW_LINES = {
+  casual: '"hey, akhirnya ada yang ngobrol juga."',
+  short: '"hm?"',
+  expressive: '"KAMU GILAA- eh, maksudku... hi!"',
+  dry: '"oh. kamu lagi."',
+  playful: '"tebak deh aku mikirin apa."',
+  detailed: '"tumben. nggak nyangka kamu buka chat aku hari ini. ada cerita?"'
 };
 
-const PREVIEW_LINES = {
-  concise: '"Hai! Ada yang bisa dibantu?"',
-  balanced: '"Halo! Ada yang bisa aku bantu hari ini?"',
-  detailed: '"Hai! Senang bertemu kamu lagi. Ceritakan apa yang kamu butuhkan, ya."'
-};
+// Draft memori lokal (disinkronkan saat form diisi / tersimpan)
+let memDraft = [];
 
 /* ---------------- Buka / tutup view ---------------- */
 
-export function openSettings() {
+export function openSettings(category) {
   if (!bound) {
     cacheEls();
     bindOnce();
     bound = true;
   }
   fillAll();
-  showCategory(state._lastCat || 'profile', { silent: true });
+  showCategory(category || state._lastCat || 'profile', { silent: true });
   els.view.hidden = false;
   requestAnimationFrame(() => els.view.classList.add('open'));
   closing = false;
@@ -109,24 +110,52 @@ function bindOnce() {
   }
   $('#identitySave').addEventListener('click', saveIdentity);
 
-  // Personality
+  // Identitas: sapaan pertama
+  $('#botGreeting').addEventListener('input', () => markDirty('identity'));
+
+  // Personality karakter
   $('#botPersonality').addEventListener('input', () => {
     markDirty('personality');
     $('#personalityCounter').textContent = $('#botPersonality').value.length + '/3000';
-    // diedit manual → jadi custom
-    setPreset('custom', { silent: true });
   });
-  $('#botPrompt').addEventListener('input', () => {
+  $('#traitGrid').addEventListener('click', (e) => {
+    const chip = e.target.closest('.trait-chip');
+    if (!chip) return;
+    chip.classList.toggle('active');
     markDirty('personality');
-    $('#promptCounter').textContent = $('#botPrompt').value.length + '/1000';
-  });
-  document.querySelector('.preset-grid').addEventListener('click', (e) => {
-    const card = e.target.closest('.preset-card');
-    if (card) applyPreset(card.dataset.preset);
+    updatePreview();
   });
   $('#personalitySave').addEventListener('click', savePersonality);
 
-  // Perilaku (segmented)
+  // Perilaku
+  $('#botLikes').addEventListener('input', () => markDirty('behavior'));
+  $('#botAvoids').addEventListener('input', () => markDirty('behavior'));
+  $('#behaviorSave').addEventListener('click', saveBehavior);
+
+  // Memory — hal-hal yang dia ingat tentang user
+  $('#memoryAdd').addEventListener('click', addMemory);
+  $('#memoryInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addMemory(); }
+  });
+  $('#memoryList').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-memdel]');
+    if (del) removeMemory(Number(del.dataset.memdel));
+  });
+  $('#memorySave').addEventListener('click', saveMemory);
+
+  // Advanced (teknis)
+  $('#botPrompt').addEventListener('input', () => {
+    markDirty('advanced');
+    $('#promptCounter').textContent = $('#botPrompt').value.length + '/1000';
+  });
+  $('#advancedSave').addEventListener('click', saveAdvanced);
+
+  // Perilaku/Personality/Advanced (segmented) — section dirty sesuai field
+  const SEG_SECTION = {
+    relationship: 'personality', speaking_style: 'personality',
+    response_length: 'behavior',
+    response_style: 'advanced', language: 'advanced'
+  };
   for (const seg of document.querySelectorAll('.settings-page .seg[data-field]')) {
     seg.addEventListener('click', (e) => {
       const btn = e.target.closest('.seg-btn');
@@ -134,11 +163,10 @@ function bindOnce() {
       for (const b of seg.querySelectorAll('.seg-btn')) {
         b.classList.toggle('active', b === btn);
       }
-      markDirty('behavior');
+      markDirty(SEG_SECTION[seg.dataset.field] || 'behavior');
       updatePreview();
     });
   }
-  $('#behaviorSave').addEventListener('click', saveBehavior);
 
   // Tampilan (instan, client-only)
   $('#segFont').addEventListener('click', (e) => {
@@ -193,20 +221,34 @@ function fillAll() {
   $('#profileBio').value = state.user.bio;
   renderAvatar($('#profileAvatarPrev'), state.user.avatar, 'user');
 
-  // Identitas bot
+  // Identitas karakter
   $('#botName').value = state.bot.bot_name;
   $('#botDescription').value = state.bot.bot_description || '';
+  $('#botGreeting').value = state.bot.greeting || '';
   renderAvatar($('#botAvatarPrev'), state.bot.bot_avatar, 'logo');
 
-  // Personality
+  // Personality karakter
   $('#botPersonality').value = state.bot.personality || '';
   $('#personalityCounter').textContent = (state.bot.personality || '').length + '/3000';
-  $('#botPrompt').value = state.bot.system_prompt || '';
-  $('#promptCounter').textContent = (state.bot.system_prompt || '').length + '/1000';
-  setPreset(state.bot.personality_preset || 'friendly', { silent: true });
+  const traits = Array.isArray(state.bot.traits) ? state.bot.traits : [];
+  for (const chip of document.querySelectorAll('#traitGrid .trait-chip')) {
+    chip.classList.toggle('active', traits.includes(chip.dataset.trait));
+  }
+  setSeg('#segRelationship', state.bot.relationship || 'companion');
+  setSeg('#segSpeaking', state.bot.speaking_style || 'casual');
 
   // Perilaku
+  $('#botLikes').value = state.bot.likes || '';
+  $('#botAvoids').value = state.bot.avoids || '';
   setSeg('#segLength', state.bot.response_length || 'balanced');
+
+  // Memory
+  memDraft = Array.isArray(state.bot.memories) ? [...state.bot.memories] : [];
+  renderMemories();
+
+  // Advanced
+  $('#botPrompt').value = state.bot.system_prompt || '';
+  $('#promptCounter').textContent = (state.bot.system_prompt || '').length + '/1000';
   setSeg('#segTone', state.bot.response_style || 'casual');
   setSeg('#segLanguage', state.bot.language || 'auto');
 
@@ -221,8 +263,8 @@ function fillAll() {
   setSeg('#segFont', size);
 
   pendingAvatar = { user: null, bot: null };
-  dirty = { profile: false, identity: false, personality: false, behavior: false };
-  for (const sec of ['profile', 'identity', 'personality', 'behavior']) {
+  dirty = { profile: false, identity: false, personality: false, behavior: false, memory: false, advanced: false };
+  for (const sec of ['profile', 'identity', 'personality', 'behavior', 'memory', 'advanced']) {
     setSaveBtn(sec, 'idle');
     setStatus(sec, '');
   }
@@ -233,22 +275,6 @@ function setSeg(sel, val) {
   for (const b of document.querySelectorAll(sel + ' .seg-btn')) {
     b.classList.toggle('active', b.dataset.val === val);
   }
-}
-
-function setPreset(preset, { silent } = {}) {
-  for (const card of document.querySelectorAll('.preset-card')) {
-    card.classList.toggle('active', card.dataset.preset === preset);
-  }
-  if (!silent) markDirty('personality');
-}
-
-function applyPreset(preset) {
-  setPreset(preset);
-  if (preset !== 'custom') {
-    $('#botPersonality').value = PRESET_TEXT[preset];
-    $('#personalityCounter').textContent = PRESET_TEXT[preset].length + '/3000';
-  }
-  markDirty('personality');
 }
 
 /* ---------------- State tombol Save ---------------- */
@@ -297,7 +323,7 @@ function markDirty(sec) {
 }
 
 function setStatus(sec, text, cls = '') {
-  const el = $('#' + (sec === 'identity' || sec === 'personality' || sec === 'behavior' ? sec : 'profile') + 'Status');
+  const el = $('#' + sec + 'Status');
   el.className = 'save-status ' + cls;
   el.textContent = text;
 }
@@ -306,20 +332,13 @@ function setStatus(sec, text, cls = '') {
 
 function updatePreview() {
   const name = $('#botName').value.trim() || 'Aomi';
-  const desc = $('#botDescription').value.trim() || 'Asisten AI pribadimu.';
-  const length = $('#segLength .seg-btn.active')?.dataset.val || 'balanced';
+  const desc = $('#botDescription').value.trim() || 'Companion pribadimu.';
+  const style = $('#segSpeaking .seg-btn.active')?.dataset.val || 'casual';
   $('#previewName').textContent = name;
   $('#previewDesc').textContent = desc;
   renderAvatar($('#previewAvatar'), pendingAvatar.bot || state.bot.bot_avatar, 'logo');
-  // contoh kalimat mengikuti panjang jawaban
-  $('#previewDesc').title = '';
-  $('#previewLinePreview')?.remove();
-  const line = document.createElement('div');
-  line.className = 'bp-desc';
-  line.id = 'previewLinePreview';
-  line.style.fontStyle = 'italic';
-  line.textContent = PREVIEW_LINES[length].replace('Hai', name);
-  $('#previewAvatar').parentElement.querySelector('.bp-body').appendChild(line);
+  // contoh kalimat mengikuti gaya bicara — suara karakter, bukan asisten
+  $('#previewLine').textContent = PREVIEW_LINES[style] || PREVIEW_LINES.casual;
 }
 
 /* ---------------- Avatar: pilih + kompres + preview ---------------- */
@@ -447,9 +466,10 @@ function saveIdentity() {
   if (!dirty.identity) return;
   const body = {
     bot_name: $('#botName').value.trim(),
-    bot_description: $('#botDescription').value.trim()
+    bot_description: $('#botDescription').value.trim(),
+    greeting: $('#botGreeting').value.trim()
   };
-  const payload = diff(body, state.bot, ['bot_name', 'bot_description']);
+  const payload = diff(body, state.bot, ['bot_name', 'bot_description', 'greeting']);
   if (pendingAvatar.bot !== null) payload.bot_avatar = pendingAvatar.bot;
 
   if (!payload || Object.keys(payload).length === 0) {
@@ -461,20 +481,20 @@ function saveIdentity() {
     Object.assign(state.bot, data.bot);
     pendingAvatar.bot = null;
     $('#brandName').textContent = data.bot.bot_name;
-    if ($('#chatTitle').dataset.default === '1') {
-      $('#chatTitle').textContent = data.bot.bot_name;
-    }
+    // header chat = identitas karakter (selalu nama terbaru)
+    $('#chatTitle').textContent = data.bot.bot_name;
   });
 }
 
 function savePersonality() {
   if (!dirty.personality) return;
   const body = {
-    personality_preset: document.querySelector('.preset-card.active')?.dataset.preset || 'custom',
-    personality: $('#botPersonality').value.trim(),
-    system_prompt: $('#botPrompt').value.trim()
+    traits: [...document.querySelectorAll('#traitGrid .trait-chip.active')].map((c) => c.dataset.trait),
+    speaking_style: $('#segSpeaking .seg-btn.active')?.dataset.val || 'casual',
+    relationship: $('#segRelationship .seg-btn.active')?.dataset.val || 'companion',
+    personality: $('#botPersonality').value.trim()
   };
-  const payload = diff(body, state.bot, ['personality_preset', 'personality', 'system_prompt']);
+  const payload = diff(body, state.bot, ['traits', 'speaking_style', 'relationship', 'personality']);
   if (!payload) {
     setStatus('personality', 'Tidak ada perubahan.');
     return;
@@ -487,16 +507,96 @@ function savePersonality() {
 function saveBehavior() {
   if (!dirty.behavior) return;
   const body = {
-    response_length: $('#segLength .seg-btn.active')?.dataset.val,
-    response_style: $('#segTone .seg-btn.active')?.dataset.val,
-    language: $('#segLanguage .seg-btn.active')?.dataset.val
+    likes: $('#botLikes').value.trim(),
+    avoids: $('#botAvoids').value.trim(),
+    response_length: $('#segLength .seg-btn.active')?.dataset.val
   };
-  const payload = diff(body, state.bot, ['response_length', 'response_style', 'language']);
+  const payload = diff(body, state.bot, ['likes', 'avoids', 'response_length']);
   if (!payload) {
     setStatus('behavior', 'Tidak ada perubahan.');
     return;
   }
   persist('behavior', '/api/bot', payload, (data) => {
+    Object.assign(state.bot, data.bot);
+  });
+}
+
+/* ---------------- Memory: hal yang dia ingat ---------------- */
+
+function renderMemories() {
+  const list = $('#memoryList');
+  list.textContent = '';
+  if (memDraft.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'memory-empty';
+    li.textContent = 'Belum ada apa-apa yang dia ingat.';
+    list.appendChild(li);
+    return;
+  }
+  memDraft.forEach((text, i) => {
+    const li = document.createElement('li');
+    li.className = 'memory-item';
+    const span = document.createElement('span');
+    span.textContent = text;
+    const del = document.createElement('button');
+    del.className = 'memory-del';
+    del.dataset.memdel = i;
+    del.setAttribute('aria-label', 'Hapus dari memori');
+    del.innerHTML = '<svg class="icon" aria-hidden="true"><use href="components/icons.svg#close" /></svg>';
+    li.append(span, del);
+    list.appendChild(li);
+  });
+}
+
+function addMemory() {
+  const input = $('#memoryInput');
+  const v = input.value.trim();
+  if (!v) return;
+  if (memDraft.length >= 12) {
+    setStatus('memory', 'Maksimal 12 hal yang bisa dia ingat sekaligus.', 'err');
+    return;
+  }
+  memDraft.push(v);
+  input.value = '';
+  renderMemories();
+  markDirty('memory');
+}
+
+function removeMemory(i) {
+  if (i < 0 || i >= memDraft.length) return;
+  memDraft.splice(i, 1);
+  renderMemories();
+  markDirty('memory');
+}
+
+function saveMemory() {
+  if (!dirty.memory) return;
+  if (JSON.stringify(memDraft) === JSON.stringify(state.bot.memories || [])) {
+    setStatus('memory', 'Tidak ada perubahan.');
+    return;
+  }
+  persist('memory', '/api/bot', { memories: memDraft }, (data) => {
+    Object.assign(state.bot, data.bot);
+    memDraft = [...(state.bot.memories || [])];
+    renderMemories();
+  });
+}
+
+/* ---------------- Advanced (teknis) ---------------- */
+
+function saveAdvanced() {
+  if (!dirty.advanced) return;
+  const body = {
+    system_prompt: $('#botPrompt').value.trim(),
+    response_style: $('#segTone .seg-btn.active')?.dataset.val || 'casual',
+    language: $('#segLanguage .seg-btn.active')?.dataset.val || 'auto'
+  };
+  const payload = diff(body, state.bot, ['system_prompt', 'response_style', 'language']);
+  if (!payload) {
+    setStatus('advanced', 'Tidak ada perubahan.');
+    return;
+  }
+  persist('advanced', '/api/bot', payload, (data) => {
     Object.assign(state.bot, data.bot);
   });
 }

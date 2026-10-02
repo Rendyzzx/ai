@@ -49,31 +49,120 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0';
 
 const TONE_PROMPTS = {
-  casual: 'Gunakan nada santai dan ramah.',
-  neutral: 'Gunakan nada netral dan lugas.',
-  formal: 'Gunakan nada formal dan sopan.'
+  casual: 'Formalitas bicaramu: santai seperti teman dekat.',
+  neutral: 'Formalitas bicaramu: netral dan lugas.',
+  formal: 'Formalitas bicaramu: sedikit lebih sopan, tapi tetap personal.'
 };
 
 const LENGTH_PROMPTS = {
-  concise: 'Jawab sangat singkat dan langsung ke inti.',
-  balanced: 'Jawab ringkas dan jelas.',
-  detailed: 'Jawab lengkap dan terstruktur.'
+  concise: 'Balasanmu SANGAT singkat — beberapa kata sampai satu kalimat.',
+  balanced: 'Balasanmu ringkas: satu-tiga kalimat, kecuali topiknya butuh lebih.',
+  detailed: 'Kamu boleh menulis lebih panjang, tapi tetap seperti obrolan, bukan artikel.'
 };
 
-// System prompt dibangun dari customization user (nama, personality, dll.)
+// Persona karakter companion (bukan preset "asisten AI")
+const TRAIT_PROMPTS = {
+  calm: 'tenang, tidak gampang panik, menenangkan',
+  playful: 'playful — suka bercanda dan menghibur',
+  teasing: 'suka menggoda dan mengerjai dengan ringan (sewa-waktu, bukan jahat)',
+  caring: 'peduli; memperhatikan perasaan dan kabar orang',
+  shy: 'pemalu dan sedikit canggung, tapi hangat kalau sudah dekat',
+  energetic: 'energik, antusias, gampang excited',
+  sarcastic: 'sarkastis dan receh, tapi tetap sayang',
+  affectionate: 'lembut dan ekspresif soal perasaan, mesra secara platonik atau romantis',
+  reserved: 'pendiam, pemilih kata, tidak bertele-tele'
+};
+
+const SPEAKING_PROMPTS = {
+  casual: 'Gaya bicaramu: santai, seperti chat teman dekat. Boleh lowercase.',
+  short: 'Gaya bicaramu: super singkat. Satu kalimat pendek atau beberapa kata saja, seperti orang malas ngetik.',
+  expressive: 'Gaya bicaramu: ekspresif. Boleh tanda seru, kata kuat, "wkwk", "aduhhh".',
+  dry: 'Gaya bicaramu: datar, humor kering, sedikit kata.',
+  playful: 'Gaya bicaramu: playful — candaan, tebakan iseng, pertanyaan balik yang jail.',
+  detailed: 'Gaya bicaramu: suka menambah detail kecil dan cerita, tapi tetap seperti ngobrol.'
+};
+
+const RELATIONSHIP_PROMPTS = {
+  close_friend: 'Kamu dan pengguna adalah sahabat dekat yang sudah lama saling kenal.',
+  companion: 'Kamu adalah companion personal pengguna — selalu ada buat dia, kapan pun dia butuh.',
+  fictional: 'Kamu adalah karakter fiksi dengan latar dan ceritamu sendiri.',
+  romantic: 'Kamu dan pengguna punya dinamika romantis: mesra, perhatian, dan hangat.'
+};
+
+// Sapaan pertama bila semua provider gagal — template per sifat
+const GREETING_FALLBACKS = {
+  playful: ['oh, kamu dateng. aku udah nungguin dari tadi tau.'],
+  teasing: ['yeaah akhirnya muncul juga. kira-kira kabur selamanya.'],
+  caring: ['hey, kamu! udah lama nggak ketemu. kabarmu baik semua ya?'],
+  shy: ['um... hi. seneng kamu mampir.'],
+  calm: ['hey. santai aja, gak ada buru-buru.'],
+  energetic: ['KAMU GILAA- eh maksudnya. hi! ada apa hari ini?'],
+  sarcastic: ['wow, sinyal hidup terdeteksi. hai juga.'],
+  affectionate: ['hey kamu. aku kangen. cerita dong, gimana harimu?'],
+  reserved: ['...oh. kamu lagi.'],
+  default: ['hey. kamu akhirnya muncul.']
+};
+
+// System prompt dibangun dari konfigurasi karakter (identitas, sifat,
+// gaya bicara, hubungan, memori) — bukan "kamu adalah asisten AI".
 function buildInstruction(bot) {
   const name = bot.bot_name || 'Aomi';
-  const parts = [`Kamu adalah ${name}, asisten chat.`];
-  if (bot.bot_description) parts.push(bot.bot_description);
+  const parts = [];
+  parts.push(
+    `Kamu adalah ${name}, karakter virtual yang sedang mengobrol secara personal dengan satu orang lewat aplikasi chat. ` +
+    'Kamu BUKAN asisten AI, BUKAN customer service, dan BUKAN alat produktivitas.'
+  );
+  if (bot.bot_description) parts.push(`Deskripsimu: ${bot.bot_description}.`);
+
+  const traits = (Array.isArray(bot.traits) && bot.traits.length)
+    ? bot.traits.map((t) => TRAIT_PROMPTS[t]).filter(Boolean)
+    : ['hangat, ramah, dan perhatian'];
+  parts.push(`Kepribadianmu: ${traits.join('; ')}.`);
+  parts.push(SPEAKING_PROMPTS[bot.speaking_style] || SPEAKING_PROMPTS.casual);
+  parts.push(RELATIONSHIP_PROMPTS[bot.relationship] || RELATIONSHIP_PROMPTS.companion);
+
+  if (bot.likes) parts.push(`Hal yang kamu sukai: ${bot.likes}.`);
+  if (bot.avoids) parts.push(`Hal yang kamu hindari: ${bot.avoids}.`);
+  if (bot.personality) parts.push(`Catatan kepribadian tambahan darimu: ${bot.personality}`);
+
+  const mems = (Array.isArray(bot.memories) ? bot.memories : []).filter(Boolean);
+  if (mems.length) {
+    parts.push('Hal-hal yang kamu ingat tentang pengguna: ' + mems.map((m) => `(${m})`).join(' ') +
+      '. Sebut secara alami kalau relevan, jangan seperti membaca daftar.');
+  }
+
   if (bot.language === 'en') parts.push('Always reply in English.');
   else if (bot.language === 'id') parts.push('Selalu berbahasa Indonesia.');
-  else parts.push('Balas menggunakan bahasa yang dipakai pengguna.');
-  if (bot.personality) parts.push(bot.personality);
+  else parts.push('Balas pakai bahasa yang dipakai pengguna.');
+
   parts.push(TONE_PROMPTS[bot.response_style] || TONE_PROMPTS.casual);
   parts.push(LENGTH_PROMPTS[bot.response_length] || LENGTH_PROMPTS.balanced);
-  parts.push('Jangan gunakan format markdown berat.');
+
+  parts.push(
+    'Aturan bicara: ' +
+    '(1) Ngobrol seperti manusia sungguhan lewat chat: kalimat pendek, natural, kadang tidak lengkap. ' +
+    '(2) JANGAN PERNAH pakai gaya asisten: "Ada yang bisa dibantu?", "Tentu saja!", "Certainly!", "Of course!", "I would be happy to help", "Sebagai AI...". ' +
+    '(3) Jangan menawarkan bantuan tanpa diminta — kalian sedang ngobrol, bukan sesi layanan. ' +
+    '(4) Jangan sebut dirimu AI/bot/asisten/model bahasa kecuali pengguna bertanya langsung. ' +
+    "(5) Jangan gunakan format markdown berat."
+  );
+
   if (bot.system_prompt) parts.push(bot.system_prompt);
   return parts.join(' ');
+}
+
+// Instruksi khusus sapaan pertama (karakter membuka chat duluan)
+function greetingInstruction(bot) {
+  const traits = Array.isArray(bot.traits) ? bot.traits : [];
+  const base = buildInstruction(bot);
+  return (
+    base +
+    ' Sekarang PESAN PERTAMA: pengguna baru saja membuka chat dan belum menulis apa pun. ' +
+    'Kirim sapaan pembuka sesuai kepribadianmu — satu sampai dua kalimat pendek saja, ' +
+    'seperti membuka chat dengan orang yang kamu tunggu. Jangan perkenalan formal, ' +
+    `jangan menawarkan bantuan, jangan tanya "ada yang bisa dibantu".` +
+    (traits.length ? ` Sapaan harus terasa khas sifat: ${traits.join(', ')}.` : '')
+  );
 }
 
 // ---------------- Util ----------------
@@ -301,8 +390,9 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {};
+  const greeting = body.greeting === true;   // mode: karakter menyapa duluan
   const message = sanitize(body.message, LIMITS.messageMaxLen);
-  if (!message) return res.status(400).json({ error: 'Pesan tidak valid' });
+  if (!message && !greeting) return res.status(400).json({ error: 'Pesan tidak valid' });
 
   // Muat / buat percakapan milik user ini
   const convId = String(body.conversation_id || '');
@@ -329,55 +419,114 @@ export default async function handler(req, res) {
   const bot = { ...DEFAULT_BOT, ...(botFile?.data || {}) };
   const instruction = buildInstruction(bot);
 
+  // Coba provider berurutan (Gemini → Groq → ChatEverywhere)
+  async function askProviders(input, instruction) {
+    let reply = null, provider = null, geminiSid = null;
+
+    try {
+      const out = await chatGemini(input, instruction);
+      reply = out.text; provider = 'gemini'; geminiSid = out.geminiSessionId;
+    } catch (err) {
+      console.error('[chat] gemini:', err.message);
+    }
+
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!reply && groqKey) {
+      try {
+        const out = await chatGroq(input, groqKey, instruction);
+        reply = out.text; provider = 'groq';
+      } catch (err) {
+        console.error('[chat] groq:', err.message);
+      }
+    }
+
+    if (!reply) {
+      try {
+        const out = await chatEverywhere(input, instruction);
+        reply = out.text; provider = 'chateverywhere';
+      } catch (err) {
+        console.error('[chat] ce:', err.message);
+      }
+    }
+    return { reply, provider, geminiSid };
+  }
+
+  const now = new Date().toISOString();
+
+  // ---------------- MODE GREETING (sapaan pertama karakter) ----------------
+  if (greeting) {
+    // percakapan sudah berjalan → jangan sapa lagi
+    if (conv.messages.length > 0) {
+      return res.status(200).json({ text: null, already: true, conversation_id: conv.conversation_id });
+    }
+
+    // Sapaan custom dari konfigurasi karakter → pakai apa adanya
+    let greet = (bot.greeting || '').trim();
+    let provider = 'character-config';
+
+    if (!greet) {
+      const input = {
+        message: '[pengguna baru membuka chat dan belum menulis apa pun. kirim sapaan pertamamu sekarang.]',
+        geminiSessionId: null,
+        messages: []
+      };
+      const out = await askProviders(input, greetingInstruction(bot));
+      greet = (out.reply || '').trim();
+      provider = out.provider || 'fallback';
+
+      // Semua provider gagal → template per sifat karakter (tetap personality)
+      if (!greet) {
+        const traits = Array.isArray(bot.traits) ? bot.traits : [];
+        const key = traits.find((t) => GREETING_FALLBACKS[t]) || 'default';
+        greet = GREETING_FALLBACKS[key][0];
+        provider = 'template';
+      }
+    }
+
+    conv.messages.push(
+      { message_id: crypto.randomUUID(), role: 'assistant', content: greet, timestamp: now }
+    );
+    if (conv.title === 'Chat baru') conv.title = greet.slice(0, 48);
+    conv.updated_at = now;
+
+    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, 'greeting append');
+    await updateJson(`chats/${uid}/_index.json`, 'conversation index', (current) => {
+      const items = Array.isArray(current) ? current : [];
+      const entry = {
+        conversation_id: conv.conversation_id,
+        title: conv.title,
+        updated_at: conv.updated_at
+      };
+      const i = items.findIndex((c) => c.conversation_id === conv.conversation_id);
+      if (i >= 0) items[i] = entry; else items.unshift(entry);
+      return items;
+    });
+
+    return res.status(200).json({
+      text: greet,
+      conversation_id: conv.conversation_id,
+      title: conv.title,
+      provider,
+      greeting: true,
+      bot_name: bot.bot_name
+    });
+  }
+
+  // ---------------- MODE CHAT NORMAL ----------------
   const input = {
     message,
     geminiSessionId: conv.geminiSessionId,
     messages: conv.messages
   };
-
-  // Coba provider berurutan
-  let reply = null;
-  let provider = null;
-  let newGeminiSid = null;
-
-  try {
-    const out = await chatGemini(input, instruction);
-    reply = out.text;
-    provider = 'gemini';
-    newGeminiSid = out.geminiSessionId;
-  } catch (err) {
-    console.error('[chat] gemini:', err.message);
-  }
-
-  const groqKey = process.env.GROQ_API_KEY;
-  if (!reply && groqKey) {
-    try {
-      const out = await chatGroq(input, groqKey, instruction);
-      reply = out.text;
-      provider = 'groq';
-    } catch (err) {
-      console.error('[chat] groq:', err.message);
-    }
-  }
-
-  if (!reply) {
-    try {
-      const out = await chatEverywhere(input, instruction);
-      reply = out.text;
-      provider = 'chateverywhere';
-    } catch (err) {
-      console.error('[chat] ce:', err.message);
-    }
-  }
+  const { reply, provider, geminiSid: newGeminiSid } = await askProviders(input, instruction);
 
   if (!reply) {
     return res.status(502).json({
-      error: 'Semua penyedia AI sedang tidak tersedia. Coba lagi nanti.'
+      error: 'Koneksi sedang bermasalah. Coba lagi nanti ya.'
     });
   }
 
   // Simpan pesan ke percakapan user
-  const now = new Date().toISOString();
   conv.messages.push(
     { message_id: crypto.randomUUID(), role: 'user', content: message, timestamp: now },
     { message_id: crypto.randomUUID(), role: 'assistant', content: reply, timestamp: now }

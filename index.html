@@ -4,21 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
   <meta name="theme-color" content="#141417" />
-  <meta name="description" content="Aomi — asisten chat AI cepat dan ringan, dengan riwayat per akun." />
-  <title>Aomi — Asisten Chat</title>
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="css/main.css" />
-  <link rel="stylesheet" href="css/sidebar.css" />
-  <link rel="stylesheet" href="css/chat.css" />
-  <link rel="stylesheet" href="css/settings.css" />
+  <meta name="description" content="Aomi — tempat ngobrol dengan companion pilihanmu. Personal, privat, dan selalu menunggumu." />
+  <title>Aomi — Ngobrol Sama Mereka</title>
+  <link rel="icon" href="assets/favicon.svg?v=e9aa0007bd" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/main.css?v=e9aa0007bd" />
+  <link rel="stylesheet" href="css/sidebar.css?v=e9aa0007bd" />
+  <link rel="stylesheet" href="css/chat.css?v=e9aa0007bd" />
+  <link rel="stylesheet" href="css/settings.css?v=e9aa0007bd" />
 </head>
 <body>
   <!-- Opening animation: overlay visual saja, aplikasi dirender di belakang -->
   <div id="app-intro" aria-hidden="true">
     <div class="intro-content">
-      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg#logo" /></svg>
+      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg>
       <div class="intro-name">Aomi</div>
-      <div class="intro-sub">Asisten AI pribadimu</div>
+      <div class="intro-sub">seseorang menunggumu di sini</div>
     </div>
   </div>
 
@@ -27,31 +27,45 @@
     <aside class="sidebar" id="sidebar">
       <header class="sidebar-head">
         <div class="brand">
-          <svg class="icon brand-icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg>
+          <svg class="icon brand-icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg>
           <span id="brandName">Aomi</span>
         </div>
         <button class="icon-btn close-btn" id="sidebarClose" aria-label="Tutup sidebar">
-          <svg class="icon" aria-hidden="true"><use href="components/icons.svg#close" /></svg>
+          <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#close" /></svg>
         </button>
       </header>
 
+      <div class="side-label">Karakter</div>
+
+      <!-- Kartu karakter (dikelola js/sidebar.js) -->
+      <div class="char-card" id="charCard" role="button" tabindex="0" aria-label="Buka pengaturan karakter">
+        <span class="avatar char-card-avatar" id="charCardAvatar"><svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg></span>
+        <div class="char-card-meta">
+          <span class="char-card-name" id="charCardName">Aomi</span>
+          <span class="char-card-status" id="charCardStatus">online</span>
+        </div>
+        <svg class="icon char-card-gear" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#gear" /></svg>
+      </div>
+
       <button class="new-chat" id="newChatBtn">
-        <svg class="icon" aria-hidden="true"><use href="components/icons.svg#plus" /></svg>
-        <span>Chat baru</span>
+        <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#plus" /></svg>
+        <span>Mulai ngobrol baru</span>
       </button>
 
+      <div class="side-label">Chat terbaru</div>
+
       <div class="search-box">
-        <svg class="icon" aria-hidden="true"><use href="components/icons.svg#search" /></svg>
+        <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#search" /></svg>
         <input id="searchInput" type="search" placeholder="Cari riwayat…" autocomplete="off" spellcheck="false" />
       </div>
 
-      <nav class="history" id="history" aria-label="Riwayat chat"></nav>
+      <nav class="history" id="history" aria-label="Chat terbaru"></nav>
 
       <footer class="sidebar-foot">
         <button class="profile-btn" id="settingsBtn" aria-label="Buka pengaturan">
-          <span class="avatar small" id="sidebarAvatar"><svg class="icon" aria-hidden="true"><use href="components/icons.svg#user" /></svg></span>
+          <span class="avatar small" id="sidebarAvatar"><svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#user" /></svg></span>
           <span class="user-name" id="userBox">…</span>
-          <svg class="icon" aria-hidden="true"><use href="components/icons.svg#gear" /></svg>
+          <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#gear" /></svg>
         </button>
       </footer>
     </aside>
@@ -62,11 +76,17 @@
     <main class="main">
       <header class="topbar">
         <button class="icon-btn menu-btn" id="sidebarToggle" aria-label="Buka sidebar">
-          <svg class="icon" aria-hidden="true"><use href="components/icons.svg#menu" /></svg>
+          <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#menu" /></svg>
         </button>
-        <div class="topbar-title" id="chatTitle">Chat baru</div>
+        <div class="char-head" id="charHead">
+          <span class="avatar char-avatar" id="charAvatar"><svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg></span>
+          <div class="char-meta">
+            <div class="char-name" id="chatTitle">Aomi</div>
+            <div class="char-status"><span class="status-dot" aria-hidden="true"></span><span id="charStatus">online</span></div>
+          </div>
+        </div>
         <button class="icon-btn" id="scrollDownBtn" aria-label="Gulir ke bawah" hidden>
-          <svg class="icon" aria-hidden="true"><use href="components/icons.svg#chevron-down" /></svg>
+          <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#chevron-down" /></svg>
         </button>
       </header>
 
@@ -74,14 +94,14 @@
         <div class="chat-column" id="chatColumn">
           <!-- Layar sambutan (statis, cukup di-toggle) -->
           <div class="welcome" id="welcome">
-            <svg class="icon welcome-icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg>
-            <h1>Halo, ada yang bisa dibantu?</h1>
-            <p>Mulai percakapan baru atau pilih salah satu ide di bawah.</p>
+            <svg class="icon welcome-icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg>
+            <h1 id="welcomeTitle">Dia nungguin kamu nih.</h1>
+            <p id="welcomeSub">Ketik sesuatu, atau mulai dari salah satu ini.</p>
             <div class="suggestions" id="suggestions">
-              <button class="suggestion" data-q="Halo! Apa kabar hari ini?">Halo! Apa kabar hari ini?</button>
-              <button class="suggestion" data-q="Jelaskan cara kerja AI dengan bahasa sederhana">Jelaskan cara kerja AI dengan bahasa sederhana</button>
-              <button class="suggestion" data-q="Buatkan rencana belajar 7 hari untuk pemrograman">Buatkan rencana belajar 7 hari untuk pemrograman</button>
-              <button class="suggestion" data-q="Buatkan puisi singkat tentang hujan sore">Buatkan puisi singkat tentang hujan sore</button>
+              <button class="suggestion" data-q="heyo, kabarmu gimana hari ini?">heyo, kabarmu gimana hari ini?</button>
+              <button class="suggestion" data-q="aku bosen nih. hiburin dong">aku bosen nih. hiburin dong</button>
+              <button class="suggestion" data-q="ceritain sesuatu yang random deh">ceritain sesuatu yang random deh</button>
+              <button class="suggestion" data-q="aku mau cerita soal hariku, dengarkan ya">aku mau cerita soal hariku, dengarkan ya</button>
             </div>
           </div>
 
@@ -94,13 +114,13 @@
 
       <div class="composer-wrap">
         <form class="composer" id="composer">
-          <textarea id="input" rows="1" placeholder="Kirim pesan ke Aomi…"
+          <textarea id="input" rows="1" placeholder="Tulis sesuatu…"
             autocomplete="off" enterkeyhint="send" aria-label="Pesan"></textarea>
           <button class="send" id="sendBtn" type="submit" aria-label="Kirim" disabled>
-            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#send" /></svg>
+            <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#send" /></svg>
           </button>
         </form>
-        <p class="composer-note">Aomi bisa keliru. Periksa kembali informasi penting.</p>
+        <p class="composer-note">Karakter ini fiktif dan dibuat dengan AI — jangan anggap mereka orang nyata.</p>
       </div>
     </main>
   </div>
@@ -112,27 +132,27 @@
       <!-- Navigasi kategori (sidebar di desktop, list di mobile) -->
       <nav class="settings-nav" id="settingsNav">
         <header class="settings-nav-head">
-          <span class="avatar small"><svg class="icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg></span>
+          <span class="avatar small"><svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg></span>
           <h2>Pengaturan</h2>
           <button class="icon-btn" id="settingsClose" aria-label="Tutup pengaturan">
-            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#close" /></svg>
+            <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#close" /></svg>
           </button>
         </header>
         <div class="settings-nav-list" id="settingsNavList">
           <button class="settings-nav-item active" data-cat="profile">
-            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#user" /></svg>
+            <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#user" /></svg>
             <span>Profil</span>
           </button>
           <button class="settings-nav-item" data-cat="bot">
-            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg>
-            <span>Bot</span>
+            <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg>
+            <span>Karakter</span>
           </button>
           <button class="settings-nav-item" data-cat="appearance">
-            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#sliders" /></svg>
+            <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#sliders" /></svg>
             <span>Tampilan</span>
           </button>
           <button class="settings-nav-item" data-cat="account">
-            <svg class="icon" aria-hidden="true"><use href="components/icons.svg#shield" /></svg>
+            <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#shield" /></svg>
             <span>Akun</span>
           </button>
         </div>
@@ -141,7 +161,7 @@
       <!-- Konten kategori -->
       <main class="settings-main" id="settingsMain">
         <button class="settings-back" id="settingsBack">
-          <svg class="icon" aria-hidden="true"><use href="components/icons.svg#chevron-left" /></svg>
+          <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#chevron-left" /></svg>
           <span>Pengaturan</span>
         </button>
 
@@ -154,10 +174,10 @@
 
           <div class="section-card">
             <div class="avatar-edit">
-              <span class="avatar big" id="profileAvatarPrev"><svg class="icon" aria-hidden="true"><use href="components/icons.svg#user" /></svg></span>
+              <span class="avatar big" id="profileAvatarPrev"><svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#user" /></svg></span>
               <div class="meta">
                 <button type="button" class="link-btn" id="profileAvatarBtn">
-                  <svg class="icon" aria-hidden="true"><use href="components/icons.svg#image" /></svg>
+                  <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#image" /></svg>
                   Ganti foto profil
                 </button>
                 <span class="hint">JPG/PNG/WebP, otomatis dikecilkan ke 256×256.</span>
@@ -189,53 +209,61 @@
           </div>
         </section>
 
-        <!-- ========== BOT ========== -->
+        <!-- ========== KARAKTER ========== -->
         <section class="settings-page" data-page="bot">
           <header class="page-head">
-            <h3>Bot</h3>
-            <p class="page-desc">Sesuaikan kepribadian asisten AI-mu.</p>
+            <h3>Karakter</h3>
+            <p class="page-desc">Siapa dia, bagaimana ia bicara, dan apa yang ia ingat.</p>
           </header>
 
-          <!-- Sub-navigasi kategori bot -->
+          <!-- Sub-navigasi kategori karakter -->
           <div class="subnav" id="botSubnav">
             <button class="subnav-item active" data-botpage="identity">Identitas</button>
             <button class="subnav-item" data-botpage="personality">Personality</button>
             <button class="subnav-item" data-botpage="behavior">Perilaku</button>
+            <button class="subnav-item" data-botpage="memory">Memory</button>
+            <button class="subnav-item" data-botpage="advanced">Advanced</button>
           </div>
 
-          <!-- --- Bot: Identitas --- -->
+          <!-- --- Karakter: Identitas --- -->
           <div class="bot-page active" data-botpage="identity">
             <div class="bot-preview">
-              <span class="avatar" id="previewAvatar"><svg class="icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg></span>
+              <span class="avatar" id="previewAvatar"><svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg></span>
               <div class="bp-body">
                 <div class="bp-name" id="previewName">Aomi</div>
-                <div class="bp-desc" id="previewDesc">Asisten AI pribadimu.</div>
+                <div class="bp-desc" id="previewDesc">Companion pribadimu.</div>
+                <div class="bp-line" id="previewLine"></div>
               </div>
             </div>
 
             <div class="section-card">
               <div class="avatar-edit">
-                <span class="avatar big" id="botAvatarPrev"><svg class="icon" aria-hidden="true"><use href="components/icons.svg#logo" /></svg></span>
+                <span class="avatar big" id="botAvatarPrev"><svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg></span>
                 <div class="meta">
                   <button type="button" class="link-btn" id="botAvatarBtn">
-                    <svg class="icon" aria-hidden="true"><use href="components/icons.svg#image" /></svg>
-                    Ganti avatar bot
+                    <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#image" /></svg>
+                    Ganti avatar
                   </button>
-                  <span class="hint">Tampil di samping setiap balasan bot.</span>
+                  <span class="hint">Wajah karakter — tampil di header chat dan pesannya.</span>
                 </div>
                 <input type="file" id="botAvatarFile" accept="image/jpeg,image/png,image/webp" hidden />
               </div>
 
               <div class="form-rows">
                 <label class="field">
-                  <span>Nama bot</span>
+                  <span>Nama karakter</span>
                   <input type="text" id="botName" maxlength="40" />
-                  <small class="field-hint">Dipakai di seluruh aplikasi dan oleh AI.</small>
+                  <small class="field-hint">Nama panggilan yang kamu pakai untuk dia.</small>
                 </label>
                 <label class="field">
-                  <span>Deskripsi</span>
-                  <input type="text" id="botDescription" maxlength="120" placeholder="Asisten AI pribadimu." />
-                  <small class="field-hint">Satu kalimat tentang siapa bot-mu.</small>
+                  <span>Deskripsi singkat</span>
+                  <input type="text" id="botDescription" maxlength="120" placeholder="Companion pribadimu." />
+                  <small class="field-hint">Satu kalimat tentang siapa dia untukmu.</small>
+                </label>
+                <label class="field">
+                  <span>Sapaan pertama (opsional)</span>
+                  <input type="text" id="botGreeting" maxlength="200" placeholder="Kosongkan agar dia menyapa dengan caranya sendiri." />
+                  <small class="field-hint">Pesan pertamanya setiap kali kamu mulai chat baru.</small>
                 </label>
               </div>
             </div>
@@ -246,43 +274,52 @@
             </div>
           </div>
 
-          <!-- --- Bot: Personality --- -->
+          <!-- --- Karakter: Personality --- -->
           <div class="bot-page" data-botpage="personality">
             <div class="section-card">
-              <h4 class="card-title">Personality preset</h4>
-              <p class="card-desc">Pilih titik awal, lalu sesuaikan sesukamu.</p>
-              <div class="preset-grid">
-                <button class="preset-card" type="button" data-preset="friendly">
-                  <strong>Ramah</strong>
-                  <span>Santai, hangat, dan mudah diajak bicara</span>
-                </button>
-                <button class="preset-card" type="button" data-preset="professional">
-                  <strong>Profesional</strong>
-                  <span>Jelas, terstruktur, dan formal</span>
-                </button>
-                <button class="preset-card" type="button" data-preset="creative">
-                  <strong>Kreatif</strong>
-                  <span>Imajinatif dan ekspresif</span>
-                </button>
-                <button class="preset-card" type="button" data-preset="custom">
-                  <strong>Custom</strong>
-                  <span>Tulis personality-mu sendiri</span>
-                </button>
+              <h4 class="card-title">Sifatnya</h4>
+              <p class="card-desc">Pilih yang paling khas dia. Bisa lebih dari satu.</p>
+              <div class="trait-grid" id="traitGrid">
+                <button type="button" class="trait-chip" data-trait="calm">Tenang</button>
+                <button type="button" class="trait-chip" data-trait="playful">Playful</button>
+                <button type="button" class="trait-chip" data-trait="teasing">Suka menggoda</button>
+                <button type="button" class="trait-chip" data-trait="caring">Perhatian</button>
+                <button type="button" class="trait-chip" data-trait="shy">Pemalu</button>
+                <button type="button" class="trait-chip" data-trait="energetic">Energik</button>
+                <button type="button" class="trait-chip" data-trait="sarcastic">Sarkastis</button>
+                <button type="button" class="trait-chip" data-trait="affectionate">Mesra</button>
+                <button type="button" class="trait-chip" data-trait="reserved">Pendiam</button>
               </div>
-
-              <label class="field">
-                <span>Personality</span>
-                <textarea id="botPersonality" maxlength="3000" rows="4" placeholder="Mis. Jawab dengan santai, singkat, dan tidak terlalu formal."></textarea>
-                <small class="field-hint counter" id="personalityCounter">0/3000</small>
-              </label>
             </div>
 
             <div class="section-card">
-              <h4 class="card-title">Instruksi khusus</h4>
-              <p class="card-desc">Perintah tambahan yang selalu dipatuhi bot.</p>
+              <h4 class="card-title">Hubungan kalian</h4>
+              <div class="seg" id="segRelationship" data-field="relationship">
+                <button class="seg-btn" data-val="close_friend">Sahabat dekat</button>
+                <button class="seg-btn" data-val="companion">Companion</button>
+                <button class="seg-btn" data-val="fictional">Karakter fiksi</button>
+                <button class="seg-btn" data-val="romantic">Romantic</button>
+              </div>
+            </div>
+
+            <div class="section-card">
+              <h4 class="card-title">Cara dia bicara</h4>
+              <div class="seg" id="segSpeaking" data-field="speaking_style">
+                <button class="seg-btn" data-val="casual">Santai</button>
+                <button class="seg-btn" data-val="short">Singkat banget</button>
+                <button class="seg-btn" data-val="expressive">Ekspresif</button>
+                <button class="seg-btn" data-val="dry">Datar</button>
+                <button class="seg-btn" data-val="playful">Playful</button>
+                <button class="seg-btn" data-val="detailed">Cerewet</button>
+              </div>
+            </div>
+
+            <div class="section-card">
+              <h4 class="card-title">Tulis kepribadiannya sendiri</h4>
+              <p class="card-desc">Bebas — cara kamu mendeskripsikan dia ke teman.</p>
               <label class="field">
-                <textarea id="botPrompt" maxlength="1000" rows="4" placeholder="Mis. Selalu sertakan contoh konkret. Jangan gunakan jargon teknis."></textarea>
-                <small class="field-hint counter" id="promptCounter">0/1000</small>
+                <textarea id="botPersonality" maxlength="3000" rows="4" placeholder="Mis. Dia pendiem pada awal, tapi jadi usil begitu dekat. Suka iseng dan balas chat dengan singkat."></textarea>
+                <small class="field-hint counter" id="personalityCounter">0/3000</small>
               </label>
             </div>
 
@@ -292,40 +329,91 @@
             </div>
           </div>
 
-          <!-- --- Bot: Perilaku --- -->
+          <!-- --- Karakter: Perilaku --- -->
           <div class="bot-page" data-botpage="behavior">
             <div class="section-card">
-              <h4 class="card-title">Panjang jawaban</h4>
+              <h4 class="card-title">Hal yang dia suka</h4>
+              <p class="card-desc">Topik, kebiasaan, atau hal kecil yang bikin dia semangat.</p>
+              <label class="field">
+                <textarea id="botLikes" maxlength="300" rows="2" placeholder="Mis. ngobrol di tengah malam, cerita random kamu, musik lo-fi."></textarea>
+              </label>
+            </div>
+
+            <div class="section-card">
+              <h4 class="card-title">Hal yang dia hindari</h4>
+              <p class="card-desc">Biar dia tahu batas dan nyaman-nya di mana.</p>
+              <label class="field">
+                <textarea id="botAvoids" maxlength="300" rows="2" placeholder="Mis. dibanding-bandingkan, small talk formal, spoiler film."></textarea>
+              </label>
+            </div>
+
+            <div class="section-card">
+              <h4 class="card-title">Panjang balasan</h4>
               <div class="seg" id="segLength" data-field="response_length">
                 <button class="seg-btn" data-val="concise">Singkat</button>
-                <button class="seg-btn" data-val="balanced">Seimbang</button>
-                <button class="seg-btn" data-val="detailed">Detail</button>
+                <button class="seg-btn" data-val="balanced">Santai</button>
+                <button class="seg-btn" data-val="detailed">Panjang</button>
               </div>
-            </div>
-
-            <div class="section-card">
-              <h4 class="card-title">Nada bicara</h4>
-              <div class="seg" id="segTone" data-field="response_style">
-                <button class="seg-btn" data-val="casual">Santai</button>
-                <button class="seg-btn" data-val="neutral">Netral</button>
-                <button class="seg-btn" data-val="formal">Formal</button>
-              </div>
-            </div>
-
-            <div class="section-card">
-              <h4 class="card-title">Bahasa</h4>
-              <div class="seg" id="segLanguage" data-field="language">
-                <button class="seg-btn" data-val="auto">Otomatis</button>
-                <button class="seg-btn" data-val="id">Indonesia</button>
-                <button class="seg-btn" data-val="en">English</button>
-              </div>
-              <p class="card-desc">Otomatis: mengikuti bahasa pesanmu.</p>
             </div>
 
             <div class="save-row">
               <button class="btn-primary" id="behaviorSave" type="button" disabled>Simpan perubahan</button>
               <span class="save-status" id="behaviorStatus"></span>
             </div>
+          </div>
+
+          <!-- --- Karakter: Memory --- -->
+          <div class="bot-page" data-botpage="memory">
+            <div class="section-card">
+              <h4 class="card-title">Yang dia ingat tentang kamu</h4>
+              <p class="card-desc">Tulis hal-hal penting — dia akan menyebutnya secara alami saat relevan.</p>
+              <div class="memory-add">
+                <input type="text" id="memoryInput" maxlength="200" placeholder="Mis. Aku ada ujian besok pagi." />
+                <button class="btn-ghost" id="memoryAdd" type="button">Ingatkan</button>
+              </div>
+              <ul class="memory-list" id="memoryList"></ul>
+            </div>
+
+            <div class="save-row">
+              <button class="btn-primary" id="memorySave" type="button" disabled>Simpan perubahan</button>
+              <span class="save-status" id="memoryStatus"></span>
+            </div>
+          </div>
+
+          <!-- --- Karakter: Advanced (tersembunyi) --- -->
+          <div class="bot-page" data-botpage="advanced">
+            <details class="advanced-box">
+              <summary>Pengaturan lanjutan</summary>
+              <div class="section-card">
+                <h4 class="card-title">Instruksi teknis tambahan</h4>
+                <p class="card-desc">Untuk yang paham prompt. Karakter tetap menaati kepribadiannya.</p>
+                <label class="field">
+                  <textarea id="botPrompt" maxlength="1000" rows="4" placeholder="Mis. Jangan pernah pakai emoji. Selalu balas dalam satu paragraf."></textarea>
+                  <small class="field-hint counter" id="promptCounter">0/1000</small>
+                </label>
+              </div>
+              <div class="section-card">
+                <h4 class="card-title">Formalitas bahasa</h4>
+                <div class="seg" id="segTone" data-field="response_style">
+                  <button class="seg-btn" data-val="casual">Santai</button>
+                  <button class="seg-btn" data-val="neutral">Netral</button>
+                  <button class="seg-btn" data-val="formal">Formal</button>
+                </div>
+              </div>
+              <div class="section-card">
+                <h4 class="card-title">Bahasa</h4>
+                <div class="seg" id="segLanguage" data-field="language">
+                  <button class="seg-btn" data-val="auto">Otomatis</button>
+                  <button class="seg-btn" data-val="id">Indonesia</button>
+                  <button class="seg-btn" data-val="en">English</button>
+                </div>
+                <p class="card-desc">Otomatis: mengikuti bahasa pesanmu.</p>
+              </div>
+              <div class="save-row">
+                <button class="btn-primary" id="advancedSave" type="button" disabled>Simpan perubahan</button>
+                <span class="save-status" id="advancedStatus"></span>
+              </div>
+            </details>
           </div>
         </section>
 
@@ -366,7 +454,7 @@
 
           <div class="section-card">
             <button class="btn-ghost danger" id="logoutBtn" type="button">
-              <svg class="icon" aria-hidden="true"><use href="components/icons.svg#logout" /></svg>
+              <svg class="icon" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logout" /></svg>
               Keluar dari akun
             </button>
             <p class="card-desc">Sesi "Ingat saya" bertahan 30 hari; tanpa itu, 12 jam.</p>
@@ -376,7 +464,7 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=e9aa0007bd"></script>
 
 <script>
   // Opening intro: PURE UI overlay — tidak pernah memicu navigasi/reload/

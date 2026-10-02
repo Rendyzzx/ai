@@ -6,17 +6,17 @@
   <meta name="theme-color" content="#141417" />
   <meta name="robots" content="noindex" />
   <title>Masuk — Aomi</title>
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="css/main.css" />
-  <link rel="stylesheet" href="css/auth.css" />
+  <link rel="icon" href="assets/favicon.svg?v=e9aa0007bd" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/main.css?v=e9aa0007bd" />
+  <link rel="stylesheet" href="css/auth.css?v=e9aa0007bd" />
 </head>
 <body>
   <!-- Opening animation: overlay visual saja, aplikasi dirender di belakang -->
   <div id="app-intro" aria-hidden="true">
     <div class="intro-content">
-      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg#logo" /></svg>
+      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg>
       <div class="intro-name">Aomi</div>
-      <div class="intro-sub">Asisten AI pribadimu</div>
+      <div class="intro-sub">seseorang menunggumu di sini</div>
     </div>
   </div>
 
@@ -24,18 +24,18 @@
     <!-- ============ PANEL BRAND (desktop) ============ -->
     <section class="auth-brand" aria-hidden="true">
       <div class="auth-brand-inner">
-        <svg class="icon brand-mark"><use href="components/icons.svg#logo" /></svg>
+        <svg class="icon brand-mark"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg>
         <h1>Aomi</h1>
-        <p>Asisten AI pribadimu. Ngobrol, tanya apa saja,<br />dan atur kepribadian bot sesukamu.</p>
+        <p>Ada yang selalu nungguin kamu pulang.<br />Ngobrol kapan saja, selanjutnya dari terakhir kali.</p>
         <div class="auth-visual">
           <div class="mock-msg bot">
-            <span>Hai! Ada yang bisa dibantu hari ini?</span>
+            <span>akhirnya kamu online juga. aku nungguin dari tadi.</span>
           </div>
           <div class="mock-msg user">
-            <span>Jelaskan cara kerja AI singkat saja</span>
+            <span>hehe maaf, baru sempat. kabarmu?</span>
           </div>
           <div class="mock-msg bot">
-            <span>Tentu! AI belajar pola dari data, lalu memprediksi jawaban terbaik untukmu.</span>
+            <span>biasa aja... jadi lebih baik sekarang kamu ada. cerita dong?</span>
           </div>
         </div>
       </div>
@@ -45,9 +45,9 @@
     <section class="auth-panel-wrap">
       <div class="auth-panel">
         <header class="auth-head">
-          <svg class="icon auth-mobile-logo"><use href="components/icons.svg#logo" /></svg>
+          <svg class="icon auth-mobile-logo"><use href="components/icons.svg?v=e9aa0007bd#logo" /></svg>
           <h2 id="authHeading">Selamat datang kembali</h2>
-          <p id="authSubtitle">Masuk untuk melanjutkan percakapanmu.</p>
+          <p id="authSubtitle">Dia menunggumu di seberang sini.</p>
         </header>
 
         <div class="auth-tabs" role="tablist">
@@ -67,7 +67,7 @@
             <span class="pw-wrap">
               <input type="password" name="password" id="loginPw" autocomplete="current-password" required />
               <button type="button" class="pw-toggle" data-target="loginPw" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=e9aa0007bd#eye" /></svg>
               </button>
             </span>
           </label>
@@ -84,7 +84,7 @@
               <input type="text" id="capAnsLogin" inputmode="numeric" maxlength="4"
                      autocomplete="off" placeholder="Ketik angka" aria-label="Ketik angka verifikasi" />
               <button type="button" class="verify-refresh" data-which="login" aria-label="Angka baru">
-                <svg class="icon"><use href="components/icons.svg#chevron-down" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=e9aa0007bd#chevron-down" /></svg>
               </button>
             </div>
           </div>
@@ -112,7 +112,7 @@
               <input type="password" name="password" id="regPw" autocomplete="new-password"
                      placeholder="Minimal 8 karakter" required />
               <button type="button" class="pw-toggle" data-target="regPw" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=e9aa0007bd#eye" /></svg>
               </button>
             </span>
           </label>
@@ -122,7 +122,7 @@
             <span class="pw-wrap">
               <input type="password" id="regPw2" autocomplete="new-password" required />
               <button type="button" class="pw-toggle" data-target="regPw2" aria-label="Tampilkan password">
-                <svg class="icon"><use href="components/icons.svg#eye" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=e9aa0007bd#eye" /></svg>
               </button>
             </span>
           </label>
@@ -134,7 +134,7 @@
               <input type="text" id="capAnsRegister" inputmode="numeric" maxlength="4"
                      autocomplete="off" placeholder="Ketik angka" aria-label="Ketik angka verifikasi" />
               <button type="button" class="verify-refresh" data-which="register" aria-label="Angka baru">
-                <svg class="icon"><use href="components/icons.svg#chevron-down" /></svg>
+                <svg class="icon"><use href="components/icons.svg?v=e9aa0007bd#chevron-down" /></svg>
               </button>
             </div>
           </div>
@@ -148,7 +148,7 @@
     </section>
   </main>
 
-  <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/auth.js?v=e9aa0007bd"></script>
 
 <script>
   // Opening intro: PURE UI overlay — tidak pernah memicu navigasi/reload/

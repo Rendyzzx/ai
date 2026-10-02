@@ -1,11 +1,12 @@
 /* ============================================================
    Aomi — sidebar.js
-   Riwayat percakapan milik akun (via /api/conversations).
-   Lazy render per batch + IntersectionObserver, pencarian
-   debounce (filter lokal atas indeks ringan), hapus via API.
+   Karakter + riwayat percakapan milik akun (via /api/conversations).
+   Kartu karakter (klik → pengaturan karakter), chat baru →
+   karakter menyapa duluan. Lazy render per batch +
+   IntersectionObserver, pencarian debounce, hapus via API.
    ============================================================ */
 
-import { $, debounce, api, apiJson, emit, on } from './app.js';
+import { $, debounce, api, apiJson, emit, on, state, renderAvatar } from './app.js?v=e9aa0007bd';
 
 const BATCH = 12;
 
@@ -20,11 +21,28 @@ export function initSidebar() {
   els.backdrop = $('#backdrop');
   els.history = $('#history');
   els.input = $('#searchInput');
+  els.charCard = $('#charCard');
+  els.charAvatar = $('#charCardAvatar');
+  els.charName = $('#charCardName');
+  els.charStatus = $('#charCardStatus');
 
   bindEvents();
+  renderCharCard();
   on('chat:updated', refresh);
+  on('settings:updated', renderCharCard);
   on('chat:activated', ({ id }) => setActive(id));
   refresh();
+}
+
+// Kartu karakter di sidebar — identitas utama aplikasi
+function renderCharCard() {
+  els.charName.textContent = state.bot.bot_name || 'Aomi';
+  const traits = Array.isArray(state.bot.traits) ? state.bot.traits : [];
+  const tag = { playful: 'iseng mode', caring: 'mikirin kamu', shy: 'pemalu tapi hangat',
+    energetic: 'energik', sarcastic: 'receh', affectionate: 'mesra', reserved: 'pendiam',
+    teasing: 'suka nggodain', calm: 'tenang' }[traits[0] || ''] || 'online';
+  els.charStatus.textContent = tag;
+  renderAvatar(els.charAvatar, state.bot.bot_avatar, 'logo');
 }
 
 async function refresh() {
@@ -48,7 +66,7 @@ function applyFilter() {
   if (filtered.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'h-empty';
-    empty.textContent = query ? 'Tidak ada hasil.' : 'Belum ada percakapan.';
+    empty.textContent = query ? 'Tidak ada hasil.' : 'Belum pernah ngobrol di sini.';
     els.history.appendChild(empty);
     els.history.appendChild(sentinel());
     return;
@@ -60,7 +78,14 @@ function applyFilter() {
 function bindEvents() {
   $('#newChatBtn').addEventListener('click', () => {
     closeDrawer();
-    emit('chat:open', { id: null });
+    // greet: true → karakter menyapa duluan di chat baru
+    emit('chat:open', { id: null, greet: true });
+  });
+
+  // Kartu karakter → buka pengaturan karakter
+  els.charCard.addEventListener('click', () => {
+    closeDrawer();
+    emit('settings:openCharacter');
   });
 
   // Event delegation: satu listener untuk seluruh item

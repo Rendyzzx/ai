@@ -318,44 +318,128 @@
   animation: viewIn 150ms ease;
 }
 
-/* ---------------- Preset card ---------------- */
+/* ---------------- Trait chips (sifat karakter) ---------------- */
 
-.preset-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+.trait-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
 }
 
-.preset-card {
+.trait-chip {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.trait-chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.trait-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ---------------- Memory (hal yang dia ingat) ---------------- */
+
+.memory-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.memory-add input {
+  flex: 1;
+  min-width: 0;
+}
+
+.memory-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 13px 14px;
-  background: var(--bg);
+  gap: 6px;
+}
+
+.memory-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  text-align: left;
-  min-height: 44px;
-  transition: border-color 0.15s, background 0.15s;
+  border-radius: var(--radius);
+  font-size: 13.5px;
 }
 
-.preset-card:hover {
-  border-color: var(--accent);
+.memory-item span {
+  flex: 1;
+  min-width: 0;
 }
 
-.preset-card.active {
-  border-color: var(--accent);
+.memory-del {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.memory-del:hover {
+  color: var(--danger);
   background: var(--surface-2);
 }
 
-.preset-card strong {
-  font-size: 13.5px;
-  font-weight: 600;
+.memory-del .icon {
+  width: 12px;
+  height: 12px;
 }
 
-.preset-card span {
-  font-size: 12px;
+.memory-empty {
+  font-size: 13px;
   color: var(--text-muted);
+  padding: 4px 0;
+}
+
+/* ---------------- Advanced (tersembunyi, teknis) ---------------- */
+
+.advanced-box summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 10px 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  transition: color 0.15s;
+  user-select: none;
+}
+
+.advanced-box summary:hover { color: var(--text); }
+
+.advanced-box[open] summary { margin-bottom: 14px; }
+
+/* ---------------- Preview karakter ---------------- */
+
+.bp-line {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 /* ---------------- Segmented control ---------------- */

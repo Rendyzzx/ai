@@ -115,6 +115,9 @@ export const state = {
   user: { username: '', display_name: '', bio: '', avatar: null, email: '' },
   bot: {
     bot_name: 'Aomi', bot_avatar: null, personality: '',
+    traits: ['playful', 'caring'], speaking_style: 'casual',
+    relationship: 'companion', greeting: '', likes: '', avoids: '',
+    memories: [],
     system_prompt: '', language: 'auto', response_length: 'balanced',
     response_style: 'casual', personality_preset: 'friendly',
     bot_description: ''
@@ -134,9 +137,13 @@ export function handleAuthInvalid() {
   dbg('AUTH', 'session invalid → teardown + redirect chat → login');
   Object.assign(state.user, { username: '', display_name: '', bio: '', avatar: null, email: '' });
   Object.assign(state.bot, {
-    bot_name: 'Aomi', bot_avatar: null, personality: '', system_prompt: '',
-    language: 'auto', response_length: 'balanced', response_style: 'casual',
-    personality_preset: 'friendly', bot_description: ''
+    bot_name: 'Aomi', bot_avatar: null, personality: '',
+    traits: ['playful', 'caring'], speaking_style: 'casual',
+    relationship: 'companion', greeting: '', likes: '', avoids: '',
+    memories: [],
+    system_prompt: '', language: 'auto', response_length: 'balanced',
+    response_style: 'casual', personality_preset: 'friendly',
+    bot_description: ''
   });
   clearSessionId();
   resetClientState();
@@ -183,14 +190,14 @@ function bindViewport() {
 
 // ---------------- Gerbang auth + bootstrap ----------------
 
-import { initSidebar } from './sidebar.js';
-import { initChat } from './chat.js';
+import { initSidebar } from './sidebar.js?v=e9aa0007bd';
+import { initChat } from './chat.js?v=e9aa0007bd';
 
 // Settings dimuat LAZY: baru di-import saat pertama kali dibuka
 let settingsMod = null;
-async function openSettings() {
-  if (!settingsMod) settingsMod = await import('./settings.js');
-  settingsMod.openSettings();
+async function openSettings(category) {
+  if (!settingsMod) settingsMod = await import('./settings.js?v=e9aa0007bd');
+  settingsMod.openSettings(category);
 }
 
 function showBootError() {
@@ -266,8 +273,8 @@ async function boot() {
   $('#userBox').textContent = state.user.display_name || state.user.username;
   renderAvatar($('#sidebarAvatar'), state.user.avatar, 'user');
   $('#brandName').textContent = state.bot.bot_name;
+  // Header chat = identitas karakter (nama), bukan judul percakapan
   $('#chatTitle').textContent = state.bot.bot_name;
-  $('#chatTitle').dataset.default = '1';
 
   // Tampilan: ukuran font tersimpan lokal (tanpa fetch)
   try {
@@ -279,7 +286,9 @@ async function boot() {
   initChat();
   dbg('AUTH', 'boot selesai → TETAP di chatbox (tidak ada redirect)');
 
-  $('#settingsBtn').addEventListener('click', openSettings);
+  $('#settingsBtn').addEventListener('click', () => openSettings());
+  // kartu karakter di sidebar → buka pengaturan karakter
+  on('settings:openCharacter', () => openSettings('bot'));
   watchSession();
 }
 
