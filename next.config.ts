@@ -56,8 +56,12 @@ const nextConfig: NextConfig = {
           // CSP moderat: inline script diperlukan (Next hydration + script
           // anti-flash tema di layout) — jangan dibuat lebih ketat dari ini
           // tanpa test menyeluruh. Resource eksternal dibatasi per-tipe:
-          // gambar/audio dari CDN (thumbnail, proxy unduhan), fetch hanya
-          // same-origin + API eksternal TIDAK pernah dari browser.
+          // gambar/audio dari CDN (thumbnail, proxy unduhan). connect-src
+          // perlu api-faa.my.id secara eksplisit karena fitur edit foto
+          // (runEditJob di ChatApp.tsx) BENAR-BENAR fetch dari browser
+          // (CORS terbuka di sana, dipakai utk lewati limit 60s server) —
+          // bukan via proxy server. Jangan dibuat 'self' saja, itu akan
+          // mem-block fetch tersebut (sudah terjadi, sudah diperbaiki).
           {
             key: "Content-Security-Policy",
             value: [
@@ -67,7 +71,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https:",
               "media-src 'self' blob: https:",
               "font-src 'self' data:",
-              "connect-src 'self'",
+              "connect-src 'self' https://api-faa.my.id",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
