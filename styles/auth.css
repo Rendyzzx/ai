@@ -1021,3 +1021,103 @@ h1, h2, h3 {
   .foot-inner { flex-wrap: wrap; gap: 8px; }
   .foot-line { flex-basis: 100%; order: 3; }
 }
+
+
+/* ============================================================
+   Brand splash sinematik (BrandSplash.tsx) — /auth only.
+   Overlay fixed TANPA menyentuh scroll: body hanya di-lock
+   selama splash aktif (body.splash-on), dilepas saat selesai.
+   Timeline text: wordmark muncul ~1.75s, tagline ~2.15s,
+   fade-out overlay 2.55s -> selesai 3.0s (sinkron dengan canvas).
+   ============================================================ */
+
+body.splash-on { overflow: hidden; }
+
+.brand-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  background: var(--bg);
+  animation: splash-fade-out 0.45s cubic-bezier(0.4, 0, 0.2, 1) 2.55s forwards;
+}
+
+/* Fallback (WebGL gagal / reduced-motion): intro versi statis, lebih singkat */
+.brand-splash.static {
+  gap: 18px;
+  animation: splash-fade-out 0.4s ease 1.6s forwards;
+}
+
+.brand-splash-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Mode 3D: teks diletakkan di bawah objek (objek di tengah layar) */
+.brand-splash.gl .brand-splash-text {
+  transform: translateY(min(30vh, 190px));
+}
+
+.brand-splash-mark {
+  width: 64px;
+  height: 64px;
+  color: var(--text);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: splash-fade-in 0.45s ease-out 0.05s both;
+}
+
+.brand-splash-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-splash-name {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  animation: splash-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1.75s both;
+}
+
+.brand-splash-tag {
+  font-size: 12.5px;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  animation: splash-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) 2.15s both;
+}
+
+/* Fallback: timing versi statis (tanpa menunggu morph 3D) */
+.brand-splash.static .brand-splash-name { animation-delay: 0.35s; }
+.brand-splash.static .brand-splash-tag { animation-delay: 0.6s; }
+
+@keyframes splash-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes splash-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes splash-fade-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+/* Reduced-motion global (main.css) memaksa durasi animasi ~0ms;
+   JS sudah memilih mode "static" tanpa canvas — intro tetap tampil
+   sebagai brand intro sederhana lalu hilang. */

@@ -18,6 +18,7 @@
    ============================================================ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import BrandSplash from "@/components/brand/BrandSplash";
 import { getSessionId, setSessionId, clearSessionId } from "@/lib/session";
 import langStats from "@/lib/generated/lang-stats.json";
 
@@ -214,6 +215,9 @@ export default function AuthLanding() {
 
   return (
     <>
+      {/* Brand intro sinematik — sekali per tab, hanya untuk pengunjung baru */}
+      <BrandSplash />
+
       {/* ================= NAVIGASI ================= */}
       <header className="nav" id="top">
         <div className="nav-inner">
