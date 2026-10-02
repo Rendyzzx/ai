@@ -7,11 +7,14 @@
 :root {
   /* Palet netral hangat, solid, satu aksen tenang (tanpa neon/glow).
      Aksen sand-warm menggantikan indigo listrik — kesan companion,
-     bukan dashboard AI. */
-  --bg:         #151413;
-  --surface:    #1b1a18;
-  --surface-2:  #232220;
+     bukan dashboard AI. Permukaan bertingkat: bg < surface < surface-2
+     < surface-3 → tiap lapisan terasa 'di atas' lapisan sebelumnya. */
+  --bg:         #131211;
+  --surface:    #1a1917;
+  --surface-2:  #232119;
+  --surface-3:  #2b2822;
   --border:     #2c2a27;
+  --border-soft: rgba(255, 255, 255, 0.055);
   --text:       #eceae6;
   --text-muted: #a3a099;
   --accent:        #d29763;
@@ -22,18 +25,46 @@
 
   /* Bubble chat: wallpaper sedikit lebih gelap dari chrome agar
      bubble kontras dari kanvas DAN beda warna satu sama lain. */
-  --wallpaper:     #111010;
+  --wallpaper:     #0f0e0d;
   --bubble-bot:    #201f1d;
   --bubble-user:   #43392c;
 
+  /* ---------- SISTEM DEPTH (soft-UI) ----------
+     Dua sisi dari satu bahasa visual:
+     - RAISED (kartu, tombol, bubble): kilau tepi-atas + bayangan
+       lembut multi-layer → terasa 'mengambang, diterangi dari atas'.
+     - INSET (field input, track segmented): bayangan-dalam tipis
+       di tepi atas → terasa 'tercekik ke dalam permukaan'.
+     Bayangan memakai hitam hangat (bukan hitam pekat) dan TIDAK
+     dianimasikan pada elemen besar saat scroll (paint-friendly). */
+  --edge-light: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --edge-light-strong: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --inset-1: inset 0 1px 3px rgba(8, 7, 5, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+
+  --elev-1: 0 1px 2px rgba(8, 7, 5, 0.25), 0 2px 10px rgba(8, 7, 5, 0.16);
+  --elev-2: 0 2px 4px rgba(8, 7, 5, 0.28), 0 8px 24px rgba(8, 7, 5, 0.2);
+  --elev-3: 0 4px 10px rgba(8, 7, 5, 0.32), 0 16px 40px rgba(8, 7, 5, 0.24);
+  --elev-4: 0 8px 18px rgba(8, 7, 5, 0.36), 0 28px 64px rgba(8, 7, 5, 0.3);
+  --accent-lift: 0 2px 10px rgba(210, 151, 99, 0.22);  /* bayangan hangat di bawah tombol aksen */
+
   /* Bentuk & jarak (skala konsisten: 4 / 8 / 12 / 16 / 24) */
   --radius:    12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
   --sidebar-w: 260px;
-  --shadow-1:  0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-1:  var(--elev-2);      /* kompat: pemakaian lama kini berlevel */
 
   /* Tipografi sistem (tanpa webfont = fast loading) */
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
           "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Fokus keyboard yang jelas dan konsisten (aksesibilitas + polish).
+   :focus-visible → hanya muncul untuk navigasi keyboard, tidak
+   mengganggu interaksi sentuh/klik mouse. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 * {
@@ -123,12 +154,17 @@ input, textarea {
   height: 36px;
   border-radius: 10px;
   color: var(--text-muted);
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, transform 0.12s, box-shadow 0.15s;
 }
 
 .icon-btn:hover {
   background: var(--surface-2);
+  box-shadow: var(--edge-light);
   color: var(--text);
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
 }
 
 /* ============================================================
@@ -181,6 +217,7 @@ input, textarea {
   place-items: center;
   background: var(--surface-2);
   border: 1px solid var(--border);
+  box-shadow: var(--edge-light);
   color: var(--text-muted);
 }
 

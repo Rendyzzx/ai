@@ -94,6 +94,8 @@ html, body {
   font-size: 13.5px;
   line-height: 1.5;
   background: var(--bubble-bot);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--edge-light), var(--elev-1);
 }
 
 .mock-msg.user {
@@ -104,6 +106,8 @@ html, body {
 .mock-msg.user span {
   background: var(--bubble-user);
   border-radius: 14px 4px 14px 14px;
+  border-color: rgba(255, 255, 255, 0.07);
+  box-shadow: var(--edge-light-strong), var(--elev-2);
 }
 
 /* Masuk bergilir satu per satu — percakapan terasa hidup & berjalan,
@@ -240,14 +244,15 @@ html, body {
 
 .auth-field input {
   padding: 12px 14px;
-  background: var(--surface);
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--inset-1);           /* field tercekik — kontras dengan tombol terangkat */
   outline: 0;
   width: 100%;
   color: var(--text);
   font-size: 14.5px;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .auth-field input::placeholder {
@@ -257,6 +262,7 @@ html, body {
 
 .auth-field input:focus {
   border-color: var(--accent);
+  box-shadow: var(--inset-1), 0 0 0 3px var(--accent-soft);
 }
 
 /* Error state: border + ikon, tidak hanya warna */
@@ -366,10 +372,11 @@ html, body {
   display: flex;
   align-items: center;
   min-width: 0;
-  background: var(--surface);
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  transition: border-color 0.15s;
+  box-shadow: var(--inset-1);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .verify-row:focus-within {
@@ -450,15 +457,20 @@ html, body {
   font-weight: 600;
   font-size: 15px;
   letter-spacing: -0.005em;
-  transition: background 0.15s, opacity 0.15s;
+  box-shadow: var(--edge-light-strong), var(--accent-lift);
+  transition: background 0.15s, opacity 0.15s, transform 0.12s, box-shadow 0.15s;
 }
 
 .auth-submit:hover:not(:disabled) {
   background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--edge-light-strong), 0 4px 14px rgba(210, 151, 99, 0.3);
 }
 
 .auth-submit:active:not(:disabled) {
   opacity: 0.92;
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--edge-light), 0 1px 4px rgba(210, 151, 99, 0.2);
 }
 
 .auth-submit:disabled {

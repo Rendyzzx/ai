@@ -12,7 +12,10 @@
   gap: 8px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 14px rgba(8, 7, 5, 0.22);   /* lapisan di atas wallpaper */
   flex: none;
+  position: relative;
+  z-index: 2;
 }
 
 .menu-btn {
@@ -114,6 +117,7 @@
   width: 64px;
   height: 64px;
   margin-bottom: 22px;
+  box-shadow: var(--edge-light-strong), var(--elev-3);
 }
 
 .welcome-avatar svg {
@@ -171,19 +175,27 @@
 
 .suggestion {
   padding: 11px 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--edge-light), var(--elev-1);
   font-size: 13.5px;
   color: var(--text-muted);
   text-align: left;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s,
+              box-shadow 0.15s, transform 0.15s;
 }
 
 .suggestion:hover {
   background: var(--surface-2);
   border-color: var(--accent);
   color: var(--text);
+  box-shadow: var(--edge-light-strong), var(--elev-2);
+  transform: translateY(-1px);
+}
+
+.suggestion:active {
+  transform: translateY(0) scale(0.99);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -285,16 +297,22 @@
   padding: 9px 14px;
 }
 
-/* Bubble bot (kiri): "ekor" di pojok dekat avatar (kiri-atas sudut tajam) */
+/* Bubble bot (kiri): "ekor" di pojok dekat avatar (kiri-atas sudut tajam).
+   Kilai tepi-atas + bayangan lembut dua lapis → bubble terasa mengambang
+   lembut di atas wallpaper (soft-UI), bukan kotak tempel. */
 .message-row.assistant .message-content {
   background: var(--bubble-bot);
   border-radius: 4px 14px 14px 14px;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--edge-light), var(--elev-1);
 }
 
-/* Bubble user (kanan): "ekor" di pojok dekat avatar (kanan-atas sudut tajam) */
+/* Bubble user (kanan): warna lebih hangat → bayangan sedikit lebih kuat */
 .message-row.user .message-content {
   background: var(--bubble-user);
   border-radius: 14px 4px 14px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: var(--edge-light-strong), var(--elev-2);
 }
 
 .message-image {
@@ -338,17 +356,26 @@
   padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
+  background: var(--surface-2);
+  box-shadow: var(--edge-light);
   font-size: 12.5px;
   font-weight: 500;
   color: var(--text-muted);
   text-decoration: none;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition: border-color 0.15s, color 0.15s, background 0.15s,
+              box-shadow 0.15s, transform 0.12s;
 }
 
 .img-dl:hover {
   border-color: var(--accent);
   color: var(--text);
-  background: var(--surface-2);
+  background: var(--surface-3);
+  box-shadow: var(--edge-light-strong), var(--elev-1);
+  transform: translateY(-1px);
+}
+
+.img-dl:active {
+  transform: translateY(0) scale(0.97);
 }
 
 .img-dl .icon {
@@ -448,10 +475,11 @@
 .dl-card {
   margin-top: 8px;
   width: min(280px, 100%);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
   padding: 10px;
   background: var(--surface);
+  box-shadow: var(--edge-light), var(--elev-1);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -520,11 +548,20 @@
   color: var(--text);
   text-decoration: none;
   background: var(--surface-2);
-  transition: border-color 0.15s, background 0.15s;
+  box-shadow: var(--edge-light);
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s,
+              transform 0.12s;
 }
 
 .dl-btn:hover {
   border-color: var(--accent);
+  background: var(--surface-3);
+  box-shadow: var(--edge-light-strong), var(--elev-1);
+  transform: translateY(-1px);
+}
+
+.dl-btn:active {
+  transform: translateY(0) scale(0.97);
 }
 
 .dl-btn .icon {
@@ -683,12 +720,14 @@
   padding: 8px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 24px;
-  transition: border-color 0.15s;
+  border-radius: 26px;
+  box-shadow: var(--edge-light), var(--elev-2);   /* pill mengambang di atas kanvas */
+  transition: border-color 0.15s, box-shadow 0.18s;
 }
 
 .composer:focus-within {
   border-color: var(--accent);
+  box-shadow: var(--edge-light-strong), var(--elev-3), 0 0 0 3px var(--accent-soft);
 }
 
 /* Tombol + (lampirkan gambar) — kiri bawah komposer */
@@ -729,7 +768,8 @@
   width: fit-content;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--edge-light), var(--elev-2);
 }
 
 .attach-preview img {
@@ -793,7 +833,19 @@
   place-items: center;
   background: var(--accent);
   color: var(--accent-ink);
-  transition: opacity 0.15s, background 0.15s;
+  box-shadow: var(--edge-light-strong), var(--accent-lift);
+  transition: opacity 0.15s, background 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+
+.send:not(:disabled):hover {
+  background: var(--accent-hover);
+  box-shadow: var(--edge-light-strong), 0 4px 14px rgba(210, 151, 99, 0.3);
+  transform: translateY(-1px);
+}
+
+.send:not(:disabled):active {
+  transform: scale(0.9);
+  box-shadow: var(--edge-light), 0 1px 4px rgba(210, 151, 99, 0.2);
 }
 
 .send .icon {
@@ -848,10 +900,10 @@
   z-index: 80;
   min-width: 172px;
   padding: 5px;
-  background: var(--surface);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--edge-light-strong), var(--elev-4);
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -896,6 +948,7 @@
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 999px;
+  box-shadow: var(--edge-light-strong), var(--elev-3);
   font-size: 12.5px;
   color: var(--text);
   z-index: 80;
@@ -925,6 +978,7 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 10px;
+  box-shadow: var(--inset-1);
   color: var(--text);
   font: inherit;
   font-size: 13.5px;
@@ -933,11 +987,12 @@
   min-height: 58px;
   max-height: 160px;
   outline: 0;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .edit-input:focus {
   border-color: var(--accent);
+  box-shadow: var(--inset-1), 0 0 0 3px var(--accent-soft);
 }
 
 .edit-actions {
@@ -958,10 +1013,17 @@
 .edit-save {
   background: var(--accent);
   color: var(--accent-ink);
+  box-shadow: var(--edge-light-strong), var(--accent-lift);
+  transition: background 0.15s, transform 0.12s, box-shadow 0.15s;
 }
 
 .edit-save:hover {
   background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.edit-save:active {
+  transform: translateY(0) scale(0.96);
 }
 
 .edit-cancel {

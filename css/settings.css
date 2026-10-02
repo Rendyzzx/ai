@@ -83,6 +83,7 @@
 .settings-nav-item.active {
   background: var(--surface-2);
   color: var(--text);
+  box-shadow: var(--edge-light), inset 0 0 0 1px rgba(210, 151, 99, 0.1);
 }
 
 .settings-nav-item .icon {
@@ -224,11 +225,12 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 10px;
+  box-shadow: var(--inset-1);           /* field tercekik ke dalam permukaan */
   outline: 0;
   width: 100%;
   color: var(--text);
   font-size: 14px;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .field textarea {
@@ -242,6 +244,7 @@
 .field textarea:focus,
 .field select:focus {
   border-color: var(--accent);
+  box-shadow: var(--inset-1), 0 0 0 3px var(--accent-soft);
 }
 
 .field-hint {
@@ -280,8 +283,9 @@
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: var(--surface);
+  background: var(--bg);
   border-radius: 10px;
+  box-shadow: var(--inset-1);           /* track: cekungan */
 }
 
 .subnav-item {
@@ -293,12 +297,13 @@
   font-size: 13.5px;
   font-weight: 500;
   color: var(--text-muted);
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
 .subnav-item.active {
   background: var(--surface-2);
   color: var(--text);
+  box-shadow: var(--edge-light), 0 1px 3px rgba(8, 7, 5, 0.3);  /* thumb terangkat dari track */
 }
 
 .bot-page {
@@ -325,22 +330,31 @@
   padding: 6px 12px;
   font-size: 13px;
   color: var(--text-muted);
-  background: transparent;
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
   border-radius: 999px;
+  box-shadow: var(--edge-light);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s,
+              box-shadow 0.15s, transform 0.12s;
 }
 
 .trait-chip:hover {
   border-color: var(--accent);
   color: var(--text);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+.trait-chip:active {
+  transform: translateY(0) scale(0.96);
 }
 
 .trait-chip.active {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-ink);
+  box-shadow: var(--edge-light-strong), var(--accent-lift);
 }
 
 /* ---------------- Memory (hal yang dia ingat) ---------------- */
@@ -370,8 +384,10 @@
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius);
+  box-shadow: var(--edge-light);
   font-size: 13.5px;
 }
 
@@ -444,8 +460,9 @@
   grid-auto-columns: 1fr;
   gap: 4px;
   padding: 4px;
-  background: var(--surface);
+  background: var(--bg);
   border-radius: 10px;
+  box-shadow: var(--inset-1);
 }
 
 .seg-btn {
@@ -462,6 +479,7 @@
 .seg-btn.active {
   background: var(--surface-2);
   color: var(--text);
+  box-shadow: var(--edge-light), 0 1px 3px rgba(8, 7, 5, 0.3);
 }
 
 /* ---------------- Save row & status ---------------- */
@@ -497,11 +515,19 @@
   font-weight: 600;
   font-size: 14px;
   min-height: 44px;
-  transition: background 0.15s;
+  box-shadow: var(--edge-light-strong), var(--accent-lift);
+  transition: background 0.15s, transform 0.12s, box-shadow 0.15s;
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--edge-light-strong), 0 4px 14px rgba(210, 151, 99, 0.3);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--edge-light), 0 1px 4px rgba(210, 151, 99, 0.2);
 }
 
 .btn-primary:disabled {
@@ -547,7 +573,12 @@
   font-size: 14px;
   font-weight: 500;
   color: var(--text);
-  transition: border-color 0.15s, background 0.15s;
+  box-shadow: var(--edge-light);
+  transition: border-color 0.15s, background 0.15s, transform 0.12s, box-shadow 0.15s;
+}
+
+.btn-ghost:active {
+  transform: scale(0.98);
 }
 
 .btn-ghost:hover {
@@ -616,9 +647,17 @@
 
   .settings-nav-item {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
     padding: 14px 14px;
     font-weight: 500;
+    box-shadow: var(--edge-light), var(--elev-1);
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+
+  .settings-nav-item.active {
+    box-shadow: var(--edge-light-strong), var(--elev-2);
+    transform: translateY(-1px);
   }
 
   /* Awal: tampilkan list kategori, konten disembunyikan */
