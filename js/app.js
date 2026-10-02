@@ -106,7 +106,7 @@ export const emit = (name, detail) =>
   bus.dispatchEvent(new CustomEvent(name, { detail }));
 
 export const on = (name, handler) =>
-  bus.addEventListener(name, handler);
+  bus.addEventListener(name, (e) => handler(e.detail));
 
 // ---------------- State global (profil + bot user login) ----------------
 // SATU sumber kebenaran di client — semua component membaca dari sini.
