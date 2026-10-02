@@ -1,0 +1,316 @@
+/* ============================================================
+   Aomi — main.css
+   Token desain, reset, dan kerangka layout.
+
+   Prinsip: permukaan MATTE & FLAT — hierarki dibangun dengan
+   warna latar bertingkat + garis hairline, bukan bayangan.
+   Bayangan hanya untuk elemen yang benar-benar melayang di atas
+   konten (drawer, menu, dialog) — lihat --overlay-shadow.
+   ============================================================ */
+
+:root {
+  /* Palet netral hangat, solid, satu aksen tenang.
+     Permukaan bertingkat: bg < surface < surface-2 < surface-3. */
+  --bg:         #131211;
+  --surface:    #1a1917;
+  --surface-2:  #211f1c;
+  --surface-3:  #2a2723;
+  --border:     #2c2a26;
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --text:       #eae7e2;
+  --text-muted: #a09c94;
+  --accent:        #d29763;
+  --accent-hover:  #dfa877;
+  --accent-ink:    #1d150d;
+  --accent-soft:   #352d24;   /* tint hangat untuk state aktif halus */
+  --danger:     #dd7a5f;
+
+  /* Bubble chat: kanvas sedikit lebih gelap dari chrome agar
+     bubble terbaca dari kanvas DAN beda warna satu sama lain. */
+  --wallpaper:     #0f0e0d;
+  --bubble-bot:    #201f1d;
+  --bubble-user:   #43392c;
+
+  /* SATU bayangan, khusus overlay yang benar-benar melayang
+     (drawer mobile, menu konteks, dialog, toast). Tidak untuk
+     tombol, kartu, bubble, atau field. */
+  --overlay-shadow: 0 12px 32px rgba(6, 5, 4, 0.5), 0 2px 8px rgba(6, 5, 4, 0.35);
+
+  /* Skala bentuk — hanya 3 tingkat + lingkaran (avatar/send):
+     s = chip/tag kecil, 8 = kontrol & field, lg = panel besar. */
+  --radius-s:  6px;
+  --radius:    8px;
+  --radius-lg: 12px;
+
+  --sidebar-w: 262px;
+  --shadow-1: none;   /* kompat legacy: kode lama merujuk token ini */
+
+  /* Tipografi sistem (tanpa webfont = fast loading) */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Fokus keyboard yang jelas dan konsisten (aksesibilitas).
+   :focus-visible → hanya untuk navigasi keyboard. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+html, body {
+  height: 100%;    /* fallback: browser lama yang tak kenal dvh/svh tetap punya tinggi pasti */
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  overflow: hidden;              /* hanya area chat yang scroll — BUKAN page lock */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Catatan: JANGAN pakai `position: fixed` + `overscroll-behavior: none`
+   pada body — kombinasi itu mematikan pull-to-refresh mobile dan membuat
+   halaman terasa terkunci. Anti-rubber-band iOS sudah dicover oleh
+   html/body height:100% + overflow:hidden. */
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* UI chrome tidak bisa diseleksi (efek highlight biru saat tap/geser
+   mengganggu) — tapi ISI PESAN CHAT sengaja TIDAK masuk daftar ini:
+   pengguna tetap bisa memilih & menyalin teks chat (lihat chat.css). */
+button,
+.icon-btn,
+.sidebar,
+.topbar,
+.char-head,
+.app-foot,
+.avatar,
+.brand,
+.side-label,
+.history,
+.h-item,
+.msg-menu,
+.welcome-lines {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Ikon SVG sprite (stroke mengikuti currentColor) */
+.icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Tombol ikon serbaguna — flat: hover/aktif hanya ganti latar & warna.
+   Tidak ada angkat (translate), tidak ada bayangan. */
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  transition: background 0.14s, color 0.14s;
+}
+
+.icon-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.icon-btn:active {
+  background: var(--surface-3);
+}
+
+/* ============================================================
+   Kerangka aplikasi:
+   Desktop  → grid dua kolom (sidebar permanen + area chat)
+   Mobile   → satu kolom, sidebar jadi drawer (lihat sidebar.css)
+   ============================================================ */
+
+.app {
+  height: 100vh;                   /* fallback universal: browser/WebView lama yang tak kenal dvh */
+  height: 100dvh;                  /* lebih akurat: ikut UI browser mobile yang muncul/hilang */
+  height: var(--app-h, 100dvh);    /* paling akurat: disinkronkan JS ke visualViewport (keyboard) */
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (max-width: 1023px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Hormati preferensi pengguna yang mengurangi animasi */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* ============================================================
+   Avatar (dipakai di pesan, sidebar, dan pengaturan)
+   Lingkaran tetap — satu-satunya bentuk bulat di sistem.
+   ============================================================ */
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;             /* cover: potong rapi, tidak gepeng */
+  display: block;
+}
+
+.avatar svg {
+  width: 16px;
+  height: 16px;
+}
+
+.avatar.big {
+  width: 64px;
+  height: 64px;
+}
+
+.avatar.big svg {
+  width: 26px;
+  height: 26px;
+}
+
+.avatar.small {
+  width: 28px;
+  height: 28px;
+}
+
+.avatar.small svg {
+  width: 14px;
+  height: 14px;
+}
+
+
+/* ============================================================
+   Opening animation (#app-intro)
+   Overlay visual di atas aplikasi. Murni CSS transform/opacity;
+   element dihapus dari DOM setelah selesai (lihat inline script).
+   Timing TIDAK boleh berubah: JS fallback setTimeout 1900ms
+   berpasangan dengan intro-out (delay 1s + durasi 0.5s).
+   ============================================================ */
+
+#app-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  animation: intro-out 0.5s cubic-bezier(0.22, 1, 0.36, 1) 1s forwards;
+}
+
+.intro-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 24px;
+}
+
+/* Logo + nama muncul: opacity 0 -> 1, translateY 10px -> 0 */
+.intro-logo {
+  width: 32px;
+  height: 32px;
+  color: var(--accent);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: intro-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+.intro-name {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  animation: intro-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+/* Subtitle kecil: fade pendek setelah nama tampak */
+.intro-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  animation: intro-fade 0.4s ease-out 0.55s both;
+}
+
+@keyframes intro-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes intro-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes intro-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+/* Reduced motion: skip intro sepenuhnya */
+@media (prefers-reduced-motion: reduce) {
+  #app-intro { display: none; }
+}

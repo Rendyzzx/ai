@@ -2,3 +2,5 @@
 .vercel
 node_modules/
 *.log
+.next/
+next-env.d.ts

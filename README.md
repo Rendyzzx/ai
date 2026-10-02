@@ -4,6 +4,18 @@ Aplikasi web chat AI modern dengan sistem login lengkap (register, login,
 logout, remember me, session management, verifikasi manusia, anti brute force),
 dioptimalkan untuk Vercel Serverless. Riwayat percakapan tersimpan per akun.
 
+## Branch `nextjs-migration` — Next.js 15 + TypeScript
+
+Seluruh codebase dipindah ke Next.js (App Router) tanpa mengubah behavior maupun contract API:
+
+- **API**: `app/api/**/route.ts` (handler lama di `api/` tetap ada selama transisi; HAPUS setelah deploy terverifikasi).
+- **Client**: `components/chat`, `components/sidebar`, `components/settings`, `components/auth` (port dari `js/*.js`).
+- **Server libs**: `lib/server/` — `store.ts`, `github.ts`, `auth.ts`, `ratelimit.ts`, `bot-config.ts`.
+- **CSS/assets**: `styles/` + `public/` (file lama dipakai referensi).
+- Session tetap opaque via header `X-Session-Id`; `APP_VERSION` tetap wajib dari Environment Variables.
+
+Deploy di Vercel tidak butuh perubahan env. Lihat `docs/MIGRATION_NOTES.md` untuk detail perbedaan framework.
+
 ## Arsitektur
 
 ```
