@@ -235,25 +235,33 @@ function probeWebgl(): boolean {
   }
 }
 
-export default function BrandSplash() {
+/* onDone: dipanggil tepat sebelum overlay splash memudar, supaya
+   hero landing bisa masuk SEREMBUT dengan fade-out splash —
+   satu pengalaman utuh, bukan dua animasi terpisah. */
+export default function BrandSplash({ onDone }: { onDone?: () => void }) {
   const [mode, setMode] = useState<Mode>("pending");
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
   /* ---- Gate: sekali per tab; skip bila user punya session (akan ke chat) ---- */
   useEffect(() => {
     try {
       if (sessionStorage.getItem(FLAG) === "1") {
         setMode("skip");
+        onDoneRef.current?.();
         return;
       }
       // tandai SEKARANG supaya StrictMode/remount tidak replay
       sessionStorage.setItem(FLAG, "1");
     } catch {
       setMode("skip"); // private mode tanpa storage: lebih baik skip daripada replay tiap load
+      onDoneRef.current?.();
       return;
     }
     if (getSessionId()) {
       setMode("skip");
+      onDoneRef.current?.();
       return;
     }
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -275,6 +283,7 @@ export default function BrandSplash() {
     let resize = () => {};
     let glCtx: WebGLRenderingContext | null = null;
     let timer = 0;
+    let doneTimer = 0;
 
     if (mode === "webgl") {
       const canvas = canvasRef.current;
@@ -364,13 +373,17 @@ export default function BrandSplash() {
       }
 
       timer = window.setTimeout(() => setMode("skip"), DURATION_MS + UNMOUNT_GRACE_MS);
+      // overlay mulai memudar di 2.55s — hero masuk bersamaan (2.6s)
+      doneTimer = window.setTimeout(() => onDoneRef.current?.(), DURATION_MS - 400);
     } else {
       timer = window.setTimeout(() => setMode("skip"), STATIC_MS + 200);
+      doneTimer = window.setTimeout(() => onDoneRef.current?.(), STATIC_MS - 300);
     }
 
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(timer);
+      clearTimeout(doneTimer);
       window.removeEventListener("resize", resize);
       body.classList.remove("splash-on");
       // lepaskan context WebGL (hemat memori setelah intro)

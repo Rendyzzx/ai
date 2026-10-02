@@ -17,7 +17,7 @@
    Login/register logic TIDAK diubah — port dari auth.html + js/auth.js.
    ============================================================ */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import BrandSplash from "@/components/brand/BrandSplash";
 import { getSessionId, setSessionId, clearSessionId } from "@/lib/session";
 import langStats from "@/lib/generated/lang-stats.json";
@@ -50,6 +50,10 @@ function friendlyError(status: number, data: { error?: string }): string {
 
 const LANG_COLORS = ["var(--accent)", "#6f6a56", "#46453d", "var(--border)"];
 
+/* Layout effect isomorfik: jalankan SEBELUM paint di client supaya
+   section [data-reveal] tidak pernah flash terlihat lalu menghilang. */
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 const GOOGLE_ERRORS: Record<string, string> = {
   google_cancelled: "Login Google dibatalkan.",
   google_error: "Gagal masuk dengan Google. Coba lagi.",
@@ -80,6 +84,11 @@ export default function AuthLanding() {
     error: false,
   });
   const redirectingRef = useRef(false);
+
+  // Hero entry — di-set saat splash selesai (BrandSplash.onDone).
+  // Tanpa JS / SSR murni: class tidak pernah ditambah, konten tetap terlihat.
+  const [entered, setEntered] = useState(false);
+  const parallaxRef = useRef<HTMLDivElement>(null);
 
   const registerSectionRef = useRef<HTMLElement>(null);
   const registerTabRef = useRef<HTMLButtonElement>(null);
@@ -121,6 +130,71 @@ export default function AuthLanding() {
         }
       } catch { /* offline: tampilkan halaman login */ }
     })();
+  }, []);
+
+  // ---------------- Scroll reveal: IntersectionObserver ----------------
+  // Section di bawah fold muncul dengan opacity + translateY kecil —
+  // SATU grup per section, bukan tiap card satu-satu (maks stagger 60ms).
+  useIsoLayoutEffect(() => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
+    els.forEach((el) => el.classList.add("revealable"));
+    if (!("IntersectionObserver" in window)) return; // browser tua: langsung terlihat
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("inview");
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -48px 0px" }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  // ---------------- Mouse parallax desktop: sangat halus ----------------
+  // Maksimum pergerakan X ±6px / Y ±4px / rotasi ±0.5deg, dilerp pelan.
+  // Hanya transform (GPU). Mobile / reduced-motion / pointer kasar: mati.
+  useEffect(() => {
+    const el = parallaxRef.current;
+    if (!el) return;
+    const fine = window.matchMedia("(pointer: fine)").matches;
+    const wide = window.matchMedia("(min-width: 901px)").matches;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!fine || !wide || reduced) return;
+
+    let raf = 0;
+    let tx = 0, ty = 0, cx = 0, cy = 0, wrote = false;
+    const onMove = (e: MouseEvent) => {
+      const nx = (e.clientX / window.innerWidth) * 2 - 1; // -1..1
+      const ny = (e.clientY / window.innerHeight) * 2 - 1;
+      tx = nx * 6; // maks ±6px
+      ty = ny * 4; // maks ±4px
+    };
+    const tick = () => {
+      const dx = tx - cx, dy = ty - cy;
+      if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+        cx += dx * 0.07;
+        cy += dy * 0.07;
+        // rotasi ikut arah X saja, maks ±0.48deg
+        el.style.transform =
+          "translate3d(" + cx.toFixed(2) + "px," + cy.toFixed(2) + "px,0) rotate(" +
+          (cx * 0.08).toFixed(3) + "deg)";
+        wrote = true;
+      } else if (wrote) {
+        el.style.transform = "translate3d(0,0,0) rotate(0deg)";
+        wrote = false;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    raf = requestAnimationFrame(tick);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      cancelAnimationFrame(raf);
+    };
   }, []);
 
   // ---------------- Verifikasi angka ----------------
@@ -250,9 +324,11 @@ export default function AuthLanding() {
 
   return (
     <>
-      {/* Brand intro sinematik — sekali per tab, hanya untuk pengunjung baru */}
-      <BrandSplash />
+      {/* Brand intro sinematik — sekali per tab, hanya untuk pengunjung baru.
+          onDone → hero masuk serembut dengan fade-out splash. */}
+      <BrandSplash onDone={() => setEntered(true)} />
 
+      <div className={"landing" + (entered ? " entered" : "")}>
       {/* ================= NAVIGASI ================= */}
       <header className="nav" id="top">
         <div className="nav-inner">
@@ -319,46 +395,45 @@ export default function AuthLanding() {
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </a>
               </div>
-              <div className="hero-tools">
-                <span className="hero-tool-pill">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h16v11H8l-4 3V6z"/></svg>
-                  Ngobrol
-                </span>
-                <span className="hero-tool-pill">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m8 6-6 6 6 6M16 6l6 6-6 6"/></svg>
-                  Coding
-                </span>
-                <span className="hero-tool-pill">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
-                  Edit foto
-                </span>
-                <span className="hero-tool-pill">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><use href="/icons.svg#download" /></svg>
-                  Download TikTok &amp; IG
-                </span>
+            </div>
+
+            {/* Artwork = bagian dari hero, tiga lapis motion ringan:
+                entry (CSS animation) -> parallax desktop (transform via rAF)
+                -> idle float halus (CSS infinite). Tanpa WebGL, tanpa layout props. */}
+            <div className="hero-visual">
+              <div className="hero-visual-move" ref={parallaxRef}>
+                <div className="hero-visual-idle">
+                  <figure className="hero-visual-art" aria-hidden="true">
+                    <img src="/assets/auth-hero.png" alt="" />
+                  </figure>
+                  <div className="hero-chat-card" aria-hidden="true">
+                    <div className="hero-chat-card-head">
+                      <span className="hero-chat-dot"></span>
+                      <span className="hero-chat-card-name">Aomi</span>
+                    </div>
+                    <p className="hero-chat-bubble user">bantu aku bikin caption buat foto ini</p>
+                    <p className="hero-chat-bubble bot">boleh. kirim fotonya, aku liat dulu ya~</p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Artwork sebagai komposisi: crop portrait kecil + kartu chat
-                overlap — bukan poster penuh di bawah teks. */}
-            <div className="hero-visual">
-              <figure className="hero-visual-art" aria-hidden="true">
-                <img src="/assets/auth-hero.png" alt="" />
-              </figure>
-              <div className="hero-chat-card" aria-hidden="true">
-                <div className="hero-chat-card-head">
-                  <span className="hero-chat-dot"></span>
-                  <span className="hero-chat-card-name">Aomi</span>
-                </div>
-                <p className="hero-chat-bubble user">bantu aku bikin caption buat foto ini</p>
-                <p className="hero-chat-bubble bot">boleh. kirim fotonya, aku liat dulu ya~</p>
+            {/* Navigasi fitur ringkas — informasi produk, bukan pill dekoratif.
+                Mobile: muncul SETELAH artwork, mengantar ke section fitur. */}
+            <nav className="hero-feats" aria-label="Yang bisa kamu lakukan">
+              <span className="hero-feats-label">Yang bisa kamu lakukan</span>
+              <div className="hero-feats-items">
+                <a href="#feat-chat">Ngobrol</a>
+                <a href="#feat-coding">Coding</a>
+                <a href="#feat-edit">Edit foto</a>
+                <a href="#feat-tiktok">Download TikTok &amp; Instagram</a>
               </div>
-            </div>
+            </nav>
           </div>
         </section>
 
         {/* ================= YANG BISA KAMU LAKUKAN ================= */}
-        <section className="cando" id="fitur">
+        <section className="cando" id="fitur" data-reveal>
           <div className="section-head">
             <h2>Yang bisa kamu lakukan di Aomi</h2>
             <p>Enam hal ini bisa langsung kamu pakai sekarang.</p>
@@ -366,28 +441,28 @@ export default function AuthLanding() {
 
           {/* Editorial list, hairline per baris — bukan grid kartu */}
           <div className="cando-list">
-            <div className="cando-row">
+            <div className="cando-row" id="feat-chat">
               <h3 className="cando-name">AI Chat</h3>
               <p className="cando-desc">
                 Ngobrol bebas, tanya apa aja, atau brainstorming bareng. Riwayatnya
                 tersimpan di akunmu — bisa dilanjut kapan pun, pindah perangkat juga bisa.
               </p>
             </div>
-            <div className="cando-row">
+            <div className="cando-row" id="feat-coding">
               <h3 className="cando-name">Coding</h3>
               <p className="cando-desc">
                 Tempel kode yang error, minta dijelasin, atau minta dibikinin function.
                 Aomi bantu debug sampai jelas masalahnya di mana.
               </p>
             </div>
-            <div className="cando-row">
+            <div className="cando-row" id="feat-edit">
               <h3 className="cando-name">Edit Foto</h3>
               <p className="cando-desc">
                 Upload gambar, kasih instruksi — perjelas, ganti warna, rapikan.
                 Hasilnya dikirim balik ke chat, tinggal diunduh.
               </p>
             </div>
-            <div className="cando-row">
+            <div className="cando-row" id="feat-tiktok">
               <h3 className="cando-name">Downloader TikTok</h3>
               <p className="cando-desc">
                 Tempel link video atau foto TikTok di chat. Aomi ambil versi unduhnya,
@@ -411,7 +486,7 @@ export default function AuthLanding() {
         </section>
 
         {/* ================= PRATINJAU INTERAKTIF ================= */}
-        <section className="demo" id="tools" aria-label="Pratinjau cara pakai Aomi">
+        <section className="demo" id="tools" aria-label="Pratinjau cara pakai Aomi" data-reveal>
           <div className="section-head">
             <h2>Begini kira-kira cara pakainya.</h2>
             <p>Pilih salah satu, lihat sendiri cara kerjanya.</p>
@@ -528,7 +603,7 @@ export default function AuthLanding() {
         </section>
 
         {/* ================= CODING + DATA PROJECT ================= */}
-        <section className="coding">
+        <section className="coding" data-reveal>
           <div className="coding-grid">
             <div className="coding-copy">
               <h2>Kalau soal coding juga bisa.</h2>
@@ -575,7 +650,7 @@ export default function AuthLanding() {
         </section>
 
         {/* ================= STATUS SISTEM (real-time) ================= */}
-        <section className="status" aria-label="Status sistem Aomi">
+        <section className="status" aria-label="Status sistem Aomi" data-reveal>
           <div className="status-panel">
             <div className="status-head">
               <span className="status-title">
@@ -628,7 +703,7 @@ export default function AuthLanding() {
         </section>
 
         {/* ================= TENTANG ================= */}
-        <section className="about" id="tentang">
+        <section className="about" id="tentang" data-reveal>
           <div className="about-grid">
             <div className="about-copy">
               <h2>Tentang Aomi</h2>
@@ -644,7 +719,7 @@ export default function AuthLanding() {
         </section>
 
         {/* ================= CONTACT AKIRA ================= */}
-        <section className="contact" aria-label="Hubungi Akira">
+        <section className="contact" aria-label="Hubungi Akira" data-reveal>
           <div className="contact-inner">
             <h2>Punya sesuatu buat Aomi?</h2>
             <p>Kalau nemu bug, punya saran, atau mau ngobrol soal Aomi, hubungi Akira.</p>
@@ -656,7 +731,7 @@ export default function AuthLanding() {
         </section>
 
         {/* ================= CTA PENUTUP ================= */}
-        <section className="closing" id="closing">
+        <section className="closing" id="closing" data-reveal>
           <h2>Udah kepikiran mau nanya apa?</h2>
           <p>Gratis buat mulai. Cerita dan riwayatmu tersimpan aman di akunmu.</p>
           <button type="button" className="btn-primary" onClick={gotoRegister}>
@@ -932,6 +1007,7 @@ export default function AuthLanding() {
           </nav>
         </div>
       </footer>
+      </div>
     </>
   );
 }

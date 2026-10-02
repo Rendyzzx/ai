@@ -275,9 +275,13 @@ h1, h2, h3 {
 .hero-grid {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
-  gap: 56px;
+  grid-template-areas:
+    "copy visual"
+    "feats feats";
+  gap: 40px 56px;
   align-items: center;
 }
+.hero-copy { grid-area: copy; }
 
 .hero-title {
   font-size: clamp(32px, 4.2vw, 46px);
@@ -296,29 +300,47 @@ h1, h2, h3 {
   align-items: center;
   gap: 24px;
   flex-wrap: wrap;
-  margin-bottom: 36px;
+  margin-bottom: 0;
 }
 
-/* Strip tool singkat — jawab "Aomi bisa ngapain" dalam 3 detik,
-   tanpa menunggu sampai section fitur. */
-.hero-tools {
+/* Navigasi fitur ringkas: SATU hairline yang menyatukan komposisi
+   hero, teks muted + interpoin — informasi produk, bukan pill berborder.
+   (Mengganti strip pill lama yang terasa generic-AI.) */
+.hero-feats {
+  grid-area: feats;
+  display: flex;
+  align-items: baseline;
+  gap: 8px 24px;
+  flex-wrap: wrap;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.hero-feats-label {
+  color: var(--muted);
+  font-size: 12.5px;
+  flex: none;
+}
+.hero-feats-items {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  align-items: baseline;
+  column-gap: 0;
+  row-gap: 6px;
 }
-.hero-tool-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface);
+.hero-feats-items a {
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.15s;
 }
-.hero-tool-pill svg { width: 14px; height: 14px; color: var(--accent); }
+.hero-feats-items a + a::before {
+  content: "·";
+  margin: 0 11px;
+  color: var(--border);
+  font-weight: 400;
+}
+.hero-feats-items a:hover { color: var(--text); }
 
 /* ---------- Komposisi visual hero: artwork + preview chat ---------- */
 /* Artwork TIDAK lagi jadi poster besar di bawah hero — jadi elemen
@@ -326,11 +348,15 @@ h1, h2, h3 {
    mengambang menutupi sebagian tepinya (overlap, bukan ditumpuk). */
 
 .hero-visual {
+  grid-area: visual;
   position: relative;
-  max-width: 360px;
-  margin: 0 0 0 auto;
+  max-width: 380px;
+  margin: 0 -10px 0 auto; /* sedikit keluar ke kanan — controlled bleed */
   padding-bottom: 56px; /* ruang untuk kartu yang overlap di bawah */
 }
+/* Lapisan motion: move = parallax desktop (transform dari rAF),
+   idle = float pelan. Keduanya hanya transform/opacity — GPU friendly. */
+.hero-visual-move { will-change: transform; }
 
 .hero-visual-art {
   border: 1px solid var(--border);
@@ -1027,9 +1053,27 @@ h1, h2, h3 {
   .nav-right { justify-self: center; margin-left: 0; }
   .nav-burger { justify-self: end; margin-left: 0; }
 
-  .hero { padding: 40px 0 56px; }
-  .hero-grid { grid-template-columns: 1fr; gap: 48px; }
-  .hero-visual { max-width: 320px; margin: 0 auto; }
+  .hero { padding: 36px 0 40px; }
+  .hero-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "copy"
+      "visual"
+      "feats";
+    gap: 36px;
+  }
+  .hero-actions { margin-bottom: 0; }
+  /* Artwork nempel ke tepi kiri layar (bleed 24px = padding halaman) —
+     framing asimetris, kartu chat overlap dari kanan. Bukan poster
+     rapi di tengah. */
+  .hero-visual {
+    max-width: 430px;
+    width: 100%;
+    margin: 0 0 0 -24px;
+    padding-bottom: 52px;
+  }
+  .hero-chat-card { left: auto; right: 16px; }
+  .hero-feats { gap: 6px 20px; padding-top: 16px; }
 
   .personal-grid { grid-template-columns: 1fr; gap: 32px; }
   .personal-panel { max-width: 440px; }
@@ -1050,8 +1094,8 @@ h1, h2, h3 {
   .hero-actions .btn-primary { width: 100%; justify-content: center; }
   .btn-quiet { width: 100%; justify-content: center; }
   .hero-actions { gap: 12px; }
-  .hero-visual { padding-bottom: 48px; }
-  .hero-chat-card { left: 0; width: calc(100% - 32px); max-width: 240px; }
+  .hero-visual { padding-bottom: 46px; }
+  .hero-chat-card { right: 8px; width: calc(100% - 40px); max-width: 240px; }
 
   .cando-row { grid-template-columns: 1fr; gap: 6px; padding: 20px 0; }
   .coding-grid { grid-template-columns: 1fr; gap: 32px; }
@@ -1169,3 +1213,101 @@ body.splash-on { overflow: hidden; }
 /* Reduced-motion global (main.css) memaksa durasi animasi ~0ms;
    JS sudah memilih mode "static" tanpa canvas — intro tetap tampil
    sebagai brand intro sederhana lalu hilang. */
+
+
+/* ============================================================
+   MOTION SYSTEM (lightweight — CSS transform/opacity only)
+   ============================================================ */
+
+/* ---- Hero entry: satu komposisi muncul BERSAMA ----
+   Dipicu class .entered dari BrandSplash.onDone (splash selesai /
+   di-skip). Tanpa JS class tak pernah ditambah → konten tetap
+   terlihat (progressive enhancement). Delay pendek antar elemen
+   (≤80ms) supaya terasa satu kesatuan, bukan tumpukan. */
+@keyframes hero-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes hero-art-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fade-only {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.landing.entered .hero-title   { animation: hero-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.landing.entered .hero-sub     { animation: hero-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) 70ms both; }
+.landing.entered .hero-actions { animation: hero-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both; }
+.landing.entered .hero-visual  { animation: hero-art-in 700ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both; }
+.landing.entered .hero-feats   { animation: hero-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) 190ms both; }
+
+/* ---- Idle float artwork: sangat kecil, cuma bikin terasa hidup ----
+   translateY 0 → -6px → 0, rotasi maks 0.4deg, 6 detik. Satu-satunya
+   animasi infinite di halaman ini. */
+@keyframes art-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-6px) rotate(0.4deg); }
+}
+.hero-visual-idle {
+  animation: art-float 6s ease-in-out 1.2s infinite;
+  will-change: transform;
+}
+
+/* ---- Scroll reveal: satu grup per section ----
+   .revealable ditambah via JS (layout effect, sebelum paint) pada
+   section [data-reveal]; IntersectionObserver menambah .inview.
+   Tanpa JS: section tetap terlihat normal. */
+.revealable {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 550ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 550ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.revealable.inview {
+  opacity: 1;
+  transform: none;
+}
+
+/* Editorial list: section cuma fade; baris-barisnya naik dengan
+   stagger pendek 60ms (≤6 baris → maks +300ms), bukan satu-satu lelet. */
+.cando.revealable { transform: none; }
+.cando.revealable .cando-row {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 500ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cando.revealable.inview .cando-row { opacity: 1; transform: none; }
+.cando.revealable.inview .cando-row:nth-child(2) { transition-delay: 60ms; }
+.cando.revealable.inview .cando-row:nth-child(3) { transition-delay: 120ms; }
+.cando.revealable.inview .cando-row:nth-child(4) { transition-delay: 180ms; }
+.cando.revealable.inview .cando-row:nth-child(5) { transition-delay: 240ms; }
+.cando.revealable.inview .cando-row:nth-child(6) { transition-delay: 300ms; }
+
+/* ---- Reduced motion: entry sederhana (opacity), tanpa parallax
+   dan tanpa float. Konten langsung usable. ---- */
+@media (prefers-reduced-motion: reduce) {
+  .landing.entered .hero-title,
+  .landing.entered .hero-sub,
+  .landing.entered .hero-actions,
+  .landing.entered .hero-feats,
+  .landing.entered .hero-visual {
+    animation: fade-only 250ms ease both;
+    animation-delay: 0s;
+  }
+  .hero-visual-idle { animation: none; }
+  .hero-visual-move { transform: none !important; }
+  .revealable {
+    transform: none;
+    transition: opacity 200ms ease;
+  }
+  .cando.revealable .cando-row {
+    transform: none;
+    transition: opacity 200ms ease;
+  }
+  .cando.revealable.inview .cando-row { transition-delay: 0s; }
+}
