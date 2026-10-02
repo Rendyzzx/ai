@@ -334,7 +334,10 @@ h1, h2, h3 {
   text-decoration: none;
   transition: color 0.15s;
 }
-.hero-feats-items a + a::before {
+/* Separator jadi SUFFIX (bukan prefix) — kalau item terakhir wrap ke
+   baris baru, dia tidak lagi membawa "titik" + margin yang membuat
+   baris baru terlihat miring/tidak sejajar dengan baris pertama. */
+.hero-feats-items a:not(:last-child)::after {
   content: "·";
   margin: 0 11px;
   color: var(--border);
