@@ -1246,11 +1246,12 @@ body.splash-on { overflow: hidden; }
 .landing.entered .hero-feats   { animation: hero-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) 190ms both; }
 
 /* ---- Idle float artwork: sangat kecil, cuma bikin terasa hidup ----
-   translateY 0 → -6px → 0, rotasi maks 0.4deg, 6 detik. Satu-satunya
-   animasi infinite di halaman ini. */
+   translateY 0 → -6px → 0, 6 detik. SATU-SATUNYA animasi infinite
+   di halaman ini. TANPA rotasi: hero visual memuat kartu chat
+   berisi text — rotasi sekecil apa pun bikin text terbaca miring. */
 @keyframes art-float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50%      { transform: translateY(-6px) rotate(0.4deg); }
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
 }
 .hero-visual-idle {
   animation: art-float 6s ease-in-out 1.2s infinite;

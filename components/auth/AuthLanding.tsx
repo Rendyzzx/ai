@@ -172,16 +172,16 @@ export default function AuthLanding() {
       const ny = (e.clientY / window.innerHeight) * 2 - 1;
       tx = nx * 6; // maks ±6px
       ty = ny * 4; // maks ±4px
+      // CATATAN: tanpa rotate — kartu chat berisi text ada di dalam
+      // wrapper ini; rotasi kecil pun bikin text terlihat miring.
     };
     const tick = () => {
       const dx = tx - cx, dy = ty - cy;
       if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
         cx += dx * 0.07;
         cy += dy * 0.07;
-        // rotasi ikut arah X saja, maks ±0.48deg
         el.style.transform =
-          "translate3d(" + cx.toFixed(2) + "px," + cy.toFixed(2) + "px,0) rotate(" +
-          (cx * 0.08).toFixed(3) + "deg)";
+          "translate3d(" + cx.toFixed(2) + "px," + cy.toFixed(2) + "px,0)";
         wrote = true;
       } else if (wrote) {
         el.style.transform = "translate3d(0,0,0) rotate(0deg)";
