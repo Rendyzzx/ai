@@ -3,9 +3,9 @@ import "../../styles/auth.css";
 import AuthLanding from "@/components/auth/AuthLanding";
 
 export const metadata: Metadata = {
-  title: "Aomi — Teman berpikir, kapan pun kamu butuh",
+  title: "Aomi — AI yang siap bantu kapan aja",
   description:
-    "Aomi membantu kamu berpikir, mencari, dan menyelesaikan sesuatu — tanpa membuat semuanya terasa rumit.",
+    "Ngobrol dengan AI, edit foto, dan download video TikTok/Instagram dalam satu tempat.",
   robots: { index: false },
   icons: { icon: { url: "/assets/favicon.svg", type: "image/svg+xml" } },
 };

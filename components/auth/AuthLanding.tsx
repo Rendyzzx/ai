@@ -2,18 +2,40 @@
 
 /* ============================================================
    Aomi — components/auth/AuthLanding.tsx
-   Landing + panel Masuk/Daftar. Port dari auth.html + js/auth.js:
-   precheck session, tab Masuk/Buat akun, verifikasi angka,
-   toggle password, peekaboo, tombol data-goto-register.
+   Landing + panel Masuk/Daftar. Redesign v2 (Okt 2026):
+   - navbar seimbang + drawer mobile (bug lama: semua item desktop
+     dipaksa satu baris di mobile → teks CTA kepotong/tumpang tindih)
+   - hero yang langsung menjelaskan kemampuan Aomi, bukan cuma mood
+   - artwork Aomi jadi elemen komposisi (crop kecil + kartu chat
+     overlap), bukan poster besar di bawah
+   - showcase tools yang BENAR-BENAR ada di backend: AI chat
+     (personality/memory), edit foto, downloader TikTok & Instagram
+   - transparansi teknis: komposisi bahasa dihitung dari repo asli
+     (lib/generated/lang-stats.json, dibuat ulang tiap build — lihat
+     scripts/compute-lang-stats.mjs), status sistem dari /api/status
+     (live, bukan angka karangan)
+   Login/register logic TIDAK diubah — port dari auth.html + js/auth.js.
    ============================================================ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Intro from "@/components/chat/Intro";
 import { getSessionId, setSessionId, clearSessionId } from "@/lib/session";
+import langStats from "@/lib/generated/lang-stats.json";
 
 interface CapData {
   number: string;
   token: string;
+}
+
+interface StatusPayload {
+  status: "operational" | "degraded";
+  checked_at: string;
+  platform: string;
+  runtime: string;
+  region: string;
+  version: string;
+  database: { provider: string; status: "up" | "down"; latency_ms: number };
+  ai_provider: { name: string; configured: boolean };
 }
 
 function friendlyError(status: number, data: { error?: string }): string {
@@ -25,6 +47,8 @@ function friendlyError(status: number, data: { error?: string }): string {
   return "Tidak dapat masuk sekarang. Coba lagi sebentar.";
 }
 
+const LANG_DOT_COLORS = ["var(--accent)", "#6f6a56", "#46453d", "var(--border)"];
+
 export default function AuthLanding() {
   const [panel, setPanel] = useState<"login" | "register">("login");
   const [capLogin, setCapLogin] = useState<CapData | null>(null);
@@ -34,6 +58,13 @@ export default function AuthLanding() {
   const [btnRegister, setBtnRegister] = useState("Buat akun");
   const [busy, setBusy] = useState(false);
   const [peeking, setPeeking] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const [demoTab, setDemoTab] = useState<"chat" | "edit" | "dl">("chat");
+  const [status, setStatus] = useState<{ loading: boolean; data: StatusPayload | null; error: boolean }>({
+    loading: true,
+    data: null,
+    error: false,
+  });
   const redirectingRef = useRef(false);
 
   const registerSectionRef = useRef<HTMLElement>(null);
@@ -73,6 +104,39 @@ export default function AuthLanding() {
     void loadCaptcha("login");
     void loadCaptcha("register");
   }, [loadCaptcha]);
+
+  // ---------------- Status sistem (real, dari /api/status) ----------------
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/status");
+        if (!res.ok) throw new Error("status http " + res.status);
+        const data = (await res.json()) as StatusPayload;
+        if (alive) setStatus({ loading: false, data, error: false });
+      } catch {
+        if (alive) setStatus({ loading: false, data: null, error: true });
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // ---------------- Drawer mobile: scroll-lock SEMENTARA selagi terbuka ----------------
+  useEffect(() => {
+    document.body.classList.toggle("nav-open", navOpen);
+    return () => document.body.classList.remove("nav-open");
+  }, [navOpen]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
 
   const goToApp = () => {
     if (redirectingRef.current) return;
@@ -125,13 +189,23 @@ export default function AuthLanding() {
   };
 
   const gotoRegister = () => {
+    setNavOpen(false);
     showPanel("register");
+    registerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const gotoLogin = () => {
+    setNavOpen(false);
+    showPanel("login");
     registerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const onFieldFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     setPeeking(e.target.type === "password");
   };
+
+  const langTotalKnown = langStats.languages.reduce((sum: number, l: { percent: number }) => sum + l.percent, 0);
+  const langOther = Math.max(0, Math.round((100 - langTotalKnown) * 10) / 10);
 
   return (
     <>
@@ -146,12 +220,40 @@ export default function AuthLanding() {
           </a>
           <nav className="nav-links" aria-label="Navigasi utama">
             <a href="#fitur">Fitur</a>
+            <a href="#tools">Tools</a>
             <a href="#tentang">Tentang</a>
-            <a href="#masuk">Masuk</a>
           </nav>
-          <button type="button" className="btn-primary btn-sm" onClick={gotoRegister}>
-            Mulai dengan Aomi
+          <div className="nav-right">
+            <a className="nav-signin" href="#masuk" onClick={gotoLogin}>Masuk</a>
+            <button type="button" className="btn-primary btn-sm" onClick={gotoRegister}>
+              Mulai ngobrol
+            </button>
+          </div>
+          <button
+            type="button"
+            className="nav-burger"
+            aria-label={navOpen ? "Tutup menu" : "Buka menu"}
+            aria-expanded={navOpen}
+            onClick={() => setNavOpen((v) => !v)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+              {navOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
+            </svg>
           </button>
+        </div>
+
+        <div className={"nav-drawer" + (navOpen ? " open" : "")} role="dialog" aria-modal="true" aria-label="Menu navigasi">
+          <nav className="nav-drawer-links">
+            <a href="#fitur" onClick={() => setNavOpen(false)}>Fitur</a>
+            <a href="#tools" onClick={() => setNavOpen(false)}>Tools</a>
+            <a href="#tentang" onClick={() => setNavOpen(false)}>Tentang</a>
+            <button type="button" onClick={gotoLogin}>Masuk</button>
+            <div className="nav-drawer-cta">
+              <button type="button" className="btn-primary" onClick={gotoRegister}>
+                Mulai ngobrol dengan Aomi
+              </button>
+            </div>
+          </nav>
         </div>
       </header>
 
@@ -160,30 +262,53 @@ export default function AuthLanding() {
         <section className="hero">
           <div className="hero-grid">
             <div className="hero-copy">
-              <p className="hero-kicker">Asisten pribadi, bukan mesin</p>
-              <h1 className="hero-title">Teman berpikir, kapan&nbsp;pun kamu&nbsp;butuh.</h1>
+              <p className="hero-kicker">Asisten pribadi, bukan mesin layanan</p>
+              <h1 className="hero-title">Ngobrol. Bikin. Cari tahu.</h1>
               <p className="hero-sub">
-                Aomi membantu kamu berpikir, mencari, dan menyelesaikan sesuatu —
-                tanpa membuat semuanya terasa rumit.
+                Aomi bisa diajak ngobrol soal apa aja, bantu beresin tulisan atau ide,
+                edit foto, sampai download video TikTok dan Instagram. Tinggal bilang
+                kamu butuh apa.
               </p>
               <div className="hero-actions">
                 <button type="button" className="btn-primary" onClick={gotoRegister}>
-                  Mulai menggunakan Aomi
+                  Mulai ngobrol
                 </button>
-                <a className="btn-quiet" href="#preview">
-                  Lihat cara kerjanya
+                <a className="btn-quiet" href="#fitur">
+                  Lihat fitur
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </a>
               </div>
+              <div className="hero-tools">
+                <span className="hero-tool-pill">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h16v11H8l-4 3V6z"/></svg>
+                  Ngobrol bebas
+                </span>
+                <span className="hero-tool-pill">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
+                  Edit foto
+                </span>
+                <span className="hero-tool-pill">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><use href="/icons.svg#download" /></svg>
+                  Download TikTok &amp; IG
+                </span>
+              </div>
             </div>
 
-            {/* Artwork: crop editorial, desaturasi halus, tepi bawah melebur */}
-            <figure className="hero-art" aria-hidden="true">
-              <div className="hero-art-frame">
-                <img className="hero-art-img" src="/assets/auth-hero.png" alt="" />
+            {/* Artwork sebagai komposisi: crop portrait kecil + kartu chat
+                mengambang overlap di tepinya — bukan poster penuh. */}
+            <div className="hero-visual">
+              <figure className="hero-visual-art" aria-hidden="true">
+                <img src="/assets/auth-hero.png" alt="" />
+              </figure>
+              <div className="hero-chat-card" aria-hidden="true">
+                <div className="hero-chat-card-head">
+                  <span className="hero-chat-dot"></span>
+                  <span className="hero-chat-card-name">Aomi</span>
+                </div>
+                <p className="hero-chat-bubble user">bantu aku bikin caption buat foto ini</p>
+                <p className="hero-chat-bubble bot">boleh. kirim fotonya, aku liat dulu ya~</p>
               </div>
-              <figcaption className="hero-art-caption">Aomi, menunggumu di seberang sini.</figcaption>
-            </figure>
+            </div>
           </div>
         </section>
 
@@ -206,11 +331,11 @@ export default function AuthLanding() {
                 <span className="mock-item-time">Hari ini</span>
               </div>
               <div className="mock-item">
-                <span className="mock-item-title">Ide nama kucing</span>
+                <span className="mock-item-title">Edit foto buat profil</span>
                 <span className="mock-item-time">Minggu</span>
               </div>
               <div className="mock-item">
-                <span className="mock-item-title">Belajar bahasa Jepang</span>
+                <span className="mock-item-title">Download reel buat referensi</span>
                 <span className="mock-item-time">3 Okt</span>
               </div>
             </aside>
@@ -242,8 +367,9 @@ export default function AuthLanding() {
         {/* ================= FITUR ================= */}
         <section className="features" id="fitur">
           <div className="section-head">
-            <h2>Dibuat untuk cara kamu berpikir.</h2>
-            <p>Bukan daftar fitur panjang. Hanya hal-hal yang membuat obrolan terasa enak untuk kembali.</p>
+            <p className="eyebrow" style={{ justifyContent: "center" }}>Yang bisa Aomi bantu</p>
+            <h2>Bukan cuma obrolan.</h2>
+            <p>Empat hal yang paling sering dipakai orang di Aomi.</p>
           </div>
 
           <div className="feature-grid">
@@ -256,24 +382,285 @@ export default function AuthLanding() {
             </div>
             <div className="feature">
               <div className="feature-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M12 8v4l2.5 2.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
               </div>
-              <h3>Ruang untuk berpikir</h3>
-              <p>Tempat tenang untuk memilah pikiran — menulis, bertanya, mencari kata yang tepat, tanpa terasa seperti mengisi formulir.</p>
+              <h3>Edit foto, tinggal bilang maunya gimana</h3>
+              <p>Upload gambar, kasih instruksi (&ldquo;perjelas&rdquo;, &ldquo;ganti warna&rdquo;, &ldquo;rapikan&rdquo;) — Aomi yang proses, hasilnya bisa langsung diunduh.</p>
             </div>
             <div className="feature">
               <div className="feature-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M5 13c0-4 3-6 7-6s7 2 7 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M4 13h16l-1.5 6h-13L4 13z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><use href="/icons.svg#download" /></svg>
               </div>
-              <h3>Bantuan tanpa mengganggu</h3>
-              <p>Aomi menjawab saat diajak dan diam saat tidak. Tidak ada lencana notifikasi yang minta perhatianmu.</p>
+              <h3>Download TikTok &amp; Instagram</h3>
+              <p>Tempel link video atau foto dari TikTok/Instagram di chat, Aomi ambil versi unduhnya buat kamu — video, audio, atau slide foto.</p>
             </div>
             <div className="feature">
               <div className="feature-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M5 5h14M5 10h14M5 15h9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="16.5" cy="18.5" r="1" fill="currentColor"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><use href="/icons.svg#sliders" /></svg>
               </div>
-              <h3>Semua percakapanmu tetap teratur</h3>
-              <p>Riwayat tersimpan rapi per akun. Mudah dicari, mudah dilanjutkan, mudah dilepas saat kamu ingin mulai dari awal.</p>
+              <h3>Karakternya bisa kamu atur</h3>
+              <p>Sifat, gaya bicara, dan hal-hal yang dia ingat tentangmu — semua bisa disetel lewat pengaturan karakter, bukan default yang kaku.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= PRATINJAU INTERAKTIF ================= */}
+        <section className="demo" id="tools" aria-label="Pratinjau cara kerja tools Aomi">
+          <div className="section-head">
+            <p className="eyebrow" style={{ justifyContent: "center" }}>Lebih dari sekadar chatbot</p>
+            <h2>Begini kira-kira cara kerjanya.</h2>
+            <p>Pratinjau singkat tiga hal yang paling sering dipakai di Aomi.</p>
+          </div>
+
+          <div className="demo-tabs" role="tablist" aria-label="Pilih pratinjau tool">
+            <button type="button" role="tab" aria-selected={demoTab === "chat"} className={"demo-tab" + (demoTab === "chat" ? " active" : "")} onClick={() => setDemoTab("chat")}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h16v11H8l-4 3V6z"/></svg>
+              Ngobrol
+            </button>
+            <button type="button" role="tab" aria-selected={demoTab === "edit"} className={"demo-tab" + (demoTab === "edit" ? " active" : "")} onClick={() => setDemoTab("edit")}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
+              Edit Foto
+            </button>
+            <button type="button" role="tab" aria-selected={demoTab === "dl"} className={"demo-tab" + (demoTab === "dl" ? " active" : "")} onClick={() => setDemoTab("dl")}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><use href="/icons.svg#download" /></svg>
+              Downloader
+            </button>
+          </div>
+
+          <div className="demo-stage">
+            <div className="demo-stage-head">
+              <span className="mock-dot" aria-hidden="true" style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)" }}></span>
+              Pratinjau — bukan chat sungguhan
+            </div>
+            <div className="demo-stage-body">
+              {demoTab === "chat" && (
+                <>
+                  <p className="demo-bubble user">lagi overthinking soal kerjaan, bisa nggak sih dibantu urutin pikirannya</p>
+                  <p className="demo-bubble bot">bisa. coba ceritain dari yang paling ganggu dulu, kita beresin satu-satu.</p>
+                </>
+              )}
+              {demoTab === "edit" && (
+                <div className="demo-card">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+                  <div className="demo-card-title">foto.jpg — &ldquo;perjelas &amp; rapikan warnanya&rdquo;</div>
+                  <div className="demo-card-sub">diproses, lalu dikirim balik ke chat buat diunduh</div>
+                </div>
+              )}
+              {demoTab === "dl" && (
+                <div className="demo-dl-row">
+                  <span className="demo-dl-thumb">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                  </span>
+                  <span className="demo-dl-text">
+                    <span className="demo-dl-title">tiktok.com/@...</span>
+                    <span className="demo-dl-sub">video + audio siap diunduh</span>
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ================= PERSONALISASI ================= */}
+        <section className="personal">
+          <div className="personal-grid">
+            <div className="personal-copy">
+              <h2>Aomi bisa menyesuaikan cara ngobrolnya.</h2>
+              <p>
+                Mau yang santai dan jahil, atau tenang dan kalem — tinggal atur
+                di pengaturan karakter. Hal-hal kecil yang kamu certain juga coba
+                diingat Aomi buat obrolan berikutnya.
+              </p>
+              <div className="personal-list">
+                <div className="personal-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><use href="/icons.svg#sliders" /></svg>
+                  <div>
+                    <div className="personal-item-title">Sifat &amp; gaya bicara</div>
+                    <div className="personal-item-sub">Dari tenang sampai jahil, dari singkat sampai ekspresif.</div>
+                  </div>
+                </div>
+                <div className="personal-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>
+                  <div>
+                    <div className="personal-item-title">Memori obrolan</div>
+                    <div className="personal-item-sub">Hal kecil yang kamu certain bisa diingat untuk obrolan selanjutnya.</div>
+                  </div>
+                </div>
+                <div className="personal-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h7M4 12h16M4 19h10"/></svg>
+                  <div>
+                    <div className="personal-item-title">Bahasa &amp; formalitas</div>
+                    <div className="personal-item-sub">Santai atau sedikit lebih sopan — kamu yang nentuin.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="personal-panel" aria-hidden="true">
+              <div className="personal-row">
+                <span className="personal-row-label">Sifat</span>
+                <span className="personal-chip">tenang &amp; perhatian</span>
+              </div>
+              <div className="personal-row">
+                <span className="personal-row-label">Gaya bicara</span>
+                <span className="personal-chip">santai</span>
+              </div>
+              <div className="personal-row">
+                <span className="personal-row-label">Bahasa</span>
+                <span className="personal-chip">Indonesia</span>
+              </div>
+              <div className="personal-row">
+                <span className="personal-row-label">Panjang balasan</span>
+                <span className="personal-chip">ringkas</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= TRANSPARANSI TEKNIS ================= */}
+        <section className="tech">
+          <div className="tech-grid">
+            <div className="tech-copy">
+              <p className="eyebrow">Bukan landing page kosong</p>
+              <h2>Aomi aplikasi yang beneran jalan.</h2>
+              <p>
+                Angka di samping ini dihitung langsung dari kode sumber Aomi
+                saat website ini di-build — bukan ditulis manual. Kalau
+                project-nya berkembang, komposisinya ikut berubah.
+              </p>
+            </div>
+            <div>
+              <div className="lang-bar" role="img" aria-label="Komposisi bahasa kode Aomi">
+                {langStats.languages.map((l: { name: string; percent: number }, i: number) => (
+                  <span
+                    key={l.name}
+                    className="lang-bar-seg"
+                    style={{ width: l.percent + "%", background: LANG_DOT_COLORS[Math.min(i, LANG_DOT_COLORS.length - 1)] }}
+                  />
+                ))}
+                {langOther > 0 && <span className="lang-bar-seg" style={{ width: langOther + "%" }} />}
+              </div>
+              <div className="lang-legend">
+                {langStats.languages.map((l: { name: string; percent: number }, i: number) => (
+                  <div className="lang-legend-row" key={l.name}>
+                    <span className="lang-legend-dot" style={{ background: LANG_DOT_COLORS[Math.min(i, LANG_DOT_COLORS.length - 1)] }}></span>
+                    <span className="lang-legend-name">{l.name}</span>
+                    <span className="lang-legend-pct">{l.percent}%</span>
+                  </div>
+                ))}
+                {langOther > 0 && (
+                  <div className="lang-legend-row">
+                    <span className="lang-legend-dot" style={{ background: "var(--border)" }}></span>
+                    <span className="lang-legend-name">Lainnya</span>
+                    <span className="lang-legend-pct">{langOther}%</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= TOOLS DIRECTORY ================= */}
+        <section className="tools">
+          <div className="section-head">
+            <h2>Tools yang tersedia sekarang.</h2>
+            <p>Tiga kemampuan inti — bakal nambah seiring Aomi berkembang.</p>
+          </div>
+          <div className="tools-grid">
+            <div className="tool-row">
+              <div className="tool-row-head">
+                <span className="tool-row-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M4 6h16v11H8l-4 3V6z"/></svg>
+                </span>
+                <div>
+                  <div className="tool-row-name">AI Chat</div>
+                  <div className="tool-row-cat">Obrolan</div>
+                </div>
+              </div>
+              <p>Ngobrol bebas, tanya sesuatu, atau sekadar cari teman cerita. Konteks obrolan tersimpan per akun.</p>
+            </div>
+            <div className="tool-row">
+              <div className="tool-row-head">
+                <span className="tool-row-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+                </span>
+                <div>
+                  <div className="tool-row-name">Edit Foto</div>
+                  <div className="tool-row-cat">Kreatif</div>
+                </div>
+              </div>
+              <p>Upload gambar dan kasih instruksi — Aomi bantu edit, lalu kirim hasilnya balik untuk diunduh.</p>
+            </div>
+            <div className="tool-row">
+              <div className="tool-row-head">
+                <span className="tool-row-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><use href="/icons.svg#download" /></svg>
+                </span>
+                <div>
+                  <div className="tool-row-name">Downloader</div>
+                  <div className="tool-row-cat">Utilitas</div>
+                </div>
+              </div>
+              <p>Tempel link TikTok atau Instagram, Aomi ambil versi unduhnya — video, audio, atau foto.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= STATUS SISTEM (real-time) ================= */}
+        <section className="status" aria-label="Status sistem Aomi">
+          <div className="status-panel">
+            <div className="status-head">
+              <span className="status-title">
+                <span
+                  className={
+                    "status-dot" +
+                    (status.loading ? "" : status.error || status.data?.status !== "operational" ? " down" : " up")
+                  }
+                  aria-hidden="true"
+                ></span>
+                {status.loading
+                  ? "Mengecek status…"
+                  : status.error
+                  ? "Status tidak dapat diambil"
+                  : status.data?.status === "operational"
+                  ? "Semua sistem normal"
+                  : "Ada gangguan"}
+              </span>
+              <span className="status-label">
+                {status.data ? "Diperbarui " + new Date(status.data.checked_at).toLocaleTimeString("id-ID") : ""}
+              </span>
+            </div>
+            <div className="status-metrics">
+              <div>
+                <div className="status-metric-label">Database</div>
+                <div className={"status-metric-value" + (status.data ? "" : " pending")}>
+                  {status.data ? (status.data.database.status === "up" ? "Operational" : "Gangguan") : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="status-metric-label">Latensi</div>
+                <div className={"status-metric-value" + (status.data ? "" : " pending")}>
+                  {status.data ? status.data.database.latency_ms + " ms" : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="status-metric-label">Region</div>
+                <div className={"status-metric-value" + (status.data ? "" : " pending")}>
+                  {status.data?.region || "—"}
+                </div>
+              </div>
+              <div>
+                <div className="status-metric-label">Versi</div>
+                <div className={"status-metric-value" + (status.data ? "" : " pending")}>
+                  {status.data?.version || "—"}
+                </div>
+              </div>
+            </div>
+            <div className="status-updated">
+              {status.data
+                ? `Platform ${status.data.platform} · ${status.data.runtime} · provider AI ${status.data.ai_provider.name} (${status.data.ai_provider.configured ? "terkonfigurasi" : "belum dikonfigurasi"})`
+                : status.error
+                ? "Tidak bisa menghubungi /api/status sekarang. Coba muat ulang halaman."
+                : "Mengambil data langsung dari server…"}
             </div>
           </div>
         </section>
@@ -297,10 +684,10 @@ export default function AuthLanding() {
 
         {/* ================= CTA PENUTUP ================= */}
         <section className="closing" id="closing">
-          <h2>Mulai percakapan dengan Aomi.</h2>
+          <h2>Udah ada yang mau diobrolin?</h2>
           <p>Gratis untuk dimulai. Cerita dan riwayatmu tersimpan aman di akunmu.</p>
           <button type="button" className="btn-primary" onClick={gotoRegister}>
-            Buat akun
+            Mulai ngobrol dengan Aomi
           </button>
         </section>
 

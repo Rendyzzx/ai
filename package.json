@@ -9,7 +9,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "prebuild": "node scripts/compute-lang-stats.mjs",
+    "predev": "node scripts/compute-lang-stats.mjs"
   },
   "dependencies": {
     "next": "^15.1.6",
