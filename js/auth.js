@@ -25,14 +25,28 @@ function clearSid() {
 const captcha = { login: {}, register: {} };
 
 // ---------------- Session valid di tab ini → langsung buka chat ----------------
+// Redirect GUARDED: maksimal satu navigasi keluar dari halaman ini,
+// tidak peduli berapa banyak trigger (precheck, login, dsb.).
+
+let isRedirecting = false;
+function goToApp() {
+  if (isRedirecting) return;
+  isRedirecting = true;
+  location.replace('/');
+}
 
 (async () => {
   const sid = getSessionId();
-  if (!sid) return;
+  if (!sid) return; // tanpa sid: halaman login TIDAK pernah redirect — tidak ada bounce
   try {
     const res = await fetch('/api/auth/me', { headers: { 'X-Session-Id': sid } });
-    if (res.ok) location.replace('/');
-    else clearSid(); // session sudah invalid → tetap di halaman login
+    if (res.status === 401) {
+      clearSid(); // session memang invalid → tetap di login
+    } else if (res.ok) {
+      goToApp();  // session valid → satu kali ke chat
+    }
+    // status lain (500/429/offline): error sesaat — JANGAN buang sid
+    // yang masih valid; tampilkan form login saja.
   } catch { /* offline: tampilkan halaman login */ }
 })();
 
@@ -144,7 +158,7 @@ async function submitAuth(kind, url, body) {
       // Simpan HANYA session id opaque — bukan password/token/API key.
       // sessionStorage mati saat tab ditutup: tidak ada auth persisten.
       setSessionId(data.session_id);
-      location.replace('/');
+      goToApp(); // SATU kali navigasi ke chat (guarded, tanpa reload loop)
       return;
     }
 

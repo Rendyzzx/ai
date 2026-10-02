@@ -191,36 +191,33 @@ function showBootError() {
 }
 
 async function boot() {
+  // Auth init IDEMPOTENT: hanya sekali per page load, apapun yang
+  // memicunya (DOMContentLoaded, retry, dsb.) — tidak pernah dobel.
+  if (window.APP_INITIALIZED) return;
+  window.APP_INITIALIZED = true;
+
   bindViewport();
 
-  // STEP 0 — tanpa session identifier → langsung login (UI tidak dirender)
+  // STEP 0 — tanpa session identifier → langsung login (UI tidak dirender).
+  // Redirect ini TIDAK bisa memantul balik: auth.html tanpa sid tidak
+  // pernah me-redirect kembali (precheck hanya jalan bila ada sid).
   if (!getSessionId()) {
     location.replace('/auth.html');
     return;
   }
 
-  // STEP 1-3 — validasi versi + session: server sumber kebenaran.
+  // STEP 1-3 — validasi session: SERVER satu-satunya sumber kebenaran.
   // /api/auth/me menolak (401) bila sid salah, session expired, atau
-  // APP_VERSION berbeda (deployment baru → semua user logout).
+  // APP_VERSION beda (deployment baru → session dihancurkan server,
+  // client di-teardown oleh handleAuthInvalid). Versi TIDAK dicek di
+  // client — pengecekan versi lokal hanya menambah jalur redirect
+  // tanpa menghapus sid, dan itu penyebab bounce '/' <-> '/auth.html'.
   let me;
   try {
     const meRes = await api('/api/auth/me');
     me = await meRes.json();
-
-    // STEP 2 — versi klien vs server: clear stale state, ke login
-    const serverVersion = me.app_version;
-    const storedVersion = (() => {
-      try { return localStorage.getItem('aomi.appVersion'); } catch { return null; }
-    })();
-    if (storedVersion && serverVersion && storedVersion !== serverVersion) {
-      resetClientState();
-      try { localStorage.setItem('aomi.appVersion', serverVersion); } catch { /* pv */ }
-      location.replace('/auth.html');
-      return;
-    }
-    if (!storedVersion && serverVersion) {
-      try { localStorage.setItem('aomi.appVersion', serverVersion); } catch { /* pv */ }
-    }
+    // simpan versi hanya untuk info/diagnostik — TIDAK untuk navigasi
+    try { localStorage.setItem('aomi.appVersion', me.app_version || ''); } catch { /* pv */ }
   } catch (err) {
     if (err.message === 'unauthorized') return; // teardown + login berjalan
     showBootError();

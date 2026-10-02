@@ -379,19 +379,29 @@
   <script type="module" src="js/app.js"></script>
 
 <script>
-  // Cleanup intro: satu event animationend + satu fallback timeout,
-  // lalu element dihapus dari DOM. Tidak ada interval yang berjalan.
+  // Opening intro: PURE UI overlay — tidak pernah memicu navigasi/reload/
+  // auth check. Sekali per lifecycle tab (sessionStorage flag) supaya
+  // redirect login->chat tidak memutar intro lagi. Cleanup DOM setelah
+  // selesai; tidak ada interval yang terus berjalan.
   (function () {
     var intro = document.getElementById('app-intro');
     if (!intro) return;
-    var kill = function () { if (intro && intro.parentNode) { intro.remove(); intro = null; } };
+
+    var done = false;
+    try { done = sessionStorage.getItem('aomi.introDone') === '1'; } catch (e) {}
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      kill(); return;
+      done = true; // aksesibilitas: skip animasi
     }
+    if (done) { intro.remove(); return; }
+    try { sessionStorage.setItem('aomi.introDone', '1'); } catch (e) {}
+
+    var kill = function () {
+      if (intro && intro.parentNode) { intro.remove(); intro = null; }
+    };
     intro.addEventListener('animationend', function (e) {
       if (e.animationName === 'intro-out') kill();
     });
-    setTimeout(kill, 3400);
+    setTimeout(kill, 3400); // fallback sekali saja — element dibuang dari DOM
   })();
 </script>
 </body>
