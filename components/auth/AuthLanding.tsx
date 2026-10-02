@@ -78,6 +78,7 @@ export default function AuthLanding() {
   const [busy, setBusy] = useState(false);
   const [peeking, setPeeking] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [showAllFeatures, setShowAllFeatures] = useState(false);
   const [demoTab, setDemoTab] = useState<"chat" | "code" | "edit" | "dl">("chat");
   const [status, setStatus] = useState<{ loading: boolean; data: StatusPayload | null; error: boolean }>({
     loading: true,
@@ -437,7 +438,7 @@ export default function AuthLanding() {
           </div>
 
           {/* Editorial list, hairline per baris — bukan grid kartu */}
-          <div className="cando-list">
+          <div className={"cando-list" + (showAllFeatures ? "" : " cando-list-collapsed")}>
             <div className="cando-row" id="feat-chat">
               <h3 className="cando-name">AI Chat</h3>
               <p className="cando-desc">
@@ -507,6 +508,18 @@ export default function AuthLanding() {
               </p>
             </div>
           </div>
+
+          {!showAllFeatures && (
+            <button
+              type="button"
+              className="cando-more"
+              onClick={() => setShowAllFeatures(true)}
+              aria-expanded={showAllFeatures}
+            >
+              <span>Lihat semua fitur</span>
+              <svg className="icon"><use href="/icons.svg#chevron-down" /></svg>
+            </button>
+          )}
         </section>
 
         {/* ================= PRATINJAU INTERAKTIF ================= */}

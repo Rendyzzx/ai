@@ -391,6 +391,26 @@ h1, h2, h3 {
 }
 .cando-desc { color: var(--text-muted); font-size: 14.5px; }
 
+/* Collapsed: cuma 3 baris pertama kelihatan, sisanya disembunyikan */
+.cando-list-collapsed .cando-row:nth-child(n+4) { display: none; }
+
+.cando-more {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 28px auto 0;
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease;
+}
+.cando-more:hover { color: var(--text); border-color: var(--text-muted); }
+.cando-more .icon { width: 16px; height: 16px; display: block; }
+
 /* ---------- Pratinjau interaktif tools ---------- */
 
 .demo { padding: 96px 0; border-top: 1px solid var(--border); }
