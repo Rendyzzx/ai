@@ -27,7 +27,8 @@ const SettingsView = dynamic(() => import("@/components/settings/SettingsView"),
   ssr: false,
   loading: () => <div className="chat-gate" aria-hidden="true" />,
 });
-import { fileOf, dlOf, musicOf, hdOf, matchMusicRequest, matchImageGenRequest, matchHdRequest, EDIT_API, EDIT_BROWSER_TIMEOUT, EDIT_RESULT_MAX, EDIT_TRIGGER_RE, matchDlTarget, IMG_GEN_API, IMG_GEN_TIMEOUT } from "@/lib/chat-utils";
+import { fileOf, dlOf, musicOf, hdOf, matchMusicRequest, matchImageGenRequest, matchHdRequest, EDIT_API, EDIT_BROWSER_TIMEOUT, EDIT_RESULT_MAX, EDIT_TRIGGER_RE, matchDlTarget, IMG_GEN_API, IMG_GEN_TIMEOUT, HD_TRIGGER_RE } from "@/lib/chat-utils";
+import { isVideoFile, uploadVideo, extractVideoFrames } from "@/lib/video";
 import { useMusic } from "@/components/music/MusicProvider";
 import { applyAllVisualPrefs, usePref } from "@/lib/prefs";
 import type { BotConfig, ChatResponse, Conversation, ConversationItem, Message, UserProfile } from "@/types";
@@ -70,6 +71,17 @@ interface PendingImage {
   thumb: string;
 }
 
+interface PendingVideo {
+  id: string;
+  name: string;
+  size: number;
+  status: "uploading" | "ready" | "error";
+  progress: number; // 0..1
+  url?: string;
+  frames: string[];
+  poster: string | null;
+}
+
 export default function ChatApp() {
   const { playMusic } = useMusic();
   const [boot, setBoot] = useState<Boot>("loading");
@@ -85,6 +97,7 @@ export default function ChatApp() {
 
   const [indicator, setIndicator] = useState<Indicator>(null);
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  const [pendingVideo, setPendingVideo] = useState<PendingVideo | null>(null);
   const [input, setInput] = useState("");
   const [nearBottom, setNearBottom] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -620,7 +633,13 @@ export default function ChatApp() {
     async (rawText: string) => {
       const text = sanitizeText(rawText, 4000);
       const img = pendingImage;
-      if ((!text && !img) || loadingRef.current) return;
+      const vid = pendingVideo;
+      if ((!text && !img && !vid) || loadingRef.current) return;
+      if (vid && vid.status === "uploading") {
+        pushError("Video masih diunggah nih, tunggu sebentar ya~");
+        return;
+      }
+      const vidReady = vid && vid.status === "ready" && vid.url ? vid : null;
 
       loadingRef.current = true;
       setInput("");
@@ -631,21 +650,24 @@ export default function ChatApp() {
         role: "user",
         content: text,
         image: img?.thumb || undefined,
+        video: vidReady && vidReady.url ? { url: vidReady.url, name: vidReady.name } : undefined,
         timestamp: new Date().toISOString(),
       };
       pushMessages([optimistic]);
       setPendingImage(null);
+      setPendingVideo(null);
 
       // Indikator: edit foto → label khusus; downloader → label file
-      const wantsGen = !img && !!matchImageGenRequest(text);
-      const wantsHd = !img && !wantsGen && !!matchHdRequest(text);
+      const wantsGen = !img && !vid && !!matchImageGenRequest(text);
+      const wantsHdVideo = !!(vidReady && HD_TRIGGER_RE.test(text));
+      const wantsHd = !img && !vid && !wantsGen && !!matchHdRequest(text);
       const wantsEdit = !!(img && text && EDIT_TRIGGER_RE.test(text));
-      const wantsMusic = !img && !wantsGen && !wantsHd && !wantsEdit && !!matchMusicRequest(text);
-      const wantsDl = !img && !wantsGen && !wantsHd && !wantsEdit && !wantsMusic && !!matchDlTarget(text);
+      const wantsMusic = !img && !vid && !wantsGen && !wantsHd && !wantsEdit && !!matchMusicRequest(text);
+      const wantsDl = !img && !vid && !wantsGen && !wantsHd && !wantsEdit && !wantsMusic && !!matchDlTarget(text);
       setIndicator(
         wantsGen
           ? "generating"
-          : wantsHd
+          : wantsHd || wantsHdVideo
             ? "hdvid"
             : wantsEdit
               ? "editing"
@@ -665,6 +687,12 @@ export default function ChatApp() {
             conversation_id: currentIdRef.current,
             message: text,
             ...(img ? { image: img.dataUrl, thumb: img.thumb } : {}),
+            ...(vidReady
+              ? {
+                  video: { url: vidReady.url, name: vidReady.name, size: vidReady.size },
+                  ...(wantsHdVideo ? {} : { frames: vidReady.frames }),
+                }
+              : {}),
           }),
         });
         const data = (await res.json().catch(() => null)) as ChatResponse | null;
@@ -760,7 +788,7 @@ export default function ChatApp() {
         loadingRef.current = false;
       }
     },
-    [pendingImage, pushMessages, refreshSidebar, runEditJob, scrollToBottom, persistEditThumb, playMusic]
+    [pendingImage, pendingVideo, pushMessages, refreshSidebar, runEditJob, scrollToBottom, persistEditThumb, playMusic]
   );
 
   /* ---------------- Aksi pesan ---------------- */
@@ -1039,6 +1067,7 @@ export default function ChatApp() {
         dl={dlOf(m)}
         music={musicOf(m)}
         hd={hdOf(m)}
+        video={m.video || null}
         sid={sid}
         userAvatar={user.avatar}
         botAvatar={bot.bot_avatar}
@@ -1244,6 +1273,37 @@ export default function ChatApp() {
                 <span className="attach-hint">Gambar siap dikirim</span>
               </div>
             )}
+            {pendingVideo && (
+              <div className="attach-preview attach-preview-video">
+                <img
+                  src={pendingVideo.poster || undefined}
+                  alt=""
+                  className="attach-video-thumb"
+                  onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden"; }}
+                />
+                <button
+                  className="attach-remove"
+                  type="button"
+                  aria-label="Hapus video"
+                  onClick={() => setPendingVideo(null)}
+                >
+                  <svg className="icon" aria-hidden="true"><use href="/icons.svg#close" /></svg>
+                </button>
+                <div className="attach-video-meta">
+                  <span className="attach-video-name">{pendingVideo.name}</span>
+                  {pendingVideo.status === "uploading" && (
+                    <span className="attach-video-progress">
+                      <span className="attach-video-bar">
+                        <span className="attach-video-bar-fill" style={{ width: Math.round(pendingVideo.progress * 100) + "%" }} />
+                      </span>
+                      Mengunggah {Math.round(pendingVideo.progress * 100)}%
+                    </span>
+                  )}
+                  {pendingVideo.status === "ready" && <span className="attach-hint">Video siap dikirim</span>}
+                  {pendingVideo.status === "error" && <span className="attach-video-err">Gagal — coba upload ulang</span>}
+                </div>
+              </div>
+            )}
             <form
               className="composer"
               onSubmit={(e) => {
@@ -1254,20 +1314,56 @@ export default function ChatApp() {
               <button
                 className="attach"
                 type="button"
-                aria-label="Lampirkan gambar"
+                aria-label="Lampirkan gambar atau video"
                 onClick={() => fileRef.current?.click()}
               >
                 <svg className="icon" aria-hidden="true"><use href="/icons.svg#plus" /></svg>
               </button>
               <input
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
+                accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
                 hidden
                 ref={fileRef}
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   e.target.value = "";
                   if (!file) return;
+                  if (isVideoFile(file)) {
+                    if (file.size > 50 * 1024 * 1024) {
+                      pushError("Video maksimal 50MB ya.");
+                      return;
+                    }
+                    const id = Math.random().toString(36).slice(2);
+                    setPendingVideo({
+                      id,
+                      name: file.name,
+                      size: file.size,
+                      status: "uploading",
+                      progress: 0,
+                      frames: [],
+                      poster: null,
+                    });
+                    // frame diekstrak paralel dengan upload
+                    void extractVideoFrames(file).then(({ frames, poster }) => {
+                      setPendingVideo((v) => (v && v.id === id ? { ...v, frames, poster } : v));
+                    });
+                    try {
+                      const url = await uploadVideo(file, (r) => {
+                        setPendingVideo((v) => (v && v.id === id ? { ...v, progress: r } : v));
+                      });
+                      setPendingVideo((v) =>
+                        v && v.id === id ? { ...v, status: "ready", url } : v
+                      );
+                    } catch (err) {
+                      setPendingVideo((v) =>
+                        v && v.id === id
+                          ? { ...v, status: "error" }
+                          : v
+                      );
+                      pushError((err as Error).message || "Gagal mengunggah video. Coba lagi ya.");
+                    }
+                    return;
+                  }
                   if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) return;
                   try {
                     const dataUrl = await compressImage(file, 1024, 0.82);
@@ -1307,7 +1403,11 @@ export default function ChatApp() {
                 className="send"
                 type="submit"
                 aria-label="Kirim"
-                disabled={loadingRef.current || (!input.trim() && !pendingImage)}
+                disabled={
+                  loadingRef.current ||
+                  (!input.trim() && !pendingImage && !pendingVideo) ||
+                  pendingVideo?.status === "uploading"
+                }
               >
                 <svg className="icon" aria-hidden="true"><use href="/icons.svg#send" /></svg>
               </button>

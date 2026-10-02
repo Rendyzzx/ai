@@ -347,6 +347,7 @@ export default function MessageRow({
   dl,
   music,
   hd,
+  video,
   sid,
   userAvatar,
   botAvatar,
@@ -371,6 +372,7 @@ export default function MessageRow({
   dl?: DlCard | null;
   music?: MusicCard | null;
   hd?: HdCard | null;
+  video?: { url: string; name: string } | null;
   sid: string | null;
   userAvatar: string | null;
   botAvatar: string | null;
@@ -406,6 +408,15 @@ export default function MessageRow({
             src={imageUrl}
             alt="Gambar terlampir"
             loading="lazy"
+          />
+        )}
+        {video && video.url && (
+          <video
+            className="message-video"
+            src={video.url}
+            controls
+            playsInline
+            preload="metadata"
           />
         )}
         {content ? (

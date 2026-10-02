@@ -18,6 +18,7 @@ export interface Message {
   dl?: DlCard | null;            // kartu downloader TikTok/IG
   music?: MusicCard | null;      // kartu lagu (mode musik)
   hd?: HdCard | null;           // kartu HD video (mode upgrade)
+  video?: { url: string; name: string } | null; // video hasil upload (pesan user)
   timestamp: string;
 }
 
@@ -132,6 +133,7 @@ export interface ChatResponse {
   imggen_job?: { prompt: string };
   hd?: HdCard;
   image_url?: string;
+  video?: { url: string; name: string };
   image_name?: string;
   expires_at?: string;
   dl?: DlCard;

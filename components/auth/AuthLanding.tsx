@@ -442,8 +442,9 @@ export default function AuthLanding() {
             <div className="cando-row" id="feat-chat">
               <h3 className="cando-name">AI Chat</h3>
               <p className="cando-desc">
-                Ngobrol bebas, tanya apa aja, atau brainstorming bareng. Riwayatnya
-                tersimpan di akunmu — bisa dilanjut kapan pun, pindah perangkat juga bisa.
+                Ngobrol bebas, tanya apa aja, atau brainstorming bareng. Kirim gambar
+                atau video, Aomi bisa melihat isinya. Riwayatnya tersimpan di akunmu —
+                bisa dilanjut kapan pun, pindah perangkat juga bisa.
               </p>
             </div>
             <div className="cando-row" id="feat-coding">
@@ -472,10 +473,10 @@ export default function AuthLanding() {
             <div className="cando-row" id="feat-hd">
               <h3 className="cando-name">HD Video</h3>
               <p className="cando-desc">
-                Kirim link video terus bilang &ldquo;hdkan&rdquo; —
-                videonya ditingkatin jadi kualitas HD. Prosesnya jalan
-                otomatis, kartu di chat update sendiri begitu hasilnya
-                siap diunduh.
+                Kirim link video ATAU upload langsung dari galerimu, terus
+                bilang &ldquo;hdkan&rdquo; — videonya ditingkatin jadi
+                kualitas HD. Prosesnya jalan otomatis, kartu di chat update
+                sendiri begitu hasilnya siap diunduh.
               </p>
             </div>
             <div className="cando-row" id="feat-tiktok">

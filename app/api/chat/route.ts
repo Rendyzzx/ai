@@ -13,9 +13,10 @@ import { DEFAULT_BOT } from "@/lib/server/bot-config";
 import { getSession } from "@/lib/server/auth";
 import { allowUser } from "@/lib/server/ratelimit";
 import { json, readBody, forbidden, originOk } from "@/lib/server/http";
-import { matchMusicRequest, matchImageGenRequest, matchHdRequest } from "@/lib/chat-utils";
+import { matchMusicRequest, matchImageGenRequest, matchHdRequest, HD_TRIGGER_RE } from "@/lib/chat-utils";
 import { resolveMusicCard, MusicError } from "@/lib/server/music";
 import { submitHdJob, HdError } from "@/lib/server/hdvid";
+import { UPLOAD_HOST_RE } from "@/lib/server/uup";
 import type { BotConfig, Conversation, ConversationItem, DlCard, HdCard, Message } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -247,21 +248,48 @@ async function geminiGetCookie(): Promise<string> {
   return cookie;
 }
 
-// Upload gambar ke Google (content-push) → media key (tanpa cookie akun).
+// Upload file (gambar/frame video) ke Google content-push → media key.
+// Tanpa cookie akun. Flow 2026: POST start (dapat upload URL) lalu
+// POST bytes (upload, finalize). Nama file ikut dikirim di body start.
+const UPLOAD_BASIC = "c2F2ZXM6cyNMdGhlNmxzd2F2b0RsN3J1d1U=";
+const UPLOAD_PUSH_ID = "feeds/mcudyrk2a4khkz";
+
 async function uploadImageGemini(buffer: Buffer, name: string): Promise<string> {
-  const res = await fetchT("https://content-push.upload.googleapis.com/", {
+  const baseHeaders: Record<string, string> = {
+    "authorization": "Basic " + UPLOAD_BASIC,
+    "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+    "origin": "https://gemini.google.com",
+    "referer": "https://gemini.google.com/",
+    "push-id": UPLOAD_PUSH_ID,
+    "x-goog-upload-protocol": "resumable",
+    "x-goog-upload-command": "start",
+    "x-tenant-id": "bard-storage",
+    "user-agent": UA,
+    "x-goog-upload-header-content-length": String(buffer.length),
+    "size": String(buffer.length),
+  };
+
+  // Langkah 1: minta upload URL
+  const startRes = await fetchT("https://content-push.googleapis.com/upload/", {
+    method: "POST",
+    headers: baseHeaders,
+    body: "File name: " + name,
+  }, LIMITS.geminiTimeout);
+  const uploadUrl = startRes.headers.get("x-goog-upload-url") || "";
+  if (!uploadUrl) throw new Error("upload url kosong (" + startRes.status + ")");
+
+  // Langkah 2: dorong bytes → media key
+  const res = await fetchT(uploadUrl, {
     method: "POST",
     headers: {
-      "X-Goog-Upload-Command": "upload, finalize",
-      "X-Goog-Upload-Offset": "0",
-      "X-Tenant-Id": "gemini",
-      "user-agent": UA,
-      "content-type": "image/jpeg",
+      ...baseHeaders,
+      "x-goog-upload-command": "upload, finalize",
+      "x-goog-upload-offset": "0",
     },
     body: new Uint8Array(buffer),
   }, LIMITS.geminiTimeout);
   const key = res.text.trim();
-  if (!key) throw new Error("media key kosong");
+  if (!key || key.length > 200) throw new Error("media key kosong");
   return key;
 }
 
@@ -338,6 +366,8 @@ interface ChatInput {
   imageBuffer: Buffer | null;
   imageName: string | null;
   imageDataUrl?: string | null;
+  frameBuffers?: Buffer[];   // frame video (dataURL dari client)
+  videoInfo?: { name: string; size: number } | null;
 }
 
 async function chatGemini(
@@ -350,23 +380,43 @@ async function chatGemini(
 
   if (!cookie) cookie = await geminiGetCookie();
 
-  // Lampiran gambar (Gemini vision): upload → media key → posisi 4 pada
-  // array pesan. Gagal upload → chat tetap jalan teks saja (graceful).
+  // Lampiran (Gemini vision): upload → media key → posisi 4 pada array
+  // pesan. Gambar tunggal ATAU beberapa frame video. Gagal upload →
+  // chat tetap jalan teks saja (graceful).
   const firstMsg: unknown[] = [input.message, 0, null, null, null, null, 0];
-  if (input.imageBuffer) {
-    try {
+  const attachments: Array<[[string, number], string]> = [];
+  const notes: string[] = [];
+  try {
+    if (input.imageBuffer) {
       const key = await uploadImageGemini(input.imageBuffer, input.imageName || "image.jpg");
-      firstMsg[3] = [[[key, 1], input.imageName || "image.jpg"]];
-    } catch (err) {
-      console.error("[chat] upload gambar gemini:", (err as Error).message);
-      input = {
-        ...input,
-        message:
-          input.message +
-          "\n(pengguna mengirim gambar, tapi gagal dilampirkan — jawab dari konteks teks saja)",
-      };
-      firstMsg[0] = input.message;
+      attachments.push([[key, 1], input.imageName || "image.jpg"]);
     }
+    for (let i = 0; i < (input.frameBuffers?.length || 0); i++) {
+      const frame = input.frameBuffers![i];
+      const fname = "frame-" + (i + 1) + ".jpg";
+      const key = await uploadImageGemini(frame, fname);
+      attachments.push([[key, 1], fname]);
+    }
+    if (attachments.length) firstMsg[3] = attachments;
+    if (input.frameBuffers?.length) {
+      notes.push(
+        "pengguna mengirim video: '" + (input.videoInfo?.name || "video") + "' " +
+        (input.videoInfo ? Math.round(input.videoInfo.size / 1024) + "KB" : "") +
+        ". Lampiran gambar berikut adalah FRAME-FRAME dari video itu " +
+        "(berurutan dari awal ke akhir video) — perlakukan sebagai isi videonya."
+      );
+    }
+  } catch (err) {
+    console.error("[chat] upload lampiran gemini:", (err as Error).message);
+    notes.push(
+      input.frameBuffers?.length
+        ? "(pengguna mengirim video, tapi lampirannya gagal dikirim — jawab dari konteks teks saja)"
+        : "(pengguna mengirim gambar, tapi gagal dilampirkan — jawab dari konteks teks saja)"
+    );
+  }
+  if (notes.length) {
+    input = { ...input, message: input.message + "\n(" + notes.join(" ") + ")" };
+    firstMsg[0] = input.message;
   }
 
   // Google menolak thread setelah ada giliran bergambar (BardErrorInfo 1097)
@@ -571,8 +621,41 @@ export async function POST(req: Request) {
     return json({ error: "Format gambar tidak didukung. Gunakan PNG, JPG, WebP, atau GIF." }, 400);
   }
 
-  // Pesan boleh kosong kalau ada gambar
-  if (!message && !greeting && !imageBuffer) {
+  // Video (opsional): URL hasil upload via /api/vupload + frame untuk
+  // AI vision. URL hanya boleh dari uguu (hosting milik flow ini) —
+  // server tidak pernah fetch URL asing dari sini (anti SSRF).
+  let videoInfo: { url: string; name: string; size: number } | null = null;
+  if (body.video && typeof body.video === "object") {
+    const v = body.video as { url?: unknown; name?: unknown; size?: unknown };
+    const url = String(v.url || "");
+    if (!UPLOAD_HOST_RE.test(url)) {
+      return json({ error: "URL video tidak valid. Upload ulang videonya ya." }, 400);
+    }
+    videoInfo = {
+      url,
+      name: sanitize(v.name, 80) || "video.mp4",
+      size: Math.max(0, Number(v.size) || 0),
+    };
+  }
+
+  // Frame video (opsional): maksimal 6 gambar JPEG hasil ekstraksi
+  // di browser — ini "mata" AI untuk video (upload video langsung ke
+  // Gemini butuh akun login, jadi kirim frame saja).
+  const frameBuffers: Buffer[] = [];
+  if (Array.isArray(body.frames)) {
+    for (const f of (body.frames as unknown[]).slice(0, 6)) {
+      if (frameBuffers.length >= 6) break;
+      if (typeof f !== "string") continue;
+      const m = f.match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
+      if (!m) continue;
+      const buf = Buffer.from(m[1], "base64");
+      if (buf.length > 1_500_000) continue; // per frame maks ~1.5MB
+      frameBuffers.push(buf);
+    }
+  }
+
+  // Pesan boleh kosong kalau ada gambar / video
+  if (!message && !greeting && !imageBuffer && !videoInfo) {
     return json({ error: "Pesan tidak valid" }, 400);
   }
 
@@ -1036,11 +1119,74 @@ export async function POST(req: Request) {
     }
   }
 
+  // ---------------- MODE HD VIDEO UPLOAD (hdkan video yang diupload) ----------------
+  // Pengguna upload video lewat composer lalu bilang "hdkan" (tanpa
+  // link — URL sudah ada dari /api/vupload). Alur kartu sama persis
+  // dengan mode HD berbasis link.
+  if (videoInfo && message && HD_TRIGGER_RE.test(message)) {
+    if (!allowUser("chathd", uid, req, 4, 60_000)) {
+      return json({ error: "Sabar, video sebelumnya masih diproses. Coba lagi sebentar." }, 429);
+    }
+
+    let job: { job_id: string };
+    try {
+      job = await submitHdJob(videoInfo.url);
+    } catch (err) {
+      const code = err instanceof HdError ? err.code : "UPSTREAM";
+      console.error("[chat] hd upload gagal (" + code + "):", (err as Error).message);
+      return json({ error: "Videonya gak bisa diproses jadi HD. Coba lagi ya." }, 502);
+    }
+
+    const card: HdCard = {
+      job_id: job.job_id,
+      state: "pending",
+      source_url: videoInfo.url,
+      quality: "HD",
+    };
+    const replyText =
+      "oke, videonya lagi ditingkatin ke HD nih~ prosesnya biasanya beberapa puluh detik, kartunya bakal update sendiri pas hasilnya siap.";
+    const userMessageId = crypto.randomUUID();
+    const assistantMessageId = crypto.randomUUID();
+    conv.messages.push(
+      {
+        message_id: userMessageId,
+        role: "user",
+        content: message,
+        video: { url: videoInfo.url, name: videoInfo.name },
+        timestamp: now,
+      },
+      { message_id: assistantMessageId, role: "assistant", content: replyText, hd: card, timestamp: now }
+    );
+    if (conv.title === "Chat baru") conv.title = "Video HD";
+    conv.updated_at = now;
+
+    await Promise.all([
+      putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, "hd append"),
+      touchIndex(uid, {
+        conversation_id: conv.conversation_id,
+        title: conv.title,
+        updated_at: conv.updated_at,
+      }),
+    ]);
+
+    return json({
+      text: replyText,
+      user_message_id: userMessageId,
+      assistant_message_id: assistantMessageId,
+      conversation_id: conv.conversation_id,
+      title: conv.title,
+      provider: "faa-hd",
+      bot_name: bot.bot_name,
+      hd: card,
+      video: { url: videoInfo.url, name: videoInfo.name },
+    });
+  }
+
   // ---------------- MODE HD VIDEO (submit job) ----------------
   // "hdkan <link video>" -> submit job ke API faa, simpan kartu HD
   // (state pending) di pesan assistant, balas cepat. Client polling
   // /api/hd?action=poll sampai "done" -> tombol unduh muncul.
-  if (!imageBuffer && message) {
+  if (!imageBuffer && !videoInfo && message) {
     const hdUrl = matchHdRequest(message);
     if (hdUrl) {
       if (!allowUser("chathd", uid, req, 4, 60_000)) {
@@ -1234,12 +1380,14 @@ export async function POST(req: Request) {
 
   // ---------------- MODE CHAT NORMAL ----------------
   const input: ChatInput = {
-    message: message || "(aku baru kirim gambar ke kamu)",
+    message: message || (videoInfo ? "(aku baru kirim video ke kamu)" : "(aku baru kirim gambar ke kamu)"),
     geminiSessionId: conv.geminiSessionId || null,
     messages: conv.messages,
     imageBuffer,
     imageName: imageBuffer ? imageName : null,
     imageDataUrl: imageBuffer ? imageDataUrl : null,
+    frameBuffers,
+    videoInfo: videoInfo ? { name: videoInfo.name, size: videoInfo.size } : null,
   };
   const { reply, provider, geminiSid: newGeminiSid } = await askProviders(input, instruction);
 
@@ -1256,6 +1404,7 @@ export async function POST(req: Request) {
       role: "user",
       content: message,
       image: imageBuffer ? imageThumb || imageDataUrl || undefined : undefined,
+      video: videoInfo ? { url: videoInfo.url, name: videoInfo.name } : undefined,
       timestamp: now,
     },
     { message_id: assistantMessageId, role: "assistant", content: reply, timestamp: now }

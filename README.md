@@ -58,6 +58,7 @@ Browser → Route Handler /api/* (session via header X-Session-Id)
 │   ├── session.ts           # session id opaque di sessionStorage
 │   ├── client-api.ts        # helper fetch + gerbang 401
 │   ├── image.ts             # kompresi gambar client-side
+│   ├── video.ts             # upload video chunked + ekstraksi frame (client)
 │   └── chat-utils.ts        # konstanta edit foto + helper pesan
 ├── styles/                  # main, sidebar, chat, auth, settings (CSS asli)
 ├── public/                  # icons.svg, assets/ (favicon, artwork)
@@ -142,6 +143,53 @@ pesan → deteksi trigger (HD_TRIGGER_RE + URL, localhost/IP lokal ditolak)
   di sisi layanan faa (pola sama seperti resolve musik).
 - URL localhost / jaringan lokal ditolak; hanya link video publik yang disubmit.
 
+## Fitur upload video (HD + AI vision)
+
+Klik ikon + di composer → pilih video (MP4/WebM/MOV, maks 50MB). Dua mode
+otomatis, tanpa menu:
+
+- **"hdkan video ini"** (atau trigger HD lain) → video diupload, job HD
+  di-submit pakai URL hasil upload, kartu HD seperti mode link.
+- **Pesan bebas** ("apa isi videoku?") → AI vision melihat isi video:
+  browser mengekstrak 6 frame secara merata (canvas), frame dikirim ke
+  Gemini vision sebagai lampiran gambar — AI menjawab tentang isi video.
+
+Alur upload (uguu.se CORS-nya tertutup → server jadi perantara; batas body
+Vercel ±4.5MB → file dipecah chunk):
+
+```
+browser: init → POST /api/vupload {action:init,name,mime,size} → upload_id
+        chunk → POST /api/vupload {action:chunk,upload_id,index,data(b64)}
+                (berulang per ±2MB, progress bar di preview)
+       finish → POST /api/vupload {action:finish,upload_id,total}
+              → server rakit → upload ke uguu.se → { url publik }
+```
+
+- Server merakit chunk, mengupload sekali ke uguu, lalu menghapus chunk dari
+  store (sisa chunk kedaluwarsa lewat TTL 1 jam).
+- URL video di /api/chat divalidasi host uguu.se saja (UPLOAD_HOST_RE).
+- Upload video LANGSUNG ke Google content-push ternyata butuh akun login —
+  makanya vision pakai frame (teruji: AI menjawab isi video dari frame).
+
+## Fix Gemini vision upload (2026-10)
+
+Endpoint lama `content-push.upload.googleapis.com` (X-Tenant-Id gemini,
+POST tunggal) sudah MATI — chat gambar di produksi diam-diam jalan teks
+saja ("gambar ga kebawa"). Alur baru (pola resumable 2 langkah):
+
+```
+POST content-push.googleapis.com/upload/
+     headers: Authorization Basic <fixed>, push-id feeds/mcudyrk2a4khkz,
+              x-goog-upload-protocol resumable, x-tenant-id bard-storage
+     body: "File name: <nama>"
+  → header x-goog-upload-url  (URL sekali pakai)
+POST <upload_url>  bytes file (command upload, finalize)
+  → media key (teks) → dipasang di posisi 4 array pesan
+```
+
+Sama untuk gambar dan frame video. Gagal upload → chat tetap jalan teks
+(graceful fallback), dengan catatan di pesan.
+
 ## Data yang disimpan (database)
 
 ```
@@ -153,6 +201,7 @@ chats/<user_id>/<conversation_id>.json
                           { messages: [ { message_id, role, content, timestamp } ] }
 bots/<user_id>.json        { bot_name, personality, traits, memories, … }
 locks/login-<hash>.json   { fails, locked_until }   # anti brute force
+vupload/<id>/…            # chunk upload video (TTL 1 jam, dihapus saat finish)
 ```
 
 ## Environment Variables (Vercel — WAJIB)
