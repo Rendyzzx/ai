@@ -196,6 +196,12 @@
    user:      [body][avatar]  rata KANAN (avatar paling kanan) */
 
 .message-row {
+  /* Virtualization ringan: baris di luar viewport TIDAK di-layout/paint.
+     Browser lompati kerja untuk baris yang tak terlihat → buka chat
+     panjang & scroll tetap enteng di HP low-end. 'auto' membuat browser
+     mengingat tinggi asli tiap baris setelah dirender → posisi scroll stabil. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
   display: flex;
   -webkit-touch-callout: none;
   align-items: flex-start;

@@ -329,6 +329,16 @@ async function boot() {
   $('#settingsBtn').addEventListener('click', () => openSettings());
   // kartu karakter di sidebar → buka pengaturan karakter
   on('settings:openCharacter', () => openSettings('bot'));
+
+  // PRELOAD settings saat idle — buka settings PERTAMA jadi instan.
+  // Tanpa ini: dynamic import ±250ms (+ jaringan di HP) tepat saat
+  // tombol pertama kali diklik → terasa freeze. Specifier HARUS sama
+  // persis dengan openSettings() supaya instance modulnya satu.
+  const preload = window.requestIdleCallback
+    ? (cb) => window.requestIdleCallback(cb, { timeout: 2000 })
+    : (cb) => setTimeout(cb, 600);
+  preload(() => { import('./settings.js?v=1764d59c65').catch(() => {}); });
+
   watchSession();
 }
 

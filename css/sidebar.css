@@ -149,6 +149,9 @@
 }
 
 .h-item {
+  /* Daftar riwayat panjang: item di luar viewport dilewati layout+paint. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 56px;
   display: flex;
   align-items: center;
   width: 100%;
