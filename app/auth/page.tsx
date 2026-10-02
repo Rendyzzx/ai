@@ -2,11 +2,38 @@ import type { Metadata, Viewport } from "next";
 import "../../styles/auth.css";
 import AuthLanding from "@/components/auth/AuthLanding";
 
+const SITE = "https://cyronime.web.id";
+
 export const metadata: Metadata = {
-  title: "Aomi — AI yang siap bantu kapan aja",
+  title: "Aomi — Ngobrol. Bikin. Cari tahu.",
   description:
-    "Ngobrol dengan AI, edit foto, dan download video TikTok/Instagram dalam satu tempat.",
-  robots: { index: false },
+    "Teman ngobrol AI yang siap bantu kapan aja — ngobrol santai, bantu ngoding, edit foto, sampai download video TikTok & Instagram. Gratis, langsung pakai.",
+  robots: { index: true, follow: true },
+  alternates: { canonical: `${SITE}/auth` },
+  openGraph: {
+    type: "website",
+    url: `${SITE}/auth`,
+    siteName: "Aomi",
+    locale: "id_ID",
+    title: "Aomi — Ngobrol. Bikin. Cari tahu.",
+    description:
+      "Teman ngobrol AI yang siap bantu kapan aja — ngobrol santai, bantu ngoding, edit foto, sampai download video TikTok & Instagram. Gratis, langsung pakai.",
+    images: [
+      {
+        url: "/assets/og-banner.png",
+        width: 1200,
+        height: 630,
+        alt: "Aomi — asisten chat AI dengan karakter yang siap menemanimu ngobrol",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Aomi — Ngobrol. Bikin. Cari tahu.",
+    description:
+      "Teman ngobrol AI yang siap bantu kapan aja — ngobrol santai, bantu ngoding, edit foto, sampai download video TikTok & Instagram. Gratis, langsung pakai.",
+    images: ["/assets/og-banner.png"],
+  },
   icons: { icon: { url: "/assets/favicon.svg", type: "image/svg+xml" } },
 };
 

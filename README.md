@@ -95,6 +95,7 @@ locks/login-<hash>.json   { fails, locked_until }   # anti brute force
 | `GOOGLE_CLIENT_ID` | Client ID Google OAuth (buat di [Google Cloud Console](https://console.cloud.google.com/apis/credentials)) |
 | `GOOGLE_CLIENT_SECRET` | Client Secret Google OAuth (server-side only, jangan expose) |
 | `GOOGLE_REDIRECT_URI` | Opsional — override redirect URI auto-detect. Default: `<origin>/api/auth/google/callback` |
+| `GOOGLE_SITE_VERIFICATION` | Token verifikasi Google Search Console (content dari meta tag). Opsional — bila kosong, meta tag verifikasi tidak dirender |
 
 Set di: **Settings → Environment Variables** → isi Production, Preview,
 Development → **Redeploy**.
@@ -113,6 +114,22 @@ Flow: klik "Masuk dengan Google" → consent Google → callback → email
 dicocokkan dengan akun yang sudah ada (auto-link via email) atau akun
 baru dibuat → session dibuat → masuk ke Aomi. User existing tetap bisa
 login dengan password seperti biasa.
+
+## SEO & Google Search Console
+
+- Landing (`/auth`) diindeks Google; chat app (`/`) noindex (butuh login).
+- Sitemap otomatis: `/sitemap.xml` — robots.txt di `/robots.txt`.
+- Banner Open Graph: `/assets/og-banner.png` (1200×630, karakter Aomi).
+- Meta `google-site-verification` dirender dari env `GOOGLE_SITE_VERIFICATION`
+  (set di Vercel → Environment Variables → Redeploy).
+
+Cara daftar ke Google Search Console:
+
+1. Buka [Google Search Console](https://search.google.com/search-console) → tambah properti `https://cyronime.web.id` (URL prefix).
+2. Pilih verifikasi **HTML tag** → salin nilai `content` dari tag yang diberikan.
+3. Set nilai itu sebagai `GOOGLE_SITE_VERIFICATION` di Vercel → Redeploy.
+4. Klik **Verify** di Search Console.
+5. Submit `https://cyronime.web.id/sitemap.xml` di menu **Sitemaps**.
 
 ## Keamanan
 
