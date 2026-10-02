@@ -45,7 +45,7 @@ In-memory per-instance (burst limiter). Kunci:
 
 | Endpoint scope | Kunci | Limit |
 |---|---|---|
-| `/api/chat` | per user | 20/menit |
+| `/api/chat` | tidak dibatasi (keputusan owner) | — |
 | chat → musik (resolve di POST chat) | per user | 8/menit |
 | `/api/conversations` list/read | per user | 120/menit |
 | `/api/conversations` write | per user | 40/menit |

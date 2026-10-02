@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import { readJson, putJson, updateJson, expireJson } from "@/lib/server/store";
 import { DEFAULT_BOT } from "@/lib/server/bot-config";
 import { getSession } from "@/lib/server/auth";
-import { allow, allowUser, clientIp } from "@/lib/server/ratelimit";
+import { allowUser } from "@/lib/server/ratelimit";
 import { json, readBody, forbidden, originOk } from "@/lib/server/http";
 import { matchMusicRequest } from "@/lib/chat-utils";
 import { resolveMusicCard, MusicError } from "@/lib/server/music";
@@ -537,11 +537,8 @@ export async function POST(req: Request) {
 
   if (!originOk(req)) return forbidden();
 
-  // Limit per USER (akun), bukan per IP: beberapa orang bisa berbagi IP
-  // (operator/NAT), dan per-akun tidak bisa diakali dengan ganti IP.
-  if (!allowUser("chat", uid, req, LIMITS.rateMax, LIMITS.rateWindowMs)) {
-    return json({ error: "Terlalu banyak permintaan. Tunggu sebentar." }, 429);
-  }
+  // Chat TIDAK dibatasi rate limit (permintaan owner) — pemakaian normal
+  // dibatasi alami oleh durasi respons AI. Origin check tetap jalan.
 
   const body = await readBody(req);
   const greeting = body.greeting === true; // mode: karakter menyapa duluan
