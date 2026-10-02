@@ -54,6 +54,14 @@ body {
   background: var(--bg);
 }
 
+/* FIX (regression scroll-lock): main.css mengunci html/body untuk chat app
+   (height:100% + overflow:hidden) — landing ini TIDAK boleh terkunci.
+   auth.css dimuat SETELAH main.css di route /auth, jadi override ini menang.
+   Tanpa ini page tidak bisa di-scroll sama sekali dan user tidak bisa
+   sampai ke form Masuk/Buat akun. */
+html, body { height: auto; min-height: 100%; }
+body { overflow: visible; }
+
 h1, h2, h3 {
   font-family: var(--font-display);
   font-weight: 600;

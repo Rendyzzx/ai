@@ -129,7 +129,11 @@ function buildInstruction(bot: BotConfig): string {
   }
 
   if (bot.language === "en") parts.push("Always reply in English.");
-  else if (bot.language === "id") parts.push("Selalu berbahasa Indonesia.");
+  else if (bot.language === "id")
+    parts.push(
+      "Selalu berbahasa Indonesia gaul dan santai — bahasa ngobrol sehari-hari " +
+        '(boleh singkatan kayak "gak", "udah", "sih"), JANGAN bahasa baku/formal.'
+    );
   else parts.push("Balas pakai bahasa yang dipakai pengguna.");
 
   parts.push(TONE_PROMPTS[bot.response_style] || TONE_PROMPTS.casual);
