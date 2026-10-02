@@ -960,7 +960,7 @@ export async function POST(req: Request) {
         { message_id: assistantMessageId, role: "assistant", content: replyText, music: card, timestamp: now }
       );
       if (conv.title === "Chat baru") {
-        conv.title = ("\uD83C\uDFB5 " + card.title).slice(0, 48);
+        conv.title = card.title.slice(0, 48);
       }
       conv.updated_at = now;
 

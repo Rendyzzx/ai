@@ -249,6 +249,16 @@ export default function ChatApp() {
 
   /* ---------------- Refresh sidebar ---------------- */
 
+  const handleLogout = useCallback(async () => {
+    try {
+      await api("/api/auth/logout", { method: "POST" });
+    } catch { /* lanjut teardown lokal */ }
+    const m = await import("@/lib/session");
+    m.clearSessionId();
+    m.resetClientState();
+    window.location.replace("/auth");
+  }, []);
+
   const refreshSidebar = useCallback(async () => {
     try {
       const data = await apiJson<{ items: ConversationItem[] }>("/api/conversations");
@@ -935,11 +945,12 @@ export default function ChatApp() {
             setSettingsCat("bot");
             setSettingsOpen(true);
           }}
-          onOpenSettings={() => {
+          onOpenSettings={(cat) => {
             setSidebarOpen(false);
-            setSettingsCat("profile");
+            setSettingsCat(cat);
             setSettingsOpen(true);
           }}
+          onLogout={handleLogout}
           onOpen={(id) => {
             setSidebarOpen(false);
             void loadConversation(id);
@@ -1177,16 +1188,7 @@ export default function ChatApp() {
           onClose={() => setSettingsOpen(false)}
           onUserUpdate={(u) => setUser((prev) => ({ ...prev, ...u }))}
           onBotUpdate={(b) => setBot((prev) => ({ ...prev, ...b }))}
-          onLogout={async () => {
-            try {
-              await api("/api/auth/logout", { method: "POST" });
-            } catch { /* lanjut teardown lokal */ }
-            import("@/lib/session").then((m) => {
-              m.clearSessionId();
-              m.resetClientState();
-            });
-            window.location.replace("/auth");
-          }}
+          onLogout={handleLogout}
         />
       )}
 
