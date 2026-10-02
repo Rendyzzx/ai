@@ -16,6 +16,7 @@ export interface Message {
   expires_at?: string | null;    // masa unduh hasil edit
   edit?: boolean;
   dl?: DlCard | null;            // kartu downloader TikTok/IG
+  music?: MusicCard | null;      // kartu lagu (mode musik)
   timestamp: string;
 }
 
@@ -48,6 +49,25 @@ export interface DlCard {
   music_title?: string;
   video?: string;
   images?: string[];
+}
+
+/** Satu baris lirik sinkron (time = detik dari awal lagu). */
+export interface MusicLyricLine {
+  time: number;
+  text: string;
+}
+
+/** Kartu lagu yang tersimpan di pesan assistant (mode musik). */
+export interface MusicCard {
+  video_id: string;        // ID video YouTube (stabil, untuk resolve ulang)
+  title: string;
+  artist: string;
+  duration: number;        // detik
+  thumbnail: string;      // thumbnail YouTube (i.ytimg.com, stabil)
+  audio_url: string;      // URL audio savetube — bisa kedaluwarsa,
+                          // refresh via /api/music?action=resolve
+  lyrics: MusicLyricLine[];
+  lyrics_estimated?: boolean; // true = lirik plain disebar (sinkron perkiraan)
 }
 
 /** Profil user. */
@@ -97,6 +117,7 @@ export interface ChatResponse {
   image_name?: string;
   expires_at?: string;
   dl?: DlCard;
+  music?: MusicCard;
 }
 
 /** State pesan yang dirender di UI (pesan lokal yang belum punya id server). */

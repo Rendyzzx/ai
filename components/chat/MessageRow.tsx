@@ -12,7 +12,8 @@ import { useState } from "react";
 import Icon from "@/components/ui/Icon";
 import Avatar from "@/components/ui/Avatar";
 import { parseMessageText } from "@/lib/markdown";
-import type { DlCard, Role } from "@/types";
+import type { DlCard, MusicCard, Role } from "@/types";
+import MusicCardView from "@/components/music/MusicCardView";
 
 export interface MessageFile {
   url: string;
@@ -20,7 +21,7 @@ export interface MessageFile {
   expiresAt?: string | null;
 }
 
-export type Indicator = "typing" | "editing" | "downloading" | null;
+export type Indicator = "typing" | "editing" | "downloading" | "music" | null;
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -208,6 +209,11 @@ export function IndicatorRow({ indicator }: { indicator: Exclude<Indicator, null
               <Icon id="download" className="edit-ic" />
               <span className="edit-label">lagi nyariin file-nya</span>
             </>
+          ) : indicator === "music" ? (
+            <>
+              <Icon id="music" className="edit-ic" />
+              <span className="edit-label">lagi nyariin lagunya</span>
+            </>
           ) : null}
           <span className="typing-dot" />
           <span className="typing-dot" />
@@ -230,6 +236,7 @@ export default function MessageRow({
   mid,
   file,
   dl,
+  music,
   sid,
   userAvatar,
   botAvatar,
@@ -250,6 +257,7 @@ export default function MessageRow({
   mid?: string | null;
   file?: MessageFile | null;
   dl?: DlCard | null;
+  music?: MusicCard | null;
   sid: string | null;
   userAvatar: string | null;
   botAvatar: string | null;
@@ -309,6 +317,7 @@ export default function MessageRow({
           <span className="img-dl-hint">masa unduh sudah habis</span>
         )}
         {dl && <DlCardView dl={dl} sid={sid} />}
+        {music && <MusicCardView music={music} />}
         {editing && (
           <div className="edit-box">
             <EditBox

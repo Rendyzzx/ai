@@ -425,7 +425,7 @@ export default function AuthLanding() {
         <section className="cando" id="fitur" data-reveal>
           <div className="section-head">
             <h2>Yang bisa kamu lakukan di Aomi</h2>
-            <p>Enam hal ini bisa langsung kamu pakai sekarang.</p>
+            <p>Tujuh hal ini bisa langsung kamu pakai sekarang.</p>
           </div>
 
           {/* Editorial list, hairline per baris — bukan grid kartu */}
@@ -462,6 +462,15 @@ export default function AuthLanding() {
               <h3 className="cando-name">Downloader Instagram</h3>
               <p className="cando-desc">
                 Sama seperti TikTok — khusus video dan foto Instagram.
+              </p>
+            </div>
+            <div className="cando-row" id="feat-music">
+              <h3 className="cando-name">Pemutar Musik</h3>
+              <p className="cando-desc">
+                Bilang aja &ldquo;tolong putarkan lagu&hellip;&rdquo; atau
+                &ldquo;playkan lagu&hellip;&rdquo;. Player-nya melayang di atas
+                chat, liriknya ikut jalan sinkron, musiknya tetap nyala di
+                background kalau kamu pindah kegiatan, dan bisa diunduh.
               </p>
             </div>
             <div className="cando-row">

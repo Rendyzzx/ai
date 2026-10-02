@@ -13,6 +13,8 @@ import { DEFAULT_BOT } from "@/lib/server/bot-config";
 import { getSession } from "@/lib/server/auth";
 import { allow, clientIp } from "@/lib/server/ratelimit";
 import { json, readBody } from "@/lib/server/http";
+import { matchMusicRequest } from "@/lib/chat-utils";
+import { resolveMusicCard, MusicError } from "@/lib/server/music";
 import type { BotConfig, Conversation, ConversationItem, DlCard, Message } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -924,6 +926,64 @@ export async function POST(req: Request) {
       }),
     ]);
     return json({ ok: true });
+  }
+
+  // ---------------- MODE MUSIK (putar lagu) ----------------
+  // "tolong putarkan lagu X" / "playkan X" / "putar <link YT>" →
+  // cari lagu (YouTube), ambil audio (savetube) + lirik (LRCLIB),
+  // simpan kartu lagu di pesan assistant. Player ada di client.
+  if (!imageBuffer && message) {
+    const musicQuery = matchMusicRequest(message);
+    if (musicQuery) {
+      if (!allow("music:" + clientIp(req.headers), 8, 60_000)) {
+        return json({ error: "Sabar, lagu sebelumnya masih diproses. Coba lagi sebentar." }, 429);
+      }
+
+      let card;
+      try {
+        card = await resolveMusicCard(musicQuery);
+      } catch (err) {
+        const code = err instanceof MusicError ? err.code : "UPSTREAM";
+        console.error("[chat] musik gagal (" + code + "):", (err as Error).message);
+        if (code === "NO_CONFIG") {
+          return json({ error: "Fitur musik belum dikonfigurasi di server." }, 503);
+        }
+        return json({ error: "Hmm, lagunya gak ketemu / gagal diambil. Coba judul lain ya." }, 502);
+      }
+
+      const replyText =
+        "sini kuputarke lagunya~ klik karta lagunya kalau mau pause/lanjut, atau buka player-nya. ada tombol unduhnya juga di player. \uD83C\uDFB7";
+      const userMessageId = crypto.randomUUID();
+      const assistantMessageId = crypto.randomUUID();
+      conv.messages.push(
+        { message_id: userMessageId, role: "user", content: message, timestamp: now },
+        { message_id: assistantMessageId, role: "assistant", content: replyText, music: card, timestamp: now }
+      );
+      if (conv.title === "Chat baru") {
+        conv.title = ("\uD83C\uDFB5 " + card.title).slice(0, 48);
+      }
+      conv.updated_at = now;
+
+      await Promise.all([
+        putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, "music append"),
+        touchIndex(uid, {
+          conversation_id: conv.conversation_id,
+          title: conv.title,
+          updated_at: conv.updated_at,
+        }),
+      ]);
+
+      return json({
+        text: replyText,
+        user_message_id: userMessageId,
+        assistant_message_id: assistantMessageId,
+        conversation_id: conv.conversation_id,
+        title: conv.title,
+        provider: "aomi-music",
+        bot_name: bot.bot_name,
+        music: card,
+      });
+    }
   }
 
   // ---------------- MODE DOWNLOADER (TikTok / Instagram) ----------------

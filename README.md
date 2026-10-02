@@ -39,18 +39,21 @@ Browser → Route Handler /api/* (session via header X-Session-Id)
 │       ├── bot/             # konfigurasi karakter per user
 │       ├── profile/         # profil user (username, display name, avatar)
 │       ├── dl/              # proxy unduhan TikTok/IG (anti SSRF allowlist)
+│       ├── music/           # fitur musik: resolve link audio + proxy unduh lagu
 │       └── tempimg/         # host gambar sementara (maxDuration 30)
 ├── components/
 │   ├── chat/                # ChatApp (orchestrator), MessageRow, MessageMenu,
 │   │                        # ConfirmDialog
 │   ├── sidebar/             # Sidebar + lazy conversation list
 │   ├── settings/            # SettingsView (overlay SPA)
+│   ├── music/               # MusicProvider (player global popup + mini bar),
+│   │                        # MusicCardView (kartu lagu di bubble)
 │   ├── auth/                # AuthLanding (landing + form Masuk/Daftar)
 │   ├── brand/               # BrandSplash (splash WebGL raymarch di /auth)
 │   └── ui/                  # Icon, Avatar
 ├── lib/
 │   ├── server/              # store.ts, github.ts, auth.ts, ratelimit.ts,
-│   │                        # bot-config.ts, http.ts, version.ts
+│   │                        # bot-config.ts, http.ts, music.ts, version.ts
 │   ├── session.ts           # session id opaque di sessionStorage
 │   ├── client-api.ts        # helper fetch + gerbang 401
 │   ├── image.ts             # kompresi gambar client-side
@@ -70,6 +73,30 @@ npm install
 npm run dev      # http://localhost:3000
 npm run build    # build production (type-check strict)
 ```
+
+## Fitur musik (putar lagu)
+
+Ketik di chat: **"tolong putarkan lagu X"**, **"playkan lagu X"**, **"nyanyiin lagu X"**,
+"ganti lagu X", atau "putar <link YouTube>".
+
+Alur:
+
+```
+pesan → deteksi trigger (regex di lib/chat-utils.ts)
+      → lib/server/music.ts: cari di YouTube (scrape) → savetube (audio 128kbps)
+        → LRCLIB (lirik sinkron, fallback plain → perkiraan)
+      → kartu lagu (music) disimpan di pesan assistant
+      → client: kartu lagu + MusicProvider (popup player)
+```
+
+- Player popup melayang (bisa digeser), lirik auto-scroll sinkron, seek, ±10 detik,
+  minimize jadi mini bar — **musik tetap jalan di background** sampai user stop.
+- Tombol **Unduh lagu** ada di bawah player → `/api/music?action=dl` (proxy savetube,
+  attachment, nama file rapi, allowlist hostname ketat).
+- Link audio savetube kedaluwarsa → player otomatis resolve ulang via
+  `/api/music?action=resolve` (sekali per lagu), jadi kartu lagu di riwayat lama tetap bisa diputar.
+- Key dekripsi savetube sudah built-in (key publik dari scraper komunitas); env `SAVETUBE_KEY`
+  opsional untuk override tanpa redeploy.
 
 ## Data yang disimpan (database)
 
@@ -97,6 +124,7 @@ locks/login-<hash>.json   { fails, locked_until }   # anti brute force
 | `GOOGLE_CLIENT_SECRET` | Client Secret Google OAuth (server-side only, jangan expose) |
 | `GOOGLE_REDIRECT_URI` | Opsional — override redirect URI auto-detect. Default: `<origin>/api/auth/google/callback` |
 | `GOOGLE_SITE_VERIFICATION` | Token verifikasi Google Search Console (content dari meta tag). Opsional — bila kosong, meta tag verifikasi tidak dirender |
+| `SAVETUBE_KEY` | Opsional — override key dekripsi metadata savetube (default sudah built-in dari scraper publik) |
 
 Set di: **Settings → Environment Variables** → isi Production, Preview,
 Development → **Redeploy**.

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: "Aomi — AI yang siap bantu kapan aja",
   description:
-    "Aomi — teman ngobrol AI yang personal: ngobrol santai, bantu ngoding, edit foto, sampai download video TikTok & Instagram. Gratis, langsung pakai.",
+    "Aomi — teman ngobrol AI yang personal: ngobrol santai, bantu ngoding, edit foto, putar lagu, sampai download video TikTok & Instagram. Gratis, langsung pakai.",
   icons: { icon: { url: "/assets/favicon.svg", type: "image/svg+xml" } },
   ...(googleVerification
     ? { verification: { google: googleVerification } }

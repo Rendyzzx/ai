@@ -3,7 +3,7 @@
    Helper bersama client chat (port dari chat.js).
    ============================================================ */
 
-import type { Message, DlCard } from "@/types";
+import type { Message, DlCard, MusicCard } from "@/types";
 
 // API edit foto — browser menembak LANGSUNG (CORS terbuka), bebas dari
 // batas 60 detik runtime server.
@@ -32,6 +32,59 @@ export function matchDlTarget(text: string): "tiktok" | "ig" | null {
     if (/(^|\.)instagram\.com$/.test(h)) return "ig";
   }
   return null;
+}
+
+/** Link YouTube (dipakai deteksi mode musik — server & client). */
+export const YT_URL_RE =
+  /https?:\/\/(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?[^\s]*v=|shorts\/|embed\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
+
+// Deteksi permintaan putar lagu: "tolong putarkan lagu X", "playkan X",
+// "nyanyiin lagu X", "ganti lagu X", "putar <link YT>".
+// SALINAN logika juga dipakai server (route chat) — server tetap yang
+// memutuskan; ini memilih animasi loading yang tepat.
+const MUSIC_VERB_RE =
+  /(?:^|\s)(?:tolong(?:in)?\s+|coba\s+|bisa\s+|boleh\s+|mohon\s+|please\s+|pls\s+|aku\s+mau\s+|pengen\s+|mau\s+)?(?:(?:putar|putarke|nyanyi|play)(?:kan|ke|in|nya|ah)?|main(?:kan|ke|in|nya|ah))(?:\s+(?:lagu|musik|music|song|soundtrack|track)\b)?[\s:,]+(.+)$/i;
+const MUSIC_CHANGE_RE =
+  /(?:^|\s)(?:ganti(?:in)?|next|skip)\s+(?:lagu|musik|music|song)\s+(.+)$/i;
+const MUSIC_FILLER_RE =
+  /^(?:kan|ke|in|nya|ini|itu|dong|dulu|bukan|lagu(?:nya)?|musik(?:nya)?|music(?:nya)?|song|soundtrack|track)\b[\s:,]*/i;
+
+/** Bersihkan query lagu dari kata sisa di sekitarnya. */
+function cleanMusicQuery(raw: string): string {
+  let q = raw.trim();
+  for (let i = 0; i < 6; i++) {
+    const next = q.replace(MUSIC_FILLER_RE, "");
+    if (next === q) break;
+    q = next;
+  }
+  return q
+    .replace(/[\s,]+(?:dong|du|deh|ya+|banget|please|pls|makasih|thanks|thx)[\s.!]*$/i, "")
+    .replace(/^[\s"'\u201C\u201D]+|[\s"'\u201C\u201D]+$/g, "")
+    .replace(/[?!.]+$/, "")
+    .trim();
+}
+
+/**
+ * Balik query lagu bila pesan adalah permintaan putar lagu,
+ * selain itu null. Query bisa judul lagu ATAU link YouTube.
+ */
+export function matchMusicRequest(raw: string): string | null {
+  const text = String(raw || "").trim();
+  if (!text || text.length > 300) return null;
+
+  const m = text.match(MUSIC_VERB_RE) || text.match(MUSIC_CHANGE_RE);
+  if (!m) return null;
+
+  const query = cleanMusicQuery(m[1]);
+  if (!query || query.length < 2) return null;
+  return query.slice(0, 200);
+}
+
+/** Metadata kartu lagu. */
+export function musicOf(m: Message): MusicCard | null {
+  return m && m.music && typeof m.music === "object" && m.music.video_id && m.music.title
+    ? m.music
+    : null;
 }
 
 /** Metadata unduh pesan hasil edit. */

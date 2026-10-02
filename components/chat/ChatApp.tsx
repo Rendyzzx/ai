@@ -21,7 +21,8 @@ import MessageRow, {
 import MessageMenu, { type MenuState } from "@/components/chat/MessageMenu";
 import ConfirmDialog from "@/components/chat/ConfirmDialog";
 import SettingsView from "@/components/settings/SettingsView";
-import { fileOf, dlOf, EDIT_API, EDIT_BROWSER_TIMEOUT, EDIT_RESULT_MAX, EDIT_TRIGGER_RE, matchDlTarget } from "@/lib/chat-utils";
+import { fileOf, dlOf, musicOf, matchMusicRequest, EDIT_API, EDIT_BROWSER_TIMEOUT, EDIT_RESULT_MAX, EDIT_TRIGGER_RE, matchDlTarget } from "@/lib/chat-utils";
+import { useMusic } from "@/components/music/MusicProvider";
 import type { BotConfig, ChatResponse, Conversation, ConversationItem, Message, UserProfile } from "@/types";
 
 const RENDER_BATCH = 30;
@@ -62,6 +63,7 @@ interface PendingImage {
 }
 
 export default function ChatApp() {
+  const { playMusic } = useMusic();
   const [boot, setBoot] = useState<Boot>("loading");
   const [user, setUser] = useState<UserProfile>(DEFAULT_USER);
   const [bot, setBot] = useState<BotConfig>(DEFAULT_BOT_STATE);
@@ -492,8 +494,9 @@ export default function ChatApp() {
 
       // Indikator: edit foto → label khusus; downloader → label file
       const wantsEdit = !!(img && text && EDIT_TRIGGER_RE.test(text));
-      const wantsDl = !img && !wantsEdit && !!matchDlTarget(text);
-      setIndicator(wantsEdit ? "editing" : wantsDl ? "downloading" : "typing");
+      const wantsMusic = !img && !wantsEdit && !!matchMusicRequest(text);
+      const wantsDl = !img && !wantsEdit && !wantsMusic && !!matchDlTarget(text);
+      setIndicator(wantsEdit ? "editing" : wantsMusic ? "music" : wantsDl ? "downloading" : "typing");
       scrollToBottom(true);
 
       try {
@@ -543,6 +546,8 @@ export default function ChatApp() {
           };
           if (data.dl) {
             msg.dl = data.dl;
+          } else if (data.music) {
+            msg.music = data.music;
           } else if (data.image_url) {
             msg.image_url = data.image_url;
             msg.image_name = data.image_name;
@@ -551,6 +556,8 @@ export default function ChatApp() {
           }
           pushMessages([msg]);
           refreshSidebar();
+          // Kartu lagu → langsung buka player & putar
+          if (data.music) playMusic(data.music);
         } else {
           pushMessages([
             {
@@ -577,7 +584,7 @@ export default function ChatApp() {
         loadingRef.current = false;
       }
     },
-    [pendingImage, pushMessages, refreshSidebar, runEditJob, scrollToBottom, persistEditThumb]
+    [pendingImage, pushMessages, refreshSidebar, runEditJob, scrollToBottom, persistEditThumb, playMusic]
   );
 
   /* ---------------- Aksi pesan ---------------- */
@@ -853,6 +860,7 @@ export default function ChatApp() {
         mid={m.message_id || null}
         file={file}
         dl={dlOf(m)}
+        music={musicOf(m)}
         sid={sid}
         userAvatar={user.avatar}
         botAvatar={bot.bot_avatar}
