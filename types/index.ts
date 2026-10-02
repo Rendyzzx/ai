@@ -17,6 +17,7 @@ export interface Message {
   edit?: boolean;
   dl?: DlCard | null;            // kartu downloader TikTok/IG
   music?: MusicCard | null;      // kartu lagu (mode musik)
+  hd?: HdCard | null;           // kartu HD video (mode upgrade)
   timestamp: string;
 }
 
@@ -49,6 +50,19 @@ export interface DlCard {
   music_title?: string;
   video?: string;
   images?: string[];
+}
+
+/** Kartu HD video (mode upgrade kualitas) di pesan assistant.
+ *  state "pending" → client polling /api/hd?action=poll&job=…
+ *  sampai "done" (download_url muncul). Kartu TIDAK di-update di
+ *  storage saat selesai — job_id stabil, poll ulang murah, jadi
+ *  kartu di riwayat lama tetap bisa ambil hasil segar. */
+export interface HdCard {
+  job_id: string;             // ID job API faa (faa_xxxxxxxx)
+  state: "pending" | "done" | "error";
+  source_url: string;         // URL video asal (display)
+  quality?: string;           // label kualitas hasil (mis. "HD")
+  download_url?: string | null;
 }
 
 /** Satu baris lirik sinkron (time = detik dari awal lagu). */
@@ -115,6 +129,8 @@ export interface ChatResponse {
   already?: boolean;
   greeting?: boolean;
   edit_job?: { input_url: string; prompt: string };
+  imggen_job?: { prompt: string };
+  hd?: HdCard;
   image_url?: string;
   image_name?: string;
   expires_at?: string;

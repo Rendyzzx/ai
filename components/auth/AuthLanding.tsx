@@ -433,7 +433,7 @@ export default function AuthLanding() {
         <section className="cando" id="fitur" data-reveal>
           <div className="section-head">
             <h2>Yang bisa kamu lakukan di Aomi</h2>
-            <p>Tujuh hal ini bisa langsung kamu pakai sekarang.</p>
+            <p>Sembilan hal ini bisa langsung kamu pakai sekarang.</p>
           </div>
 
           {/* Editorial list, hairline per baris — bukan grid kartu */}
@@ -457,6 +457,24 @@ export default function AuthLanding() {
               <p className="cando-desc">
                 Upload gambar, kasih instruksi — perjelas, ganti warna, rapikan.
                 Hasilnya dikirim balik ke chat, tinggal diunduh.
+              </p>
+            </div>
+            <div className="cando-row" id="feat-imggen">
+              <h3 className="cando-name">Generate Gambar</h3>
+              <p className="cando-desc">
+                Bilang aja &ldquo;buatkan gambar&hellip;&rdquo; atau
+                &ldquo;bikin gambar&hellip;&rdquo; — kucing oren, logo,
+                poster, pemandangan, apa aja. Hasilnya dikirim ke chat
+                lengkap dengan tombol unduhnya.
+              </p>
+            </div>
+            <div className="cando-row" id="feat-hd">
+              <h3 className="cando-name">HD Video</h3>
+              <p className="cando-desc">
+                Kirim link video terus bilang &ldquo;hdkan&rdquo; —
+                videonya ditingkatin jadi kualitas HD. Prosesnya jalan
+                otomatis, kartu di chat update sendiri begitu hasilnya
+                siap diunduh.
               </p>
             </div>
             <div className="cando-row" id="feat-tiktok">

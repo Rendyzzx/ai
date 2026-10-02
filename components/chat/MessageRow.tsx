@@ -8,12 +8,13 @@
    pernah dieksekusi. Port dari messageNode() di chat.js.
    ============================================================ */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
 import Avatar from "@/components/ui/Avatar";
 import { parseMessageText } from "@/lib/markdown";
-import type { DlCard, MusicCard, Role } from "@/types";
+import type { DlCard, HdCard, MusicCard, Role } from "@/types";
 import MusicCardView from "@/components/music/MusicCardView";
+import { api } from "@/lib/client-api";
 
 export interface MessageFile {
   url: string;
@@ -21,7 +22,7 @@ export interface MessageFile {
   expiresAt?: string | null;
 }
 
-export type Indicator = "typing" | "editing" | "downloading" | "music" | null;
+export type Indicator = "typing" | "editing" | "downloading" | "music" | "generating" | "hdvid" | null;
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -222,12 +223,112 @@ export function IndicatorRow({ indicator }: { indicator: Exclude<Indicator, null
               <Icon id="music" className="edit-ic" />
               <span className="edit-label">lagi nyariin lagunya</span>
             </>
+          ) : indicator === "generating" ? (
+            <>
+              <Icon id="image" className="edit-ic" />
+              <span className="edit-label">lagi bikin gambarnya</span>
+            </>
+          ) : indicator === "hdvid" ? (
+            <>
+              <Icon id="download" className="edit-ic" />
+              <span className="edit-label">lagi proses HD video-nya</span>
+            </>
           ) : null}
           <span className="typing-dot" />
           <span className="typing-dot" />
           <span className="typing-dot" />
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------------- Kartu HD video (polling job + tombol unduh) ---------------- */
+
+const HD_POLL_INTERVAL_MS = 4000;
+const HD_POLL_MAX_TRIES = 90; // ~6 menit
+
+export function HdCardView({ hd, sid }: { hd: HdCard; sid: string | null }) {
+  const [state, setState] = useState<"pending" | "done" | "error">(
+    hd.state === "done" ? "done" : hd.state === "error" ? "error" : "pending"
+  );
+  const [quality, setQuality] = useState<string>(hd.quality || "HD");
+  const pollStarted = useRef(false);
+
+  // Job masih pending -> polling /api/hd tiap beberapa detik sampai
+  // done/error. Kartu di riwayat lama juga otomatis lanjut polling
+  // (job_id stabil di pesan, hasil segar diambil ulang tiap buka chat).
+  useEffect(() => {
+    if (state !== "pending" || !hd.job_id || pollStarted.current) return;
+    pollStarted.current = true;
+    let stopped = false;
+    (async () => {
+      for (let tries = 0; tries < HD_POLL_MAX_TRIES && !stopped; tries++) {
+        await new Promise((r) => setTimeout(r, HD_POLL_INTERVAL_MS));
+        if (stopped) return;
+        try {
+          const res = await api("/api/hd?action=poll&job=" + encodeURIComponent(hd.job_id));
+          const data = (await res.json().catch(() => null)) as
+            | { state?: string; download_url?: string; quality?: string }
+            | null;
+          if (stopped) return;
+          if (data?.state === "done" && data.download_url) {
+            if (data.quality) setQuality(data.quality);
+            setState("done");
+            return;
+          }
+          if (data?.state === "error") {
+            setState("error");
+            return;
+          }
+        } catch (err) {
+          if ((err as Error).message === "unauthorized") return;
+          // gangguan sesaat -> jeda lalu coba lagi
+        }
+      }
+      if (!stopped) setState("error");
+    })();
+    return () => {
+      stopped = true;
+    };
+  }, [state, hd.job_id]);
+
+  return (
+    <div className="dl-card hd-card">
+      <div className="dl-head">
+        <span className="dl-badge">HD</span>
+        <span className="dl-title">Video HD</span>
+      </div>
+      <div className="dl-sub">upgrade kualitas video</div>
+      {state === "pending" && (
+        <div className="hd-pending" role="status">
+          <span className="typing-dot" />
+          <span className="typing-dot" />
+          <span className="typing-dot" />
+          <span className="hd-pending-label">lagi diproses, hasilnya muncul di sini…</span>
+        </div>
+      )}
+      {state === "error" && (
+        <div className="hd-hint">hasilnya gak bisa diambil (kedaluwarsa / gagal). coba kirim ulang link videonya ya.</div>
+      )}
+      {state === "done" && (
+        <div className="dl-btns">
+          <a
+            className="dl-btn"
+            rel="noopener"
+            href={
+              "/api/hd?action=dl&job=" +
+              encodeURIComponent(hd.job_id) +
+              "&name=aomi-hd" +
+              (sid ? "&sid=" + encodeURIComponent(sid) : "")
+            }
+            aria-label="Unduh video HD"
+          >
+            <Icon id="download" />
+            <span>{"MP4 · " + quality}</span>
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -245,6 +346,7 @@ export default function MessageRow({
   file,
   dl,
   music,
+  hd,
   sid,
   userAvatar,
   botAvatar,
@@ -268,6 +370,7 @@ export default function MessageRow({
   file?: MessageFile | null;
   dl?: DlCard | null;
   music?: MusicCard | null;
+  hd?: HdCard | null;
   sid: string | null;
   userAvatar: string | null;
   botAvatar: string | null;
@@ -327,6 +430,7 @@ export default function MessageRow({
           <span className="img-dl-hint">masa unduh sudah habis</span>
         )}
         {dl && <DlCardView dl={dl} sid={sid} />}
+        {hd && <HdCardView hd={hd} sid={sid} />}
         {music && <MusicCardView music={music} />}
         {editing && (
           <div className="edit-box">

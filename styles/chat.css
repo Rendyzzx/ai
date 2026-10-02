@@ -551,6 +551,29 @@
   height: 14px;
 }
 
+/* ---------------- Kartu HD video (polling job faa) ---------------- */
+/* Struktur markup sama dengan .dl-card (badge+judul+sub+tombol),
+   tinggal state polling + hint kecil khusus HD. */
+
+.hd-pending {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0 2px;
+}
+
+.hd-pending-label {
+  margin-left: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.hd-hint {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  padding: 4px 0 2px;
+}
+
 /* Slide foto: grid thumbnail kecil, klik = unduh/buka asli */
 .dl-imgs {
   display: grid;

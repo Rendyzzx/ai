@@ -40,6 +40,7 @@ Browser → Route Handler /api/* (session via header X-Session-Id)
 │       ├── profile/         # profil user (username, display name, avatar)
 │       ├── dl/              # proxy unduhan TikTok/IG (anti SSRF allowlist)
 │       ├── music/           # fitur musik: resolve link audio + proxy unduh lagu
+│       ├── hd/              # fitur HD video: poll job + proxy unduh hasil (maxDuration 60)
 │       └── tempimg/         # host gambar sementara (maxDuration 30)
 ├── components/
 │   ├── chat/                # ChatApp (orchestrator), MessageRow, MessageMenu,
@@ -97,6 +98,49 @@ pesan → deteksi trigger (regex di lib/chat-utils.ts)
   `/api/music?action=resolve` (sekali per lagu), jadi kartu lagu di riwayat lama tetap bisa diputar.
 - Key dekripsi savetube sudah built-in (key publik dari scraper komunitas); env `SAVETUBE_KEY`
   opsional untuk override tanpa redeploy.
+
+## Fitur generate gambar (AI text2img)
+
+Ketik di chat: **"buatkan gambar X"**, "bikin gambar X", "generate gambar X", "gambarin X".
+
+Alur (pola sama seperti edit foto — API faa CORS terbuka, browser yang menembak
+langsung supaya bebas dari limit 60 detik runtime server; generate terukur ±30-60s):
+
+```
+pesan → deteksi trigger (regex di lib/chat-utils.ts)
+      → server: simpan pesan user, balas cepat { imggen_job: { prompt } }
+      → browser: fetch api-faa.my.id/faa/ai-text2img-pro?prompt=…
+        (hasil biner → blob image/png|jpg, di-snip saat disimpan)
+      → POST /api/chat action=imggen-save → sniff + simpan ke tempimg (TTL 3 hari)
+      → pesan assistant: gambar + tombol Unduh (image_url + expires_at)
+```
+
+- Objek wajib ada kata "gambar"/"image"/"poster"/dll untuk buat/bikin/generate
+  (menghindari false positive seperti "bikin kopi"); "gambarin" cukup verb-nya.
+- Hasil generate tersimpan sama seperti hasil edit foto: URL unduh 3 hari +
+  thumbnail permanen di riwayat (action thumb).
+- Gagal (timeout/klar) → pesan kesalahan di chat + tersimpan via action imggen-fail.
+
+## Fitur HD video (upgrade kualitas)
+
+Ketik di chat: **"hdkan <link video>"**, "jadiin hd <link>", "bikin hd <link>", "hd kan video ini <link>".
+
+Alur (job asynchronous, pola 2 API: submit → poll hasil):
+
+```
+pesan → deteksi trigger (HD_TRIGGER_RE + URL, localhost/IP lokal ditolak)
+      → server: POST api-faa.my.id/faa/hdvid?url=… → { job_id }
+      → kartu HD (hd) state "pending" disimpan di pesan assistant, balas cepat
+      → client: kartu polling /api/hd?action=poll&job=… tiap 4 detik
+        sampai state "done" (download_url + quality muncul)
+      → tombol Unduh → /api/hd?action=dl (proxy hasil, attachment,
+        allowlist hostname ketat: uguu.se / api-faa.my.id, cap 80MB)
+```
+
+- Kartu TIDAK di-update di storage saat selesai — job_id stabil, jadi kartu di
+  riwayat lama otomatis poll ulang dan tetap bisa unduh selama job masih ada
+  di sisi layanan faa (pola sama seperti resolve musik).
+- URL localhost / jaringan lokal ditolak; hanya link video publik yang disubmit.
 
 ## Data yang disimpan (database)
 

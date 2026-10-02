@@ -27,7 +27,7 @@ const SettingsView = dynamic(() => import("@/components/settings/SettingsView"),
   ssr: false,
   loading: () => <div className="chat-gate" aria-hidden="true" />,
 });
-import { fileOf, dlOf, musicOf, matchMusicRequest, EDIT_API, EDIT_BROWSER_TIMEOUT, EDIT_RESULT_MAX, EDIT_TRIGGER_RE, matchDlTarget } from "@/lib/chat-utils";
+import { fileOf, dlOf, musicOf, hdOf, matchMusicRequest, matchImageGenRequest, matchHdRequest, EDIT_API, EDIT_BROWSER_TIMEOUT, EDIT_RESULT_MAX, EDIT_TRIGGER_RE, matchDlTarget, IMG_GEN_API, IMG_GEN_TIMEOUT } from "@/lib/chat-utils";
 import { useMusic } from "@/components/music/MusicProvider";
 import { applyAllVisualPrefs, usePref } from "@/lib/prefs";
 import type { BotConfig, ChatResponse, Conversation, ConversationItem, Message, UserProfile } from "@/types";
@@ -533,6 +533,87 @@ export default function ChatApp() {
     } catch { /* opsional — URL unduh masih valid */ }
   }, []);
 
+  /* ---------------- Generate gambar (tahap 2 browser -> tahap 3 simpan) ---------------- */
+
+  const runImgGenJob = useCallback(
+    async (job: { prompt: string }, cid: string | null) => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), IMG_GEN_TIMEOUT);
+      let blob: Blob | null = null;
+      try {
+        const r = await fetch(
+          IMG_GEN_API + "?prompt=" + encodeURIComponent(job.prompt),
+          { signal: ctrl.signal }
+        );
+        clearTimeout(timer);
+        if (!r.ok) throw new Error("imggen http " + r.status);
+        blob = await r.blob();
+        if (!blob.type.startsWith("image/") || blob.size > EDIT_RESULT_MAX) throw new Error("hasil tidak valid");
+      } catch {
+        clearTimeout(timer);
+        setIndicator(null);
+        pushMessages([
+          {
+            message_id: "",
+            role: "assistant",
+            content: "Generate-nya kelamaan atau gagal. Coba lagi pakai prompt yang sama ya.",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+        api("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "imggen-fail",
+            conversation_id: cid,
+            message: "generate gambar tadi gagal (kelamaan/gangguan) — coba kirim ulang ya.",
+          }),
+        }).catch(() => {});
+        refreshSidebar();
+        return;
+      }
+
+      // Tahap 3: kirim hasil ke server -> URL unduh 3 hari.
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = reject;
+        fr.readAsDataURL(blob!);
+      });
+      const res2 = await api("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "imggen-save", conversation_id: cid, image: dataUrl }),
+      });
+      const data2 = (await res2.json().catch(() => null)) as ChatResponse | null;
+      setIndicator(null);
+      if (res2.ok && data2?.image_url) {
+        const msg: Message = {
+          message_id: data2.assistant_message_id || "",
+          role: "assistant",
+          content: data2.text || "",
+          image_url: data2.image_url,
+          image_name: data2.image_name,
+          expires_at: data2.expires_at,
+          timestamp: new Date().toISOString(),
+        };
+        pushMessages([msg]);
+        persistEditThumb(data2.image_url, data2.assistant_message_id || "", data2.conversation_id || cid);
+        refreshSidebar();
+      } else {
+        pushMessages([
+          {
+            message_id: "",
+            role: "assistant",
+            content: data2?.error || "Gagal menyimpan hasil generate. Coba lagi ya.",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+    },
+    [pushMessages, refreshSidebar, persistEditThumb]
+  );
+
   /* ---------------- Kirim pesan ---------------- */
 
   const send = useCallback(
@@ -556,10 +637,24 @@ export default function ChatApp() {
       setPendingImage(null);
 
       // Indikator: edit foto → label khusus; downloader → label file
+      const wantsGen = !img && !!matchImageGenRequest(text);
+      const wantsHd = !img && !wantsGen && !!matchHdRequest(text);
       const wantsEdit = !!(img && text && EDIT_TRIGGER_RE.test(text));
-      const wantsMusic = !img && !wantsEdit && !!matchMusicRequest(text);
-      const wantsDl = !img && !wantsEdit && !wantsMusic && !!matchDlTarget(text);
-      setIndicator(wantsEdit ? "editing" : wantsMusic ? "music" : wantsDl ? "downloading" : "typing");
+      const wantsMusic = !img && !wantsGen && !wantsHd && !wantsEdit && !!matchMusicRequest(text);
+      const wantsDl = !img && !wantsGen && !wantsHd && !wantsEdit && !wantsMusic && !!matchDlTarget(text);
+      setIndicator(
+        wantsGen
+          ? "generating"
+          : wantsHd
+            ? "hdvid"
+            : wantsEdit
+              ? "editing"
+              : wantsMusic
+                ? "music"
+                : wantsDl
+                  ? "downloading"
+                  : "typing"
+      );
       scrollToBottom(true);
 
       try {
@@ -573,6 +668,22 @@ export default function ChatApp() {
           }),
         });
         const data = (await res.json().catch(() => null)) as ChatResponse | null;
+
+        if (res.ok && data?.imggen_job) {
+          // Tahap 1 selesai (server simpan pesan user). Browser lanjut
+          // menembak API faa text2img sendiri (CORS terbuka).
+          setCurrentId(data.conversation_id || currentIdRef.current);
+          if (data.user_message_id) {
+            setLoaded((prev) => {
+              const next = [...prev];
+              const last = next[next.length - 1];
+              if (last && last.role === "user") next[next.length - 1] = { ...last, message_id: data.user_message_id! };
+              return next;
+            });
+          }
+          await runImgGenJob(data.imggen_job, data.conversation_id || currentIdRef.current);
+          return;
+        }
 
         if (res.ok && data?.edit_job) {
           // Tahap 1 selesai (server simpan pesan user + host gambar).
@@ -611,6 +722,8 @@ export default function ChatApp() {
             msg.dl = data.dl;
           } else if (data.music) {
             msg.music = data.music;
+          } else if (data.hd) {
+            msg.hd = data.hd;
           } else if (data.image_url) {
             msg.image_url = data.image_url;
             msg.image_name = data.image_name;
@@ -925,6 +1038,7 @@ export default function ChatApp() {
         file={file}
         dl={dlOf(m)}
         music={musicOf(m)}
+        hd={hdOf(m)}
         sid={sid}
         userAvatar={user.avatar}
         botAvatar={bot.bot_avatar}

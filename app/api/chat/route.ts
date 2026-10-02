@@ -13,9 +13,10 @@ import { DEFAULT_BOT } from "@/lib/server/bot-config";
 import { getSession } from "@/lib/server/auth";
 import { allowUser } from "@/lib/server/ratelimit";
 import { json, readBody, forbidden, originOk } from "@/lib/server/http";
-import { matchMusicRequest } from "@/lib/chat-utils";
+import { matchMusicRequest, matchImageGenRequest, matchHdRequest } from "@/lib/chat-utils";
 import { resolveMusicCard, MusicError } from "@/lib/server/music";
-import type { BotConfig, Conversation, ConversationItem, DlCard, Message } from "@/types";
+import { submitHdJob, HdError } from "@/lib/server/hdvid";
+import type { BotConfig, Conversation, ConversationItem, DlCard, HdCard, Message } from "@/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -908,8 +909,74 @@ export async function POST(req: Request) {
     });
   }
 
+  // ---------------- IMGGEN SAVE: browser kirim hasil generate (dataURL) ----------------
+  // Sama seperti edit-save: browser menembak API faa sendiri (CORS
+  // terbuka, +/-30-60s) lalu hasilnya disimpan di sini sebagai gambar
+  // temp dengan masa unduh 3 hari.
+  if (body.action === "imggen-save" && imageBuffer) {
+    if (imageBuffer.length > LIMITS.editResultMax) {
+      return json({ error: "Hasil generate terlalu besar." }, 413);
+    }
+    const sniff = sniffImage(imageBuffer);
+    if (!sniff) {
+      return json({ error: "Hasil generate tidak bisa dibaca sebagai gambar. Coba lagi ya." }, 502);
+    }
+
+    const host = String(req.headers.get("host") || "").replace(/[^a-zA-Z0-9.\-]/g, "");
+    if (!host) {
+      return json({ error: "Host tidak diketahui. Coba lagi." }, 500);
+    }
+
+    const resultId = crypto.randomUUID();
+    await putJson(
+      `tempimg/${resultId}.json`,
+      { b64: imageBuffer.toString("base64"), mime: sniff.mime },
+      "imggen result"
+    );
+    await expireJson(`tempimg/${resultId}.json`, LIMITS.tempResultTtl);
+    const resultUrl = `https://${host}/api/tempimg?id=${resultId}`;
+    const imageSaveName = `aomi-gambar-${resultId.slice(0, 8)}.${sniff.ext}`;
+    const expiresAt = new Date(Date.now() + LIMITS.tempResultTtl * 1000).toISOString();
+
+    const replyText =
+      "ini dia gambarnya~ bisa diunduh di bawah. kalau mau versi lain atau detailnya diubah, bilang aja prompt baru ya.";
+    const assistantMessageId = crypto.randomUUID();
+    conv.messages.push({
+      message_id: assistantMessageId,
+      role: "assistant",
+      content: replyText,
+      image_url: resultUrl,
+      image_name: imageSaveName,
+      image_mime: sniff.mime,
+      expires_at: expiresAt,
+      timestamp: now,
+    });
+    conv.updated_at = now;
+
+    await Promise.all([
+      putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, "imggen append"),
+      touchIndex(uid, {
+        conversation_id: conv.conversation_id,
+        title: conv.title,
+        updated_at: conv.updated_at,
+      }),
+    ]);
+
+    return json({
+      text: replyText,
+      assistant_message_id: assistantMessageId,
+      conversation_id: conv.conversation_id,
+      title: conv.title,
+      provider: "faa-imggen",
+      bot_name: bot.bot_name,
+      image_url: resultUrl,
+      image_name: imageSaveName,
+      expires_at: expiresAt,
+    });
+  }
+
   // ---------------- EDIT FAIL: browser laporkan edit gagal ----------------
-  if (body.action === "edit-fail" && message) {
+  if ((body.action === "edit-fail" || body.action === "imggen-fail") && message) {
     const assistantMessageId = crypto.randomUUID();
     conv.messages.push({
       message_id: assistantMessageId,
@@ -927,6 +994,105 @@ export async function POST(req: Request) {
       }),
     ]);
     return json({ ok: true });
+  }
+
+  // ---------------- MODE GENERATE GAMBAR (tahap START) ----------------
+  // "buatkan gambar X" / "bikin gambar X" / "gambarin X" -> simpan
+  // pesan user, balas CEPAT dengan job info. Browser menembak API
+  // faa text2img sendiri (generate +/-30-60s, kepanjangan buat server).
+  if (!imageBuffer && message) {
+    const genPrompt = matchImageGenRequest(message);
+    if (genPrompt) {
+      if (!allowUser("chatimggen", uid, req, 6, 60_000)) {
+        return json({ error: "Sabar, gambar sebelumnya masih diproses. Coba lagi sebentar." }, 429);
+      }
+
+      const userMessageId = crypto.randomUUID();
+      conv.messages.push({
+        message_id: userMessageId,
+        role: "user",
+        content: message,
+        timestamp: now,
+      });
+      if (conv.title === "Chat baru") conv.title = genPrompt.slice(0, 48);
+      conv.updated_at = now;
+
+      await Promise.all([
+        putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, "imggen start"),
+        touchIndex(uid, {
+          conversation_id: conv.conversation_id,
+          title: conv.title,
+          updated_at: conv.updated_at,
+        }),
+      ]);
+
+      return json({
+        imggen_job: { prompt: genPrompt },
+        user_message_id: userMessageId,
+        conversation_id: conv.conversation_id,
+        title: conv.title,
+        bot_name: bot.bot_name,
+      });
+    }
+  }
+
+  // ---------------- MODE HD VIDEO (submit job) ----------------
+  // "hdkan <link video>" -> submit job ke API faa, simpan kartu HD
+  // (state pending) di pesan assistant, balas cepat. Client polling
+  // /api/hd?action=poll sampai "done" -> tombol unduh muncul.
+  if (!imageBuffer && message) {
+    const hdUrl = matchHdRequest(message);
+    if (hdUrl) {
+      if (!allowUser("chathd", uid, req, 4, 60_000)) {
+        return json({ error: "Sabar, video sebelumnya masih diproses. Coba lagi sebentar." }, 429);
+      }
+
+      let job: { job_id: string };
+      try {
+        job = await submitHdJob(hdUrl);
+      } catch (err) {
+        const code = err instanceof HdError ? err.code : "UPSTREAM";
+        console.error("[chat] hd gagal (" + code + "):", (err as Error).message);
+        return json({ error: "Videonya gak bisa diproses jadi HD. Cek linknya terus coba lagi ya." }, 502);
+      }
+
+      const card: HdCard = {
+        job_id: job.job_id,
+        state: "pending",
+        source_url: hdUrl,
+        quality: "HD",
+      };
+      const replyText =
+        "oke, videonya lagi ditingkatin ke HD nih~ prosesnya biasanya beberapa puluh detik, kartunya bakal update sendiri pas hasilnya siap.";
+      const userMessageId = crypto.randomUUID();
+      const assistantMessageId = crypto.randomUUID();
+      conv.messages.push(
+        { message_id: userMessageId, role: "user", content: message, timestamp: now },
+        { message_id: assistantMessageId, role: "assistant", content: replyText, hd: card, timestamp: now }
+      );
+      if (conv.title === "Chat baru") conv.title = "Video HD";
+      conv.updated_at = now;
+
+      await Promise.all([
+        putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, "hd append"),
+        touchIndex(uid, {
+          conversation_id: conv.conversation_id,
+          title: conv.title,
+          updated_at: conv.updated_at,
+        }),
+      ]);
+
+      return json({
+        text: replyText,
+        user_message_id: userMessageId,
+        assistant_message_id: assistantMessageId,
+        conversation_id: conv.conversation_id,
+        title: conv.title,
+        provider: "faa-hd",
+        bot_name: bot.bot_name,
+        hd: card,
+      });
+    }
   }
 
   // ---------------- MODE MUSIK (putar lagu) ----------------

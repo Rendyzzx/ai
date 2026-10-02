@@ -3,13 +3,19 @@
    Helper bersama client chat (port dari chat.js).
    ============================================================ */
 
-import type { Message, DlCard, MusicCard } from "@/types";
+import type { Message, DlCard, HdCard, MusicCard } from "@/types";
 
 // API edit foto — browser menembak LANGSUNG (CORS terbuka), bebas dari
 // batas 60 detik runtime server.
 export const EDIT_API = "https://api-faa.my.id/faa/editfoto";
 export const EDIT_BROWSER_TIMEOUT = 120_000; // API eksternal terukur ±40-60s
 export const EDIT_RESULT_MAX = 4_000_000; // hasil maks 4MB
+
+// API generate gambar (AI text2img) — browser menembak LANGSUNG (CORS
+// terbuka), pola sama seperti edit foto: generate terukur ±30-40s,
+// terlalu lama untuk ditunggu server (limit 60s).
+export const IMG_GEN_API = "https://api-faa.my.id/faa/ai-text2img-pro";
+export const IMG_GEN_TIMEOUT = 150_000; // API eksternal terukur ±30-60s
 
 // Deteksi permintaan edit foto (gambar terlampir + kata pemicu).
 // SALINAN dari EDIT_TRIGGER_RE di server — server tetap yang memutuskan
@@ -64,6 +70,83 @@ function cleanMusicQuery(raw: string): string {
     .trim();
 }
 
+// Deteksi permintaan generate gambar: "buatkan gambar X", "bikin
+// gambar X", "generate gambar X", "gambarin X".
+// SALINAN logika juga dipakai server (route chat) — server tetap yang
+// memutuskan; ini memilih animasi loading yang tepat.
+// Objek WAJIB ada kata "gambar"/"image"/dll untuk buat/bikin/generate
+// (menghindari false positive "bikin kopi"); khusus "gambarin" cukup
+// verb-nya sendiri.
+const IMGGEN_OBJ_RE =
+  /(?:^|\s)(?:tolong(?:in)?\s+|coba\s+|bisa\s+|boleh\s+|mohon\s+|please\s+|pls\s+|aku\s+mau\s+|pengen\s+|mau\s+)?(?:buat|bikin|generate|draw|paint|create)(?:kan|ke|in|nya|ah)?(?:\s+aku)?(?:\s+(?:se?buah|se?cuan|satu))?[\s,]*(?:gambar|image|ilustrasi|ilustration|poster|wallpaper|logo|art|drawing|painting|foto)\b[\s:,]+(.+)$/i;
+const IMGGEN_VERB_RE =
+  /(?:^|\s)(?:tolong(?:in)?\s+|coba\s+|bisa\s+|boleh\s+|mohon\s+|please\s+|pls\s+|aku\s+mau\s+|pengen\s+|mau\s+)?gambarin\b[\s:,]+(.+)$/i;
+
+/** Bersihkan prompt dari sapaan/kata sisa di ujung. */
+function cleanGenPrompt(raw: string): string {
+  let q = raw.trim();
+  for (let i = 0; i < 4; i++) {
+    const next = q.replace(/^(?:yang|buat|bikin|gambarnya|gambarkan)\b[\s:,]*/i, "");
+    if (next === q) break;
+    q = next;
+  }
+  return q
+    .replace(/[\s,]+(?:dong|du|deh|donk|ya+|banget|please|pls|makasih|thanks|thx)[\s.!]*$/i, "")
+    .replace(/^["'\u201C]+|["'\u201D]+$/g, "")
+    .replace(/[?!.]+$/, "")
+    .trim();
+}
+
+/**
+ * Balik prompt bila pesan adalah permintaan generate gambar,
+ * selain itu null.
+ */
+export function matchImageGenRequest(raw: string): string | null {
+  const text = String(raw || "").trim();
+  if (!text || text.length > 500) return null;
+  const m = text.match(IMGGEN_OBJ_RE) || text.match(IMGGEN_VERB_RE);
+  if (!m) return null;
+  const prompt = cleanGenPrompt(m[1] || "");
+  if (!prompt || prompt.length < 2) return null;
+  return prompt.slice(0, 300);
+}
+
+// Deteksi permintaan HD video: "hdkan <link>", "jadiin hd", "bikin hd".
+// SALINAN dari HD_TRIGGER_RE di server — server tetap yang memutuskan
+// rute; ini hanya memilih animasi loading yang tepat.
+export const HD_TRIGGER_RE =
+  /\b(?:hdfy|hd-?kan|hd-?in|jadi(?:in|kan)?\s+hd|bikin(?:in|kan)?\s+hd|ubah(?:in)?\s+jadi\s+hd|upgrade(?:\s+ke)?\s+hd)\b/i;
+
+/**
+ * Balik URL video bila pesan adalah permintaan upgrade HD,
+ * selain itu null. URL localhost/jaringan lokal ditolak.
+ */
+export function matchHdRequest(raw: string): string | null {
+  const text = String(raw || "").trim();
+  if (!text || text.length > 2000) return null;
+  if (!HD_TRIGGER_RE.test(text)) return null;
+  const urls = text.match(/https?:\/\/[^\s<>"')\]]+/gi) || [];
+  for (const rawUrl of urls) {
+    let u: URL;
+    try {
+      u = new URL(rawUrl.replace(/[.,;!?]+$/, ""));
+    } catch {
+      continue;
+    }
+    const h = u.hostname.toLowerCase();
+    if (
+      !h ||
+      h === "localhost" ||
+      h.endsWith(".local") ||
+      /^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)
+    ) {
+      continue;
+    }
+    return u.href;
+  }
+  return null;
+}
+
 /**
  * Balik query lagu bila pesan adalah permintaan putar lagu,
  * selain itu null. Query bisa judul lagu ATAU link YouTube.
@@ -99,6 +182,11 @@ export function dlOf(m: Message): DlCard | null {
   return m && m.dl && typeof m.dl === "object" && (m.dl.video || m.dl.images || m.dl.music)
     ? m.dl
     : null;
+}
+
+/** Metadata kartu HD video. */
+export function hdOf(m: Message): HdCard | null {
+  return m && m.hd && typeof m.hd === "object" && m.hd.job_id ? m.hd : null;
 }
 
 /** Format waktu item riwayat (port dari sidebar.js). */
