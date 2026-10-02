@@ -46,12 +46,14 @@ body {
   font-family: var(--font);
   font-size: 15px;
   line-height: 1.5;
-  overflow: hidden;              /* body TIDAK pernah scroll: hanya area chat */
-  overscroll-behavior: none;
-  position: fixed;               /* cegah iOS rubber-band menggeser layout */
-  inset: 0;
+  overflow: hidden;              /* hanya area chat yang scroll — BUKAN page lock */
   -webkit-font-smoothing: antialiased;
 }
+
+/* Catatan: JANGAN pakai `position: fixed` + `overscroll-behavior: none`
+   pada body — kombinasi itu mematikan pull-to-refresh mobile dan membuat
+   halaman terasa terkunci. Anti-rubber-band iOS sudah dicover oleh
+   html/body height:100% + overflow:hidden. */
 
 button {
   font: inherit;
@@ -182,4 +184,76 @@ input, textarea {
 .avatar.small svg {
   width: 14px;
   height: 14px;
+}
+
+
+/* ============================================================
+   Opening animation (#app-intro)
+   Hanya visual overlay di atas aplikasi (aplikasi tetap dirender
+   di belakang — tidak ada layout shift). Murni CSS transform/opacity,
+   tanpa JS interval; element dihapus dari DOM setelah selesai.
+   ============================================================ */
+
+#app-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  animation: intro-out 0.8s cubic-bezier(0.22, 1, 0.36, 1) 2.2s forwards;
+}
+
+.intro-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 24px;
+}
+
+/* Logo + nama muncul: opacity 0 -> 1, translateY 10px -> 0 */
+.intro-logo {
+  width: 34px;
+  height: 34px;
+  color: var(--accent);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: intro-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+}
+
+.intro-name {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  animation: intro-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+}
+
+/* Subtitle kecil: fade pendek setelah nama tampak */
+.intro-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  animation: intro-fade 0.5s ease-out 1s both;
+}
+
+@keyframes intro-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes intro-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes intro-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+/* Reduced motion: skip intro sepenuhnya */
+@media (prefers-reduced-motion: reduce) {
+  #app-intro { display: none; }
 }

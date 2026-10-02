@@ -11,6 +11,15 @@
   <link rel="stylesheet" href="css/auth.css" />
 </head>
 <body>
+  <!-- Opening animation: overlay visual saja, aplikasi dirender di belakang -->
+  <div id="app-intro" aria-hidden="true">
+    <div class="intro-content">
+      <svg class="intro-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="components/icons.svg#logo" /></svg>
+      <div class="intro-name">Aomi</div>
+      <div class="intro-sub">Asisten AI pribadimu</div>
+    </div>
+  </div>
+
   <main class="auth-shell">
     <!-- ============ PANEL BRAND (desktop) ============ -->
     <section class="auth-brand" aria-hidden="true">
@@ -140,5 +149,22 @@
   </main>
 
   <script type="module" src="js/auth.js"></script>
+
+<script>
+  // Cleanup intro: satu event animationend + satu fallback timeout,
+  // lalu element dihapus dari DOM. Tidak ada interval yang berjalan.
+  (function () {
+    var intro = document.getElementById('app-intro');
+    if (!intro) return;
+    var kill = function () { if (intro && intro.parentNode) { intro.remove(); intro = null; } };
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      kill(); return;
+    }
+    intro.addEventListener('animationend', function (e) {
+      if (e.animationName === 'intro-out') kill();
+    });
+    setTimeout(kill, 3400);
+  })();
+</script>
 </body>
 </html>

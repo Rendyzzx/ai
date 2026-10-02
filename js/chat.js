@@ -51,41 +51,53 @@ function labelFor(role) {
     : (state.bot.bot_name || 'Aomi');
 }
 
-/** Bot: [Avatar][Nama+Konten] di kiri. User: [Konten][Avatar] di kanan. */
+/**
+ * Renderer pesan — SATU-satunya jalur render pesan di aplikasi ini.
+ * Struktur DOM menentukan posisi (bukan CSS order-trick):
+ *
+ * assistant (kiri):  .message-row.assistant > [.message-avatar, .message-body]
+ * user (kanan):      .message-row.user      > [.message-body, .message-avatar]
+ *
+ * .message-body > [.message-header (nama pengirim), .message-content]
+ * Avatar & nama dari state terpusat (profile/bot dinamis, tidak hardcode).
+ */
 function messageNode(role, content, isError) {
-  const msg = document.createElement('div');
-  msg.className = 'msg ' + (role === 'user' ? 'user' : 'ai') + (isError ? ' error' : '');
+  const row = document.createElement('div');
+  row.className = 'message-row ' + (role === 'user' ? 'user' : 'assistant') + (isError ? ' error' : '');
 
+  // Avatar dinamis dari state (user: profile.avatar, bot: bot.avatar)
   const avatar = document.createElement('div');
-  avatar.className = 'avatar';
+  avatar.className = 'message-avatar';
   avatar.setAttribute('aria-hidden', 'true');
-  const drawAvatar = () => renderAvatar(
-    avatar, role === 'user' ? state.user.avatar : state.bot.bot_avatar,
+  renderAvatar(
+    avatar,
+    role === 'user' ? state.user.avatar : state.bot.bot_avatar,
     role === 'user' ? 'user' : 'logo'
   );
-  drawAvatar();
 
-  const wrap = document.createElement('div');
-  wrap.className = 'msg-content';
-
+  // Body: header (nama) + content
   const body = document.createElement('div');
-  body.className = 'body';
-  body.textContent = content;
+  body.className = 'message-body';
+
+  const header = document.createElement('div');
+  header.className = 'message-header';
+  header.dataset.role = role === 'user' ? 'user' : 'assistant';
+  header.textContent = labelFor(role);
+
+  const contentEl = document.createElement('div');
+  contentEl.className = 'message-content';
+  contentEl.textContent = content;
+
+  body.append(header, contentEl);
 
   if (role === 'user') {
-    // Pesan user: tanpa label nama, avatar di KANAN
-    wrap.appendChild(body);
-    msg.append(wrap, avatar);
+    // USER di kanan: [body][avatar] — avatar paling kanan
+    row.append(body, avatar);
   } else {
-    // Pesan bot: nama bot di atas konten, avatar di KIRI
-    const who = document.createElement('div');
-    who.className = 'who';
-    who.dataset.role = 'assistant';
-    who.textContent = labelFor(role);
-    wrap.append(who, body);
-    msg.append(avatar, wrap);
+    // BOT di kiri: [avatar][body] — avatar paling kiri
+    row.append(avatar, body);
   }
-  return msg;
+  return row;
 }
 
 /**
@@ -94,13 +106,15 @@ function messageNode(role, content, isError) {
  * membangun ulang ribuan node — DOM cap tetap ~150.
  */
 function refreshLabels() {
-  for (const who of els.column.querySelectorAll('.who')) {
-    if (who.dataset.role === 'assistant') who.textContent = state.bot.bot_name;
+  for (const h of els.column.querySelectorAll('.message-header')) {
+    h.textContent = h.dataset.role === 'user'
+      ? labelFor('user')
+      : labelFor('assistant');
   }
-  for (const av of els.column.querySelectorAll('.msg.user > .avatar')) {
+  for (const av of els.column.querySelectorAll('.message-row.user > .message-avatar')) {
     renderAvatar(av, state.user.avatar, 'user');
   }
-  for (const av of els.column.querySelectorAll('.msg.ai > .avatar')) {
+  for (const av of els.column.querySelectorAll('.message-row.assistant > .message-avatar')) {
     renderAvatar(av, state.bot.bot_avatar, 'logo');
   }
 }
@@ -110,7 +124,7 @@ function appendMessage(role, content, isError = false) {
   els.welcome.hidden = true;
   els.column.appendChild(messageNode(role, content, isError));
 
-  const nodes = els.column.querySelectorAll(':scope > .msg');
+  const nodes = els.column.querySelectorAll(':scope > .message-row');
   if (nodes.length > DOM_CAP) {
     nodes[0].remove();
     firstHidden++;
@@ -120,7 +134,7 @@ function appendMessage(role, content, isError = false) {
 }
 
 function resetView() {
-  els.column.querySelectorAll('.msg').forEach((n) => n.remove());
+  els.column.querySelectorAll('.message-row').forEach((n) => n.remove());
   loaded = [];
   firstHidden = 0;
   currentId = null;
@@ -141,7 +155,7 @@ async function loadConversation(id) {
     els.title.textContent = conv.title || labelFor('assistant');
     els.title.dataset.default = '0';
 
-    els.column.querySelectorAll('.msg').forEach((n) => n.remove());
+    els.column.querySelectorAll('.message-row').forEach((n) => n.remove());
     firstHidden = Math.max(0, loaded.length - RENDER_BATCH);
 
     const fragment = document.createDocumentFragment();
@@ -164,7 +178,7 @@ function prependBatch() {
   const slice = loaded.slice(start, firstHidden);
   firstHidden = start;
 
-  const anchor = els.column.querySelector('.msg') || null;
+  const anchor = els.column.querySelector('.message-row') || null;
   const fragment = document.createDocumentFragment();
   for (const m of slice) {
     fragment.appendChild(messageNode(m.role, m.content));
@@ -269,7 +283,7 @@ async function submit() {
   // Indikator mengetik (dengan avatar bot)
   const typing = messageNode('assistant', '');
   typing.classList.add('typing');
-  typing.querySelector('.body').innerHTML =
+  typing.querySelector('.message-content').innerHTML =
     '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
   els.column.appendChild(typing);
   scrollToBottom(true);
