@@ -17,6 +17,7 @@ import { matchMusicRequest, matchImageGenRequest, matchHdRequest, HD_TRIGGER_RE 
 import { resolveMusicCard, MusicError } from "@/lib/server/music";
 import { submitHdJob, HdError } from "@/lib/server/hdvid";
 import { UPLOAD_HOST_RE } from "@/lib/server/uup";
+import { upscalePhoto, fetchUpscaledBytes, HdPhotoError } from "@/lib/server/hdphoto";
 import type { BotConfig, Conversation, ConversationItem, DlCard, HdCard, Message } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -873,6 +874,106 @@ export async function POST(req: Request) {
       title: conv.title,
       provider: regOut.provider,
       bot_name: bot.bot_name,
+    });
+  }
+
+  // ---------------- MODE HD FOTO (upscale, server-side) ----------------
+  // Gambar terlampir + kata "hdkan"/"jadiin hd" → upscale lewat API faa
+  // hdv4 (sinkron ±7 detik, aman di server). Alur: host input di
+  // tempimg → hdv4 → unduh hasil → rehost tempimg (TTL 3 hari).
+  if (imageBuffer && message && HD_TRIGGER_RE.test(message)) {
+    if (!allowUser("chathd", uid, req, 4, 60_000)) {
+      return json({ error: "Sabar, foto sebelumnya masih diproses. Coba lagi sebentar." }, 429);
+    }
+
+    const host = String(req.headers.get("host") || "").replace(/[^a-zA-Z0-9.\-]/g, "");
+    if (!host) {
+      return json({ error: "Host tidak diketahui. Coba lagi." }, 500);
+    }
+
+    // Host gambar input sebagai URL publik (hdv4 butuh URL)
+    const tempId = crypto.randomUUID();
+    await putJson(
+      `tempimg/${tempId}.json`,
+      { b64: imageBuffer.toString("base64"), mime: imgMatch![1] },
+      "temp image"
+    );
+    await expireJson(`tempimg/${tempId}.json`, LIMITS.tempInputTtl);
+    const publicUrl = `https://${host}/api/tempimg?id=${tempId}`;
+
+    // Upscale lalu unduh hasilnya
+    let resultBytes: Buffer;
+    let resultMime: string;
+    try {
+      const upscaledUrl = await upscalePhoto(publicUrl);
+      const out = await fetchUpscaledBytes(upscaledUrl, LIMITS.editResultMax);
+      resultBytes = out.buffer;
+      resultMime = out.mime;
+    } catch (err) {
+      const code = err instanceof HdPhotoError ? err.code : "UPSTREAM";
+      console.error("[chat] hd foto gagal (" + code + "):", (err as Error).message);
+      return json({ error: "Fotonya gak bisa diproses jadi HD. Coba lagi ya." }, 502);
+    }
+    const sniff = sniffImage(resultBytes) || { mime: resultMime, ext: resultMime.includes("png") ? "png" : "jpg" };
+
+    // Rehost hasil (TTL unduh 3 hari) → URL publik milik kita
+    const resultId = crypto.randomUUID();
+    await putJson(
+      `tempimg/${resultId}.json`,
+      { b64: resultBytes.toString("base64"), mime: sniff.mime },
+      "hd photo result"
+    );
+    await expireJson(`tempimg/${resultId}.json`, LIMITS.tempResultTtl);
+    const resultUrl = `https://${host}/api/tempimg?id=${resultId}`;
+    const imageSaveName = `aomi-hd-${resultId.slice(0, 8)}.${sniff.ext}`;
+    const expiresAt = new Date(Date.now() + LIMITS.tempResultTtl * 1000).toISOString();
+
+    const replyText =
+      "ini dia foto HD-nya~ resolusinya udah dinaikin, bisa diunduh di bawah ya.";
+    const userMessageId = crypto.randomUUID();
+    const assistantMessageId = crypto.randomUUID();
+    conv.messages.push(
+      {
+        message_id: userMessageId,
+        role: "user",
+        content: message,
+        image: imageThumb || imageDataUrl,
+        timestamp: now,
+      },
+      {
+        message_id: assistantMessageId,
+        role: "assistant",
+        content: replyText,
+        image_url: resultUrl,
+        image_name: imageSaveName,
+        image_mime: sniff.mime,
+        expires_at: expiresAt,
+        timestamp: now,
+      }
+    );
+    if (conv.title === "Chat baru") conv.title = message.slice(0, 48) || "Foto HD";
+    conv.updated_at = now;
+
+    await Promise.all([
+      putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, "hd photo append"),
+      touchIndex(uid, {
+        conversation_id: conv.conversation_id,
+        title: conv.title,
+        updated_at: conv.updated_at,
+      }),
+    ]);
+
+    return json({
+      text: replyText,
+      user_message_id: userMessageId,
+      assistant_message_id: assistantMessageId,
+      conversation_id: conv.conversation_id,
+      title: conv.title,
+      provider: "faa-hdphoto",
+      bot_name: bot.bot_name,
+      image_url: resultUrl,
+      image_name: imageSaveName,
+      expires_at: expiresAt,
     });
   }
 

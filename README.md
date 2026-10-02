@@ -143,6 +143,38 @@ pesan → deteksi trigger (HD_TRIGGER_RE + URL, localhost/IP lokal ditolak)
   di sisi layanan faa (pola sama seperti resolve musik).
 - URL localhost / jaringan lokal ditolak; hanya link video publik yang disubmit.
 
+## Fitur HD foto (upscale gambar)
+
+Kirim FOTO di chat + bilang **"hdkan foto ini"** (trigger HD sama seperti
+video, tapi yang dilampirkan gambar). Alur server-side (API sinkron ±7 detik):
+
+```
+gambar terlampir + trigger HD
+  → server host input di /api/tempimg (URL publik, hdv4 butuh URL)
+  → GET api-faa.my.id/faa/hdv4?image=<url>  (sinkron, hasil 4x resolusi)
+  → unduh image_upscaled → rehost di tempimg (TTL unduh 3 hari)
+  → balas image_url + tombol unduh (pola sama seperti hasil edit foto)
+```
+
+- hdv4 teruji: 720x796 → 2880x3184 (4x upscale).
+- Gagal upscale → error ramah ke user, percakapan tetap tersimpan.
+
+## API edit foto (DIGANTI 2026-10)
+
+Edit foto sekarang pakai API baru (yang lama api-faa editfoto dibuang):
+
+```
+browser: GET apiii-xrina.vercel.app/ai-image/editimg?image=<input_url>&prompt=<p>
+       → balasan: gambar binary langsung (image/png)
+       → error: HTTP 500 JSON { status:false, message } (mis. "Insufficient credits")
+```
+
+- Param input ganti dari `url=` ke `image=`.
+- Balasan binary → client cek `blob.type.startsWith("image/")`; error JSON
+  masuk jalur gagal yang ramah (kirim ulang fotonya).
+- Catatan: API ini balas cepat saat sukses; error "Insufficient credits"
+  berarti kredit backend xrina habis (di luar kendali kita).
+
 ## Fitur upload video (HD + AI vision)
 
 Klik ikon + di composer → pilih video (MP4/WebM/MOV, maks 50MB). Dua mode

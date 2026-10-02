@@ -471,12 +471,11 @@ export default function AuthLanding() {
               </p>
             </div>
             <div className="cando-row" id="feat-hd">
-              <h3 className="cando-name">HD Video</h3>
+              <h3 className="cando-name">HD Video &amp; Foto</h3>
               <p className="cando-desc">
-                Kirim link video ATAU upload langsung dari galerimu, terus
-                bilang &ldquo;hdkan&rdquo; — videonya ditingkatin jadi
-                kualitas HD. Prosesnya jalan otomatis, kartu di chat update
-                sendiri begitu hasilnya siap diunduh.
+                Kirim link video, upload video, atau kirim foto, terus bilang
+                &ldquo;hdkan&rdquo; — videonya ditingkatin ke kualitas HD dan
+                fotonya di-upscale 4x resolusinya. Hasilnya tinggal diunduh.
               </p>
             </div>
             <div className="cando-row" id="feat-tiktok">

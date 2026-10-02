@@ -459,12 +459,13 @@ export default function ChatApp() {
       let blob: Blob | null = null;
       try {
         const r = await fetch(
-          `${EDIT_API}?url=${encodeURIComponent(job.input_url)}&prompt=${encodeURIComponent(job.prompt)}`,
+          `${EDIT_API}?image=${encodeURIComponent(job.input_url)}&prompt=${encodeURIComponent(job.prompt)}`,
           { signal: ctrl.signal }
         );
         clearTimeout(timer);
         if (!r.ok) throw new Error("edit http " + r.status);
         blob = await r.blob();
+        if (!blob.type.startsWith("image/")) throw new Error("bukan gambar: " + blob.type);
         if (blob.size > EDIT_RESULT_MAX) throw new Error("hasil terlalu besar");
       } catch {
         clearTimeout(timer);
@@ -662,6 +663,7 @@ export default function ChatApp() {
       const wantsHdVideo = !!(vidReady && HD_TRIGGER_RE.test(text));
       const wantsHd = !img && !vid && !wantsGen && !!matchHdRequest(text);
       const wantsEdit = !!(img && text && EDIT_TRIGGER_RE.test(text));
+      const wantsHdFoto = !!(img && text && HD_TRIGGER_RE.test(text));
       const wantsMusic = !img && !vid && !wantsGen && !wantsHd && !wantsEdit && !!matchMusicRequest(text);
       const wantsDl = !img && !vid && !wantsGen && !wantsHd && !wantsEdit && !wantsMusic && !!matchDlTarget(text);
       setIndicator(
@@ -669,7 +671,7 @@ export default function ChatApp() {
           ? "generating"
           : wantsHd || wantsHdVideo
             ? "hdvid"
-            : wantsEdit
+            : wantsEdit || wantsHdFoto
               ? "editing"
               : wantsMusic
                 ? "music"

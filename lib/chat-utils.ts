@@ -6,9 +6,10 @@
 import type { Message, DlCard, HdCard, MusicCard } from "@/types";
 
 // API edit foto — browser menembak LANGSUNG (CORS terbuka), bebas dari
-// batas 60 detik runtime server.
-export const EDIT_API = "https://api-faa.my.id/faa/editfoto";
-export const EDIT_BROWSER_TIMEOUT = 120_000; // API eksternal terukur ±40-60s
+// batas 60 detik runtime server. API baru (xrina) balas gambar binary
+// langsung; error balas JSON 500 (mis. "Insufficient credits").
+export const EDIT_API = "https://apiii-xrina.vercel.app/ai-image/editimg";
+export const EDIT_BROWSER_TIMEOUT = 120_000; // API eksternal ±40-60s saat inference
 export const EDIT_RESULT_MAX = 4_000_000; // hasil maks 4MB
 
 // API generate gambar (AI text2img) — browser menembak LANGSUNG (CORS
