@@ -1,5 +1,5 @@
 // POST /api/auth/logout → hapus session di repo (client bersihkan sessionStorage)
-import { destroySession } from '../lib/auth.js';
+import { destroySession } from '../../lib/auth.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');

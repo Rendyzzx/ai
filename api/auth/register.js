@@ -5,12 +5,12 @@
 // ============================================================
 
 import crypto from 'node:crypto';
-import { readJson, putJson, updateJson } from '../lib/github.js';
-import { allow, clientIp } from '../lib/ratelimit.js';
+import { readJson, putJson, updateJson } from '../../lib/github.js';
+import { allow, clientIp } from '../../lib/ratelimit.js';
 import {
   hashPassword, validateCredentials, verifyCaptcha,
   createSession
-} from '../lib/auth.js';
+} from '../../lib/auth.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');

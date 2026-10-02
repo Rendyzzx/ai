@@ -15,9 +15,9 @@
 //     dicek magic bytes → file palsu/executable ditolak
 // ============================================================
 
-import { readJson, putJson, updateJson } from './lib/github.js';
-import { getSession } from './lib/auth.js';
-import { allow, clientIp } from './lib/ratelimit.js';
+import { readJson, putJson, updateJson } from '../lib/github.js';
+import { getSession } from '../lib/auth.js';
+import { allow, clientIp } from '../lib/ratelimit.js';
 
 const AVATAR_MAX_BYTES = 200 * 1024;
 

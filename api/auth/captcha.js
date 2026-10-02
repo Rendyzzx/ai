@@ -2,7 +2,7 @@
 // GET /api/auth/captcha → soal verifikasi manusia (token terenkripsi)
 // ============================================================
 
-import { makeCaptcha } from '../lib/auth.js';
+import { makeCaptcha } from '../../lib/auth.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
