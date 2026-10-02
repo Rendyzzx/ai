@@ -146,11 +146,16 @@
   gap: 5px;
 }
 
+/* Serif italic ("latin") hanya untuk sapaan hero — personal & premium,
+   kontras sengaja dengan UI sans di sekitarnya (tombol/komposer tetap
+   sans, lihat .suggestion). Sistem font, tanpa webfont baru. */
 .w-line {
-  font-size: clamp(21px, 3vw, 26px);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(22px, 3.2vw, 28px);
+  letter-spacing: 0;
+  line-height: 1.35;
   opacity: 0;
   animation: w-line-in 0.45s ease-out forwards;
 }
@@ -171,26 +176,32 @@
   animation: w-line-in 0.45s ease-out 1.05s forwards;
 }
 
-/* Saran pembuka: chip tenang tanpa kotak/border */
+/* Saran pembuka: box tenang (border tipis) agar terasa satu
+   kelompok yang nyambung ke komposer — bukan teks ngambang.
+   Font tetap sans UI biasa, beda sengaja dari sapaan hero di atas. */
 .suggestions {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
   gap: 8px;
   margin-top: 26px;
-  max-width: 480px;
+  width: 100%;
+  max-width: 420px;
 }
 
 .suggestion {
-  padding: 9px 14px;
-  border-radius: 999px;
-  font-size: 13px;
+  padding: 11px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 13.5px;
   color: var(--text-muted);
-  transition: background 0.15s, color 0.15s;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .suggestion:hover {
   background: var(--surface-2);
+  border-color: var(--accent);
   color: var(--text);
 }
 
