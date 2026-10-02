@@ -35,7 +35,7 @@ html, body {
 
 /* Wordmark besar bertema Latin: nama diketik serif klasik (Cormorant
    Garamond), label kecil tracked-caps di bawahnya — kesan lockup
-   butik/premium, bukan logo app generik. Dimuat hanya di halaman ini. */
+   butik/premium. Dimuat hanya di halaman ini. */
 .brand-wordmark {
   display: flex;
   flex-direction: column;
@@ -72,7 +72,7 @@ html, body {
    memberi tahu bahwa ini companion chat, bukan asisten AI.
    Bot (dia) selalu di KIRI, kamu (user) selalu di KANAN — digaransi
    dua kali (align-self + margin-left:auto) supaya tidak pernah
-   kebalik oleh default stretch pada flex-column. */
+   kebalik oleh default stretch pada flex-column. Bubbles FLAT. */
 .auth-visual {
   margin-top: 28px;
   display: flex;
@@ -90,12 +90,11 @@ html, body {
 .mock-msg span {
   display: inline-block;
   padding: 9px 14px;
-  border-radius: 4px 14px 14px 14px;
+  border-radius: 3px 12px 12px 12px;
   font-size: 13.5px;
   line-height: 1.5;
   background: var(--bubble-bot);
   border: 1px solid var(--border-soft);
-  box-shadow: var(--edge-light), var(--elev-1);
 }
 
 .mock-msg.user {
@@ -105,9 +104,7 @@ html, body {
 
 .mock-msg.user span {
   background: var(--bubble-user);
-  border-radius: 14px 4px 14px 14px;
-  border-color: rgba(255, 255, 255, 0.07);
-  box-shadow: var(--edge-light-strong), var(--elev-2);
+  border-radius: 12px 3px 12px 12px;
 }
 
 /* Masuk bergilir satu per satu — percakapan terasa hidup & berjalan,
@@ -182,7 +179,7 @@ html, body {
 
 .auth-head h2 {
   font-size: 21px;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.015em;
 }
 
@@ -243,11 +240,10 @@ html, body {
 }
 
 .auth-field input {
-  padding: 12px 14px;
+  padding: 11px 13px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--inset-1);           /* field tercekik — kontras dengan tombol terangkat */
   outline: 0;
   width: 100%;
   color: var(--text);
@@ -262,7 +258,7 @@ html, body {
 
 .auth-field input:focus {
   border-color: var(--accent);
-  box-shadow: var(--inset-1), 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 /* Error state: border + ikon, tidak hanya warna */
@@ -281,7 +277,7 @@ html, body {
 
 .pw-toggle {
   position: absolute;
-  right: 6px;
+  right: 4px;
   top: 50%;
   transform: translateY(-50%);
   width: 36px;
@@ -289,7 +285,7 @@ html, body {
   display: grid;
   place-items: center;
   color: var(--text-muted);
-  border-radius: 8px;
+  border-radius: var(--radius);
   transition: color 0.15s;
 }
 
@@ -302,8 +298,8 @@ html, body {
   height: 17px;
 }
 
-/* Checkbox custom (bukan kotak native browser) — box kecil
-   rounded, terisi warna aksen + ikon check saat ditandai. */
+/* Checkbox custom (bukan kotak native browser) — box kecil,
+   terisi warna aksen + ikon check saat ditandai. */
 .auth-check {
   display: flex;
   align-items: center;
@@ -329,10 +325,10 @@ html, body {
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: transparent;
   background: var(--surface);
-  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .auth-check-box .icon {
@@ -366,7 +362,7 @@ html, body {
   color: var(--text-muted);
 }
 
-/* Satu pill menyatu: kode | pembatas tipis | input | refresh —
+/* Satu baris menyatu: kode | pembatas tipis | input | refresh —
    bukan tiga kotak lepas yang terasa tidak nyambung. */
 .verify-row {
   display: flex;
@@ -375,12 +371,12 @@ html, body {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--inset-1);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .verify-row:focus-within {
   border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .verify-num {
@@ -457,20 +453,15 @@ html, body {
   font-weight: 600;
   font-size: 15px;
   letter-spacing: -0.005em;
-  box-shadow: var(--edge-light-strong), var(--accent-lift);
-  transition: background 0.15s, opacity 0.15s, transform 0.12s, box-shadow 0.15s;
+  transition: background 0.15s;
 }
 
 .auth-submit:hover:not(:disabled) {
   background: var(--accent-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--edge-light-strong), 0 4px 14px rgba(210, 151, 99, 0.3);
 }
 
 .auth-submit:active:not(:disabled) {
-  opacity: 0.92;
-  transform: translateY(0) scale(0.98);
-  box-shadow: var(--edge-light), 0 1px 4px rgba(210, 151, 99, 0.2);
+  background: #c68750;
 }
 
 .auth-submit:disabled {
