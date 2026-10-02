@@ -418,17 +418,6 @@ export default function AuthLanding() {
               </div>
             </div>
 
-            {/* Navigasi fitur ringkas — informasi produk, bukan pill dekoratif.
-                Mobile: muncul SETELAH artwork, mengantar ke section fitur. */}
-            <nav className="hero-feats" aria-label="Navigasi fitur Aomi">
-              <span className="hero-feats-label">Langsung coba:</span>
-              <div className="hero-feats-items">
-                <a href="#feat-chat">Ngobrol</a>
-                <a href="#feat-coding">Coding</a>
-                <a href="#feat-edit">Edit foto</a>
-                <a href="#feat-tiktok">Download TikTok &amp; Instagram</a>
-              </div>
-            </nav>
           </div>
         </section>
 

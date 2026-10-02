@@ -275,9 +275,7 @@ h1, h2, h3 {
 .hero-grid {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
-  grid-template-areas:
-    "copy visual"
-    "feats feats";
+  grid-template-areas: "copy visual";
   gap: 40px 56px;
   align-items: center;
 }
@@ -302,48 +300,6 @@ h1, h2, h3 {
   flex-wrap: wrap;
   margin-bottom: 0;
 }
-
-/* Navigasi fitur ringkas: SATU hairline yang menyatukan komposisi
-   hero, teks muted + interpoin — informasi produk, bukan pill berborder.
-   (Mengganti strip pill lama yang terasa generic-AI.) */
-.hero-feats {
-  grid-area: feats;
-  display: flex;
-  align-items: baseline;
-  gap: 8px 24px;
-  flex-wrap: wrap;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-}
-.hero-feats-label {
-  color: var(--muted);
-  font-size: 12.5px;
-  flex: none;
-}
-.hero-feats-items {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 0;
-  row-gap: 6px;
-}
-.hero-feats-items a {
-  color: var(--text-muted);
-  font-size: 13.5px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: color 0.15s;
-}
-/* Separator jadi SUFFIX (bukan prefix) — kalau item terakhir wrap ke
-   baris baru, dia tidak lagi membawa "titik" + margin yang membuat
-   baris baru terlihat miring/tidak sejajar dengan baris pertama. */
-.hero-feats-items a:not(:last-child)::after {
-  content: "·";
-  margin: 0 11px;
-  color: var(--border);
-  font-weight: 400;
-}
-.hero-feats-items a:hover { color: var(--text); }
 
 /* ---------- Komposisi visual hero: artwork + preview chat ---------- */
 /* Artwork TIDAK lagi jadi poster besar di bawah hero — jadi elemen
@@ -1061,8 +1017,7 @@ h1, h2, h3 {
     grid-template-columns: 1fr;
     grid-template-areas:
       "copy"
-      "visual"
-      "feats";
+      "visual";
     gap: 36px;
   }
   .hero-actions { margin-bottom: 0; }
@@ -1082,8 +1037,6 @@ h1, h2, h3 {
     right: auto;
     transform: translateX(-50%);
   }
-  .hero-feats { gap: 6px 20px; padding-top: 16px; }
-
   .personal-grid { grid-template-columns: 1fr; gap: 32px; }
   .personal-panel { max-width: 440px; }
 
@@ -1256,7 +1209,6 @@ body.splash-on { overflow: hidden; }
 .landing.entered .hero-sub     { animation: hero-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) 70ms both; }
 .landing.entered .hero-actions { animation: hero-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both; }
 .landing.entered .hero-visual  { animation: hero-art-in 700ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both; }
-.landing.entered .hero-feats   { animation: hero-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) 190ms both; }
 
 /* ---- Idle float artwork: sangat kecil, cuma bikin terasa hidup ----
    translateY 0 → -6px → 0, 6 detik. SATU-SATUNYA animasi infinite
@@ -1310,7 +1262,6 @@ body.splash-on { overflow: hidden; }
   .landing.entered .hero-title,
   .landing.entered .hero-sub,
   .landing.entered .hero-actions,
-  .landing.entered .hero-feats,
   .landing.entered .hero-visual {
     animation: fade-only 250ms ease both;
     animation-delay: 0s;
