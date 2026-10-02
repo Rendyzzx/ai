@@ -44,7 +44,8 @@ async function refresh() {
     const data = await apiJson('/api/conversations');
     items = data.items || [];
   } catch {
-    items = [];
+    // Error sesaat (cold start / server sibuk / jaringan) → PERTAHANKAN
+    // daftar lama. Jangan kosongkan riwayat hanya karena 1 fetch gagal.
   }
   applyFilter();
 }
@@ -62,6 +63,30 @@ function applyFilter() {
     empty.className = 'h-empty';
     empty.textContent = query ? 'Tidak ada hasil.' : 'Belum pernah ngobrol di sini.';
     els.history.appendChild(empty);
+    // Index riwayat bisa hilang (terhapus karena error sesaat) padahal
+    // file percakapannya masih ada → sediakan tombol pemulihan.
+    if (!query) {
+      const rec = document.createElement('button');
+      rec.type = 'button';
+      rec.className = 'h-recover';
+      rec.textContent = 'Pulihkan riwayat';
+      rec.addEventListener('click', async () => {
+        if (rec.disabled) return;
+        rec.disabled = true;
+        rec.textContent = 'Memulihkan...';
+        try {
+          await api('/api/conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'recover' })
+          });
+          await refresh();
+        } catch { /* gagal → tetap tampil */ }
+        rec.disabled = false;
+        rec.textContent = 'Pulihkan riwayat';
+      });
+      els.history.appendChild(rec);
+    }
     els.history.appendChild(sentinel());
     return;
   }

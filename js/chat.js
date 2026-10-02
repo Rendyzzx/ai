@@ -590,45 +590,77 @@ async function requestGreeting() {
 }
 
 async function loadConversation(id) {
+  // Muat via api() (bukan apiJson) supaya status HTTP jelas —
+  // HANYA 404 (data memang tidak ada) yang boleh menghapus percakapan
+  // dari riwayat. Error lain (cold start, server sibuk, jaringan)
+  // hanya menampilkan pesan; riwayat TETAP AMAN.
+  let res = null, data = null;
   try {
-    const data = await apiJson('/api/conversations?id=' + encodeURIComponent(id));
-    const conv = data.conversation;
-    currentId = conv.conversation_id;
-    loaded = conv.messages || [];
-    // Header selalu identitas karakter; judul percakapan cukup di sidebar
-    updateCharHead();
-
-    els.column.querySelectorAll('.message-row').forEach((n) => n.remove());
-    firstHidden = Math.max(0, loaded.length - RENDER_BATCH);
-    lastRole = null;
-
-    const fragment = document.createDocumentFragment();
-    let prev = firstHidden > 0 ? loaded[firstHidden - 1].role : null;
-    for (const m of loaded.slice(firstHidden)) {
-      const showName = m.role === 'assistant' && m.role !== prev;
-      fragment.appendChild(
-        messageNode(m.role, m.content, false, showName, m.image || m.image_url || null, m.message_id, fileOf(m), dlOf(m))
-      );
-      prev = m.role;
-    }
-    els.column.appendChild(fragment);
-    lastRole = loaded.length ? loaded[loaded.length - 1].role : null;
-    els.welcome.hidden = loaded.length > 0;
-    updateEarlierButton();
-    scrollToBottom(false);
-    emit('chat:activated', { id: currentId });
+    res = await api('/api/conversations?id=' + encodeURIComponent(id));
+    data = await res.json().catch(() => null);
   } catch (err) {
-    // Percakapan ada di daftar riwayat tapi datanya sudah tidak ada
-    // (mis. peninggalan migrasi/outage lama) → jangan diam-diam kosong,
-    // beri tahu dan bersihkan entrinya sendiri dari riwayat.
+    if (err.message === 'unauthorized') return; // sudah dialihkan ke login
     resetView();
-    if (err.message !== 'unauthorized') {
+    els.welcome.hidden = true;
+    appendMessage('assistant', 'Gagal memuat percakapan (koneksi/server sedang sibuk). Riwayatmu aman — coba buka lagi sebentar.', true);
+    return;
+  }
+
+  if (!res.ok) {
+    if (res.status === 404) {
+      // File percakapan memang tidak ada (pindah akun / peninggalan lama)
+      // → satu-satunya kasus yang boleh membersihkan entrinya.
+      resetView();
       els.welcome.hidden = true;
       appendMessage('assistant', 'Percakapan ini sudah tidak tersedia (datanya hilang/rusak). Sudah dihapus dari riwayat.', true);
       api('/api/conversations?id=' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
       emit('chat:deleted', { id });
+    } else {
+      // 5xx dsb. → JANGAN hapus; coba lagi nanti.
+      resetView();
+      els.welcome.hidden = true;
+      appendMessage('assistant', 'Server sedang sibuk, percakapan belum bisa dimuat. Riwayatmu aman — coba buka lagi sebentar.', true);
     }
+    return;
   }
+
+  const conv = data?.conversation;
+  if (!conv || !conv.conversation_id) {
+    resetView();
+    els.welcome.hidden = true;
+    appendMessage('assistant', 'Data percakapan tidak valid. Coba muat ulang halaman.', true);
+    return;
+  }
+
+  currentId = conv.conversation_id;
+  loaded = (Array.isArray(conv.messages) ? conv.messages : [])
+    .filter((m) => m && typeof m === 'object');
+  updateCharHead();
+
+  els.column.querySelectorAll('.message-row').forEach((n) => n.remove());
+  firstHidden = Math.max(0, loaded.length - RENDER_BATCH);
+  lastRole = null;
+
+  const fragment = document.createDocumentFragment();
+  let prev = firstHidden > 0 ? loaded[firstHidden - 1].role : null;
+  for (const m of loaded.slice(firstHidden)) {
+    const showName = m.role === 'assistant' && m.role !== prev;
+    let row = null;
+    try {
+      row = messageNode(m.role, m.content, false, showName, m.image || m.image_url || null, m.message_id, fileOf(m), dlOf(m));
+    } catch {
+      // Satu pesan rusak TIDAK BOLEH menggagalkan seluruh riwayat.
+      row = messageNode(m.role, String(m.content ?? ''), false, showName, null, m.message_id);
+    }
+    fragment.appendChild(row);
+    prev = m.role;
+  }
+  els.column.appendChild(fragment);
+  lastRole = loaded.length ? loaded[loaded.length - 1].role : null;
+  els.welcome.hidden = loaded.length > 0;
+  updateEarlierButton();
+  scrollToBottom(false);
+  emit('chat:activated', { id: currentId });
 }
 
 function prependBatch() {
@@ -642,9 +674,13 @@ function prependBatch() {
   let prev = start > 0 ? loaded[start - 1].role : null;
   for (const m of slice) {
     const showName = m.role === 'assistant' && m.role !== prev;
-    fragment.appendChild(
-      messageNode(m.role, m.content, false, showName, m.image || m.image_url || null, m.message_id, fileOf(m), dlOf(m))
-    );
+    let row = null;
+    try {
+      row = messageNode(m.role, m.content, false, showName, m.image || m.image_url || null, m.message_id, fileOf(m), dlOf(m));
+    } catch {
+      row = messageNode(m.role, String(m.content ?? ''), false, showName, null, m.message_id);
+    }
+    fragment.appendChild(row);
     prev = m.role;
   }
   const prevHeight = els.scroll.scrollHeight;

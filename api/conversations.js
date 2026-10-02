@@ -10,7 +10,7 @@
 // ============================================================
 
 import crypto from 'node:crypto';
-import { readJson, putJson, updateJson, deleteJson } from '../lib/store.js';
+import { readJson, putJson, updateJson, deleteJson, listJsonPaths } from '../lib/store.js';
 import { getSession } from '../lib/auth.js';
 
 const convPath = (uid, id) => `chats/${uid}/${id}.json`;
@@ -50,9 +50,42 @@ export default async function handler(req, res) {
       if (!file) return res.status(404).json({ error: 'Percakapan tidak ditemukan' });
       // Jangan bocorkan session_id Gemini ke klien
       const { geminiSessionId, ...safe } = file.data;
+      // Defensif: pesan harus array of object — data lama/rusak tidak
+      // boleh membuat route 500 (dan memicu penghapusan riwayat di klien)
+      safe.messages = (Array.isArray(safe.messages) ? safe.messages : [])
+        .filter((m) => m && typeof m === 'object');
       return res.status(200).json({ conversation: safe });
     }
     return res.status(200).json({ items: await readIndex(uid) });
+  }
+
+  // ---------------- POST action=recover: pulihkan riwayat ----------------
+  // _index.json bisa hilang (mis. terhapus karena error sesaat di klien).
+  // File percakapannya MASIH ADA di penyimpanan — bangun ulang index darinya.
+  if (req.method === 'POST' && req.body?.action === 'recover') {
+    const paths = await listJsonPaths(`chats/${uid}`);
+    const ids = paths
+      .map((p) => p.split('/').pop().replace(/\.json$/, ''))
+      .filter((name) => name !== '_index' && /^[a-f0-9-]{8,36}$/.test(name))
+      .slice(0, 150);
+
+    const items = [];
+    for (const id of ids) {
+      const file = await readJson(convPath(uid, id));
+      const c = file?.data;
+      if (c && typeof c === 'object' && Array.isArray(c.messages)) {
+        items.push({
+          conversation_id: id,
+          title: typeof c.title === 'string' && c.title ? c.title : 'Chat baru',
+          updated_at: c.updated_at || c.created_at || ''
+        });
+      }
+    }
+    items.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
+
+    // Tulis ulang index SECARA PENUH (bukan updateJson) — hasil pemulihan
+    await putJson(idxPath(uid), items, 'conversation index recover');
+    return res.status(200).json({ ok: true, recovered: items.length });
   }
 
   // ---------------- POST: percakapan baru ----------------

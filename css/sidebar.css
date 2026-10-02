@@ -212,6 +212,30 @@
   text-align: center;
 }
 
+/* Tombol pemulihan riwayat (muncul saat daftar kosong) */
+.h-recover {
+  display: block;
+  margin: 4px auto 0;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.h-recover:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.h-recover:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .sidebar-foot {
   padding: 8px 8px;
   border-top: 1px solid var(--border);
