@@ -18,7 +18,6 @@
    ============================================================ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Intro from "@/components/chat/Intro";
 import { getSessionId, setSessionId, clearSessionId } from "@/lib/session";
 import langStats from "@/lib/generated/lang-stats.json";
 
@@ -215,8 +214,6 @@ export default function AuthLanding() {
 
   return (
     <>
-      <Intro />
-
       {/* ================= NAVIGASI ================= */}
       <header className="nav" id="top">
         <div className="nav-inner">
@@ -325,7 +322,7 @@ export default function AuthLanding() {
         <section className="cando" id="fitur">
           <div className="section-head">
             <h2>Yang bisa kamu lakukan di Aomi</h2>
-            <p>Bukan daftar panjang — ini yang beneran bisa kamu pakai sekarang.</p>
+            <p>Enam hal ini bisa langsung kamu pakai sekarang.</p>
           </div>
 
           {/* Editorial list, hairline per baris — bukan grid kartu */}
@@ -378,7 +375,7 @@ export default function AuthLanding() {
         <section className="demo" id="tools" aria-label="Pratinjau cara pakai Aomi">
           <div className="section-head">
             <h2>Begini kira-kira cara pakainya.</h2>
-            <p>Pilih salah satu — ini pratinjau singkat, bukan chat sungguhan.</p>
+            <p>Pilih salah satu, lihat sendiri cara kerjanya.</p>
           </div>
 
           <div className="demo-tabs" role="tablist" aria-label="Pilih pratinjau">

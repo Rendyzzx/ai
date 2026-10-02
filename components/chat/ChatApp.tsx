@@ -20,7 +20,6 @@ import MessageRow, {
 } from "@/components/chat/MessageRow";
 import MessageMenu, { type MenuState } from "@/components/chat/MessageMenu";
 import ConfirmDialog from "@/components/chat/ConfirmDialog";
-import Intro from "@/components/chat/Intro";
 import SettingsView from "@/components/settings/SettingsView";
 import { fileOf, dlOf, EDIT_API, EDIT_BROWSER_TIMEOUT, EDIT_RESULT_MAX, EDIT_TRIGGER_RE, matchDlTarget } from "@/lib/chat-utils";
 import type { BotConfig, ChatResponse, Conversation, ConversationItem, Message, UserProfile } from "@/types";
@@ -940,11 +939,21 @@ export default function ChatApp() {
   /* ---------------- Boot states ---------------- */
 
   if (boot === "loading") {
+    // Loading state normal & fungsional (tanpa splash animasi):
+    // hanya terlihat sekilas sebelum session dicek / redirect ke /auth.
     return (
-      <>
-        <Intro />
-        <div className="app" aria-busy="true" />
-      </>
+      <div
+        aria-busy="true"
+        style={{
+          minHeight: "100dvh",
+          display: "grid",
+          placeItems: "center",
+          color: "#6f706a",
+          fontSize: 14,
+        }}
+      >
+        Memuat…
+      </div>
     );
   }
 
@@ -979,7 +988,6 @@ export default function ChatApp() {
 
   return (
     <>
-      <Intro />
       <div className="app">
         <Sidebar
           items={items}
