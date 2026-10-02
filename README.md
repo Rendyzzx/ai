@@ -74,8 +74,11 @@ Development → **Redeploy**.
 - Session: token acak 256-bit dikirim via header **X-Session-Id** (tidak ada cookie auth
   persisten; client hanya menyimpan session id opaque di sessionStorage — tanpa
   password/token/API key di browser).
-- Setiap deployment baru (APP_VERSION / SHA commit berubah) otomatis meng-invalid-kan
-  SEMUA session versi lama → semua user logout → login ulang dengan UI versi terbaru.
+- APP_VERSION HANYA dari Environment Variables Vercel (contoh: 2026.10.02.001).
+  Deploy baru TIDAK mematikan session; naikkan APP_VERSION secara manual saat
+  memang ingin force-logout semua user versi lama (satu kali logout, by design).
+  JANGAN fallback ke SHA commit — tiap push akan me-logout semua user dan
+  terlihat seperti login loop saat deploy beruntun.
 - Asset JS/CSS distempel hash versi saat build (?v=…) + HTML no-cache → browser tidak
   pernah memakai JS/CSS lama setelah redeploy.
 - Masa berlaku session: 12 jam, atau 30 hari dengan "Remember Me"
