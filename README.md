@@ -42,10 +42,11 @@ Browser → Route Handler /api/* (session via header X-Session-Id)
 │       └── tempimg/         # host gambar sementara (maxDuration 30)
 ├── components/
 │   ├── chat/                # ChatApp (orchestrator), MessageRow, MessageMenu,
-│   │                        # ConfirmDialog, Intro
+│   │                        # ConfirmDialog
 │   ├── sidebar/             # Sidebar + lazy conversation list
 │   ├── settings/            # SettingsView (overlay SPA)
 │   ├── auth/                # AuthLanding (landing + form Masuk/Daftar)
+│   ├── brand/               # BrandSplash (splash WebGL raymarch di /auth)
 │   └── ui/                  # Icon, Avatar
 ├── lib/
 │   ├── server/              # store.ts, github.ts, auth.ts, ratelimit.ts,

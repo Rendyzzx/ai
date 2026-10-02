@@ -2,7 +2,7 @@
 // Aomi — scripts/migrate-github-to-redis.mjs
 // Migrasi sekali jalan: baca seluruh JSON dari repo GitHub
 // 'Rendyzzx/token' (database lama) → tulis ke Upstash Redis
-// (database baru, format key lib/store.js: 'aomi:<path>').
+// (database baru, format key lib/server/store.ts: "aomi:<path>").
 //
 // Cara pakai (env wajib):
 //   GITHUB_TOKEN               → token dengan akses repo Rendyzzx/token
