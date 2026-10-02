@@ -8,6 +8,7 @@
 import { readJson } from "@/lib/server/store";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const ID_RE = /^[a-z0-9-]{8,64}$/;
