@@ -68,7 +68,6 @@ locks/login-<hash>.json   { fails, locked_until }   # anti brute force
 | `UPSTASH_REDIS_REST_TOKEN` | Token REST Upstash |
 | `GITHUB_TOKEN` | Token GitHub dengan akses repo `Rendyzzx/token` (fallback + migrasi data) |
 | `SESSION_SECRET` | String acak bebas (untuk enkripsi captcha & verifikasi token). Jika tidak di-set, fallback ke `GITHUB_TOKEN` |
-| `GROQ_API_KEY` | Opsional. Fallback AI bila scraping Gemini gagal |
 
 Set di: **Settings → Environment Variables** → isi Production, Preview,
 Development → **Redeploy**.
