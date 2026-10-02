@@ -277,3 +277,77 @@
     display: grid;
   }
 }
+
+/* ============================================================
+   Dialog konfirmasi kustom (pengganti window.confirm bawaan browser)
+   ============================================================ */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.confirm-overlay.show {
+  opacity: 1;
+}
+
+.confirm-box {
+  width: 100%;
+  max-width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  transform: translateY(6px) scale(0.98);
+  transition: transform 0.15s;
+}
+
+.confirm-overlay.show .confirm-box {
+  transform: translateY(0) scale(1);
+}
+
+.confirm-msg {
+  margin: 0 0 18px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirm-btn {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--surface-2);
+  color: var(--text);
+  transition: background 0.15s;
+}
+
+.confirm-btn:hover {
+  background: var(--border);
+}
+
+.confirm-ok {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.confirm-ok:hover {
+  background: var(--danger);
+  opacity: 0.88;
+}

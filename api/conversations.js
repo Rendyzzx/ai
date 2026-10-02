@@ -85,13 +85,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'ID tidak valid' });
     }
     const file = await readJson(convPath(uid, id));
-    if (file) {
-      await deleteJson(convPath(uid, id));
-      await updateJson(idxPath(uid), 'conversation index', (current) => {
-        const items = Array.isArray(current) ? current : [];
-        return items.filter((c) => c.conversation_id !== id);
-      });
-    }
+    if (file) await deleteJson(convPath(uid, id));
+    // Bersihkan entri index SELALU, bukan hanya kalau file ketemu — kalau
+    // tidak, entri "hantu" (ada di daftar riwayat, tapi file-nya sudah
+    // tidak ada — mis. peninggalan migrasi/outage lama) tidak akan pernah
+    // bisa dihapus karena baris di atas butuh file ada dulu.
+    await updateJson(idxPath(uid), 'conversation index', (current) => {
+      const items = Array.isArray(current) ? current : [];
+      return items.filter((c) => c.conversation_id !== id);
+    });
     return res.status(200).json({ ok: true });
   }
 

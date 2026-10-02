@@ -7,7 +7,7 @@
    diambil dari state (settings.js bisa mengubahnya kapan pun).
    ============================================================ */
 
-import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state } from './app.js?v=8e77d9b6f3';
+import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state } from './app.js?v=a975b269f0';
 
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
@@ -314,8 +314,17 @@ async function loadConversation(id) {
     updateEarlierButton();
     scrollToBottom(false);
     emit('chat:activated', { id: currentId });
-  } catch {
+  } catch (err) {
+    // Percakapan ada di daftar riwayat tapi datanya sudah tidak ada
+    // (mis. peninggalan migrasi/outage lama) → jangan diam-diam kosong,
+    // beri tahu dan bersihkan entrinya sendiri dari riwayat.
     resetView();
+    if (err.message !== 'unauthorized') {
+      els.welcome.hidden = true;
+      appendMessage('assistant', 'Percakapan ini sudah tidak tersedia (datanya hilang/rusak). Sudah dihapus dari riwayat.', true);
+      api('/api/conversations?id=' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
+      emit('chat:deleted', { id });
+    }
   }
 }
 

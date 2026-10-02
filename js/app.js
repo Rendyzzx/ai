@@ -173,6 +173,43 @@ export async function apiJson(path, options = {}) {
   return data;
 }
 
+// ---------------- Dialog konfirmasi kustom ----------------
+// Pengganti window.confirm() bawaan browser (yang nongol sebagai
+// popup "situs menyatakan…") — pakai markup #confirmOverlay di index.html.
+let confirmResolve = null;
+
+export function confirmDialog(message) {
+  const overlay = document.getElementById('confirmOverlay');
+  const msgEl = document.getElementById('confirmMsg');
+  if (!overlay || !msgEl) return Promise.resolve(window.confirm(message)); // jaga-jaga
+
+  msgEl.textContent = message;
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('show'));
+
+  return new Promise((resolve) => {
+    confirmResolve = (result) => {
+      overlay.classList.remove('show');
+      setTimeout(() => { overlay.hidden = true; }, 150);
+      confirmResolve = null;
+      resolve(result);
+    };
+  });
+}
+
+function bindConfirmDialog() {
+  const overlay = document.getElementById('confirmOverlay');
+  if (!overlay) return;
+  document.getElementById('confirmOk')?.addEventListener('click', () => confirmResolve?.(true));
+  document.getElementById('confirmCancel')?.addEventListener('click', () => confirmResolve?.(false));
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) confirmResolve?.(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !overlay.hidden) confirmResolve?.(false);
+  });
+}
+
 // ---------------- Tinggi viewport & keyboard mobile ----------------
 
 const syncViewport = raf(() => {
@@ -190,13 +227,13 @@ function bindViewport() {
 
 // ---------------- Gerbang auth + bootstrap ----------------
 
-import { initSidebar } from './sidebar.js?v=8e77d9b6f3';
-import { initChat } from './chat.js?v=8e77d9b6f3';
+import { initSidebar } from './sidebar.js?v=a975b269f0';
+import { initChat } from './chat.js?v=a975b269f0';
 
 // Settings dimuat LAZY: baru di-import saat pertama kali dibuka
 let settingsMod = null;
 async function openSettings(category) {
-  if (!settingsMod) settingsMod = await import('./settings.js?v=8e77d9b6f3');
+  if (!settingsMod) settingsMod = await import('./settings.js?v=a975b269f0');
   settingsMod.openSettings(category);
 }
 
@@ -222,6 +259,7 @@ async function boot() {
 
   dbg('ROUTER', 'route: / (chatbox) — boot mulai');
   bindViewport();
+  bindConfirmDialog();
 
   // STEP 0 — tanpa session identifier → langsung login (UI tidak dirender).
   // Redirect ini TIDAK bisa memantul balik: auth.html tanpa sid tidak

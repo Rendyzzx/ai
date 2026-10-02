@@ -6,7 +6,7 @@
    IntersectionObserver, pencarian debounce, hapus via API.
    ============================================================ */
 
-import { $, debounce, api, apiJson, emit, on, state, renderAvatar } from './app.js?v=8e77d9b6f3';
+import { $, debounce, api, apiJson, emit, on, state, renderAvatar, confirmDialog } from './app.js?v=a975b269f0';
 
 const BATCH = 12;
 
@@ -212,7 +212,8 @@ function formatTime(iso) {
 /* ---------------- Aksi ---------------- */
 
 async function deleteConversation(id) {
-  if (!window.confirm('Hapus percakapan ini?')) return;
+  const ok = await confirmDialog('Hapus percakapan ini?');
+  if (!ok) return;
   try {
     await api('/api/conversations?id=' + encodeURIComponent(id), { method: 'DELETE' });
   } catch {

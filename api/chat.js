@@ -320,6 +320,17 @@ async function sendGeminiRequest(firstMsg, resumeArray, cookie, instruction) {
   throw new Error('parsing gemini gagal');
 }
 
+// Ringkasan singkat percakapan terakhir (teks biasa) — dipakai saat thread
+// Gemini harus di-restart (lihat chatGemini) agar karakter tetap "ingat"
+// konteks obrolan meski koneksi server-side Google terputus.
+function buildRecap(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) return '';
+  const recent = messages.slice(-6).filter((m) => m && m.content);
+  if (recent.length === 0) return '';
+  const lines = recent.map((m) => (m.role === 'user' ? 'User' : 'Kamu') + ': ' + String(m.content).slice(0, 300));
+  return '[Ingat, ini lanjutan obrolan kalian sebelumnya — jangan menyapa seolah baru kenal]\n' + lines.join('\n');
+}
+
 async function chatGemini(input, instruction) {
   let { resumeArray, cookie } = input.geminiSessionId
     ? decodeSessionId(input.geminiSessionId)
@@ -344,23 +355,34 @@ async function chatGemini(input, instruction) {
 
   // PENTING: Google menolak (BardErrorInfo 1097) setiap kali thread
   // dilanjutkan setelah ada giliran bergambar di dalamnya — ini konsisten
-  // 100% direproduksi, bukan sesekali gagal. Tanpa penanganan ini, SEKALI
-  // user kirim gambar, geminiSessionId tersimpan jadi "rusak" dan SETIAP
-  // chat teks berikutnya error permanen (karena sessionId rusak itu
-  // tersimpan lalu dipakai lagi, dan gagal lagi, selamanya).
+  // 100% direproduksi (sudah dicoba: kirim ulang media key, cookie baru,
+  // reqid naik — semua tetap ditolak). Ini batasan sesi tamu Gemini
+  // (tanpa login akun asli), bukan sesuatu yang bisa dipaksa dari sisi kita.
   //
-  // Perbaikan: kalau request dengan resumeArray gagal, otomatis coba lagi
-  // SEKALI dengan thread baru (resumeArray kosong). Ini juga menyembuhkan
-  // sessionId yang sudah rusak dari percakapan lama — begitu retry
-  // berhasil, sessionId baru yang sehat tersimpan dan chat lanjut normal.
+  // Tanpa penanganan ini, SEKALI user kirim gambar, geminiSessionId
+  // tersimpan jadi "rusak" dan SETIAP chat teks berikutnya error permanen.
+  //
+  // Perbaikan 2 lapis:
+  // 1. Kalau request dengan resumeArray gagal, otomatis retry SEKALI
+  //    dengan thread baru. SessionId sehat yang baru lalu menggantikan
+  //    yang rusak → chat tidak pernah stuck selamanya.
+  // 2. Supaya user tidak merasa "sesi reset" (karakter jadi lupa),
+  //    thread baru ini dibekali ringkasan percakapan terakhir sebagai
+  //    teks — jadi walau koneksi server-side Google terputus, karakter
+  //    tetap "ingat" obrolan sebelumnya dari sisi konten.
   let parsed;
   try {
     parsed = await sendGeminiRequest(firstMsg, resumeArray, cookie, instruction);
   } catch (err) {
     if (!resumeArray) throw err;   // thread baru pun gagal → bukan masalah resume
-    console.warn('[chat] resume gemini gagal, mulai thread baru:', err.message);
+    console.warn('[chat] resume gemini gagal, mulai thread baru dgn konteks:', err.message);
     resumeArray = null;
-    parsed = await sendGeminiRequest(firstMsg, null, cookie, instruction);
+
+    const recap = buildRecap(input.messages);
+    const healedMsg = recap
+      ? [recap + '\n\n' + firstMsg[0], ...firstMsg.slice(1)]
+      : firstMsg;
+    parsed = await sendGeminiRequest(healedMsg, null, cookie, instruction);
   }
 
   const resume = [...parsed[1], parsed[4][0][0]];
