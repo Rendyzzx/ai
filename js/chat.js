@@ -7,7 +7,7 @@
    diambil dari state (settings.js bisa mengubahnya kapan pun).
    ============================================================ */
 
-import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state } from './app.js?v=e9aa0007bd';
+import { $, raf, sanitizeText, renderAvatar, api, apiJson, emit, on, state } from './app.js?v=816c275a5c';
 
 const RENDER_BATCH = 30;   // pesan per batch render
 const DOM_CAP = 150;       // node pesan maksimum di DOM
@@ -147,6 +147,8 @@ function messageNode(role, content, isError, showName) {
   // Chat natural: nama tampil hanya pada pesan karakter pertama dari
   // rangkaian beruntun — nama user sendiri tidak pernah ditampilkan.
   header.hidden = !(role === 'assistant' && showName);
+  // Tanpa header → avatar harus sejajar baris pertama bubble (lihat CSS .compact)
+  row.classList.toggle('compact', header.hidden);
 
   const contentEl = document.createElement('div');
   contentEl.className = 'message-content';

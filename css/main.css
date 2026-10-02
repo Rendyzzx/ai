@@ -16,6 +16,13 @@
   --accent-ink:#ffffff;
   --danger:    #ff6b6b;
 
+  /* Bubble chat (referensi WhatsApp): wallpaper area chat sedikit
+     lebih gelap dari chrome (topbar/sidebar), bubble jelas kontras
+     dari wallpaper DAN beda warna satu sama lain. */
+  --wallpaper:     #101013;
+  --bubble-bot:    #242430;
+  --bubble-user:   #3c4098;
+
   /* Bentuk & jarak */
   --radius:    12px;
   --sidebar-w: 260px;
