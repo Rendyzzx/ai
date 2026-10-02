@@ -23,11 +23,11 @@ import { allow, clientIp } from '../lib/ratelimit.js';
 
 // Hanya CDN TikTok yang boleh di-proxy
 const ALLOWED_HOSTS = [
-  /^([a-z0-9-]+\\.)?tiktokcdn\\.com$/i,
-  /^([a-z0-9-]+\\.)?tiktokcdn-us\\.com$/i,
-  /^([a-z0-9-]+\\.)?tiktokcdn-eu\\.com$/i,
-  /^([a-z0-9-]+\\.)?tiktok\\.com$/i,
-  /^([a-z0-9-]+\\.)?byteoversea\\.com$/i
+  /^([a-z0-9-]+\.)?tiktokcdn\.com$/i,
+  /^([a-z0-9-]+\.)?tiktokcdn-us\.com$/i,
+  /^([a-z0-9-]+\.)?tiktokcdn-eu\.com$/i,
+  /^([a-z0-9-]+\.)?tiktok\.com$/i,
+  /^([a-z0-9-]+\.)?byteoversea\.com$/i
 ];
 
 const MAX_BYTES = 30_000_000;      // ~30MB cap buffer unduhan
