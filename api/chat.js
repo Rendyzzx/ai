@@ -270,28 +270,10 @@ async function uploadImageGemini(buffer, filename) {
   return key;
 }
 
-async function chatGemini(input, instruction) {
-  let { resumeArray, cookie } = input.geminiSessionId
-    ? decodeSessionId(input.geminiSessionId)
-    : { resumeArray: null, cookie: null };
-
-  if (!cookie) cookie = await geminiGetCookie();
-
-  // Lampiran gambar (Gemini vision): upload → media key → posisi 4 pada
-  // array pesan. Posisi ini TERVERIFIKASI: model membaca isi gambar benar.
-  // Gagal upload → chat tetap jalan teks saja (graceful).
-  const firstMsg = [input.message, 0, null, null, null, null, 0];
-  if (input.imageBuffer) {
-    try {
-      const key = await uploadImageGemini(input.imageBuffer, input.imageName);
-      firstMsg[3] = [[[key, 1], input.imageName || 'image.jpg']];
-    } catch (err) {
-      console.error('[chat] upload gambar gemini:', err.message);
-      input = { ...input, message: input.message + '\n(pengguna mengirim gambar, tapi gagal dilampirkan — jawab dari konteks teks saja)' };
-      firstMsg[0] = input.message;
-    }
-  }
-
+// Satu percobaan request ke Gemini dengan resumeArray tertentu.
+// Melempar error kalau Google menolak/parsing gagal — dipakai chatGemini
+// untuk retry otomatis dengan thread baru (lihat catatan di bawah).
+async function sendGeminiRequest(firstMsg, resumeArray, cookie, instruction) {
   const requestBody = [
     firstMsg,
     ['en-US'],
@@ -324,25 +306,68 @@ async function chatGemini(input, instruction) {
   );
 
   const match = Array.from(res.text.matchAll(/^\d+\n(.+?)\n/gm)).reverse();
-  let parsed = null;
   for (const item of match) {
     try {
       const outer = JSON.parse(item[1]);
       const candidate = outer?.[0]?.[2];
       if (!candidate) continue;
       const inner = JSON.parse(candidate);
-      if (inner?.[4]?.[0]?.[1]?.[0]) {
-        parsed = inner;
-        break;
-      }
+      if (inner?.[4]?.[0]?.[1]?.[0]) return inner;
     } catch {
       /* lewati chunk non-JSON */
     }
   }
-  if (!parsed) throw new Error('parsing gemini gagal');
+  throw new Error('parsing gemini gagal');
+}
+
+async function chatGemini(input, instruction) {
+  let { resumeArray, cookie } = input.geminiSessionId
+    ? decodeSessionId(input.geminiSessionId)
+    : { resumeArray: null, cookie: null };
+
+  if (!cookie) cookie = await geminiGetCookie();
+
+  // Lampiran gambar (Gemini vision): upload → media key → posisi 4 pada
+  // array pesan. Posisi ini TERVERIFIKASI: model membaca isi gambar benar.
+  // Gagal upload → chat tetap jalan teks saja (graceful).
+  const firstMsg = [input.message, 0, null, null, null, null, 0];
+  if (input.imageBuffer) {
+    try {
+      const key = await uploadImageGemini(input.imageBuffer, input.imageName);
+      firstMsg[3] = [[[key, 1], input.imageName || 'image.jpg']];
+    } catch (err) {
+      console.error('[chat] upload gambar gemini:', err.message);
+      input = { ...input, message: input.message + '\n(pengguna mengirim gambar, tapi gagal dilampirkan — jawab dari konteks teks saja)' };
+      firstMsg[0] = input.message;
+    }
+  }
+
+  // PENTING: Google menolak (BardErrorInfo 1097) setiap kali thread
+  // dilanjutkan setelah ada giliran bergambar di dalamnya — ini konsisten
+  // 100% direproduksi, bukan sesekali gagal. Tanpa penanganan ini, SEKALI
+  // user kirim gambar, geminiSessionId tersimpan jadi "rusak" dan SETIAP
+  // chat teks berikutnya error permanen (karena sessionId rusak itu
+  // tersimpan lalu dipakai lagi, dan gagal lagi, selamanya).
+  //
+  // Perbaikan: kalau request dengan resumeArray gagal, otomatis coba lagi
+  // SEKALI dengan thread baru (resumeArray kosong). Ini juga menyembuhkan
+  // sessionId yang sudah rusak dari percakapan lama — begitu retry
+  // berhasil, sessionId baru yang sehat tersimpan dan chat lanjut normal.
+  let parsed;
+  try {
+    parsed = await sendGeminiRequest(firstMsg, resumeArray, cookie, instruction);
+  } catch (err) {
+    if (!resumeArray) throw err;   // thread baru pun gagal → bukan masalah resume
+    console.warn('[chat] resume gemini gagal, mulai thread baru:', err.message);
+    resumeArray = null;
+    parsed = await sendGeminiRequest(firstMsg, null, cookie, instruction);
+  }
 
   const resume = [...parsed[1], parsed[4][0][0]];
-  const text = parsed[4][0][1][0].replace(/\*\*(.+?)\*\*/g, '*$1*');
+  const text = parsed[4][0][1][0]
+    .replace(/\*\*(.+?)\*\*/g, '*$1*')
+    .replace(/\[cite:\s*\d+(?:,\s*\d+)*\]/gi, '')  // buang tag [cite: n] sisa citation gambar
+    .trim();
   return {
     text: text.slice(0, LIMITS.responseMaxLen),
     geminiSessionId: encodeSessionId(resume, cookie, instruction)
