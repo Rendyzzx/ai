@@ -8,7 +8,8 @@
    position:fixed dari main.css tidak berlaku di sini. */
 html, body {
   position: static;
-  overflow: auto;
+  overflow-x: hidden;   /* jaring pengaman: tidak pernah ada scroll-x di halaman ini */
+  overflow-y: auto;
 }
 
 .auth-shell {
@@ -78,12 +79,18 @@ html, body {
 
 .auth-panel-wrap {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);  /* kolom implisit bisa menyusut; tanpa ini
+                                              konten non-shrink (verify-row) bisa
+                                              mendorong SELURUH halaman jadi lebih
+                                              lebar dari viewport di mobile */
   place-items: center;
   padding: clamp(20px, 5vw, 48px);
+  min-width: 0;
 }
 
 .auth-panel {
   width: min(100%, 24rem);
+  min-width: 0;
   padding: 12px 0 28px;
   animation: auth-in 0.35s ease-out both;
 }
@@ -144,6 +151,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-width: 0;
 }
 
 .auth-field {
@@ -271,6 +279,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .verify-label {
@@ -284,6 +293,7 @@ html, body {
 .verify-row {
   display: flex;
   align-items: center;
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -446,6 +456,12 @@ html, body {
 
   .auth-tabs {
     margin: 26px 0 24px;
+  }
+
+  .verify-num {
+    padding: 0 12px;
+    font-size: 16px;
+    letter-spacing: 0.22em;
   }
 }
 
