@@ -644,6 +644,12 @@ export default function ChatApp() {
 
       loadingRef.current = true;
       setInput("");
+      // Reset tinggi textarea manual — kalau pesan sebelumnya multi-baris,
+      // style.height masih "nempel" tinggi lama (diset imperatif di
+      // onChange, React gak nyentuh balik pas value dikosongkan via
+      // setInput), bikin kotak kosong tetep tinggi & placeholder
+      // nongkrong di atas (gak center sama tombol +/kirim).
+      if (inputRef.current) inputRef.current.style.height = "auto";
 
       // Render optimistik untuk pesan user
       const optimistic: Message = {
