@@ -45,9 +45,15 @@ export const viewport: Viewport = {
   themeColor: "#111210",
 };
 
+// Tanpa ini, Next.js nge-prerender halaman ini jadi STATIC di build time —
+// asset yang diupload admin lewat bot TIDAK PERNAH kebaca ulang (bug: upload
+// baru "sukses" tapi gambar di web tidak pernah berubah).
+export const dynamic = "force-dynamic";
+
 export default async function AuthPage() {
-  // Login banner bisa diganti admin lewat bot Telegram (fallback: artwork default).
-  const hero = await getAssetInfo("loginBanner").catch(() => null);
+  // Peekaboo (karakter di atas form login) bisa diganti admin lewat bot
+  // Telegram (fallback: artwork default auth-banner-open/closed).
+  const peekaboo = await getAssetInfo("loginBanner").catch(() => null);
   return (
     <>
       {/* Font non-blocking: display=swap, FOUT singkat ok */}
@@ -57,7 +63,7 @@ export default async function AuthPage() {
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600&family=IBM+Plex+Sans:wght@400;500&display=swap"
       />
-      <AuthLanding heroSrc={hero?.url} heroWidth={hero?.width} heroHeight={hero?.height} />
+      <AuthLanding peekSrc={peekaboo?.url} />
     </>
   );
 }

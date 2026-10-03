@@ -76,7 +76,8 @@ Status: 🟢 Website Online
 
 - **Website** — status, environment, version, storage.
 - **Pengaturan Website** — 🛠 Maintenance, 🎭 Character (hero maintenance
-  page), 🖼️ Login Banner (artwork hero login), 🌐 Tampilan & limits.
+  page), 🖼️ Login Banner (peekaboo — karakter di atas form login, BUKAN
+  hero marketing landing page), 🌐 Tampilan & limits.
   Upload asset: admin kirim FOTO → validasi magic bytes (JPEG/PNG/WEBP
   saja, maks 5 MB — SVG/GIF/executable ditolak; filename Telegram tidak
   pernah dipercaya) → binary ke repo token (`assets/site/*`) →

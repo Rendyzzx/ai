@@ -679,10 +679,15 @@ h1, h2, h3 {
   overflow: hidden;
 }
 
-/* Peekaboo: karakter di atas form, full-bleed di tepi atas panel */
+/* Peekaboo: karakter di atas form, full-bleed di tepi atas panel.
+   Tinggi proporsional ke lebar panel (bukan px fix) — box 150px lama
+   terlalu pipih utk portrait (rasio ~2.67:1), bikin karakter kepotong
+   jadi sliver tipis & terlihat "tenggelam". ~1.55:1 lebih manusiawi
+   buat asset custom yang diupload admin (bukan cuma 2 artwork bawaan). */
 .peekaboo {
   position: relative;
-  height: 150px;
+  aspect-ratio: 31 / 20;
+  max-height: 260px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
 }
@@ -692,7 +697,7 @@ h1, h2, h3 {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 28%;
+  object-position: 50% 18%;
   transition: opacity 0.28s ease;
 }
 .peek-open    { opacity: 1; }

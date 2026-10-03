@@ -25,9 +25,12 @@ import { validateUpload, type AssetExt } from "./imagedata";
 
 export type AssetKind = "character" | "loginBanner";
 
+/** loginBanner = peekaboo (karakter di atas form "Selamat datang kembali"),
+ *  BUKAN hero marketing di landing page. Satu upload dipakai utk kedua
+ *  state peek (open/closed) — animasi tetap jalan, gambarnya sama. */
 export const ASSET_KINDS: Record<AssetKind, { label: string; urlKind: string; fallback: string }> = {
   character: { label: "Character", urlKind: "character", fallback: "/assets/auth-hero.png" },
-  loginBanner: { label: "Login Banner", urlKind: "login-banner", fallback: "/assets/auth-hero.png" },
+  loginBanner: { label: "Login Banner (peekaboo)", urlKind: "login-banner", fallback: "/assets/auth-banner-open.png" },
 };
 
 export interface AssetRecord {

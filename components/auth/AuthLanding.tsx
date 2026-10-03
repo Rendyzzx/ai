@@ -68,20 +68,11 @@ const GOOGLE_ERRORS: Record<string, string> = {
 };
 
 export default function AuthLanding({
-  heroSrc,
-  heroWidth,
-  heroHeight,
+  peekSrc,
 }: {
-  /** Banner login dari admin (fallback artwork default di sini). */
-  heroSrc?: string;
-  heroWidth?: number;
-  heroHeight?: number;
+  /** Peekaboo (karakter di atas form login) dari admin — fallback: artwork default. */
+  peekSrc?: string;
 }) {
-  const hero = {
-    src: heroSrc || "/assets/auth-hero.png",
-    width: heroWidth || 900,
-    height: heroHeight || 1120,
-  };
   const [panel, setPanel] = useState<"login" | "register">("login");
   const [capLogin, setCapLogin] = useState<CapData | null>(null);
   const [capRegister, setCapRegister] = useState<CapData | null>(null);
@@ -421,10 +412,10 @@ export default function AuthLanding({
                 <div className="hero-visual-idle">
                   <figure className="hero-visual-art" aria-hidden="true">
                     <Image
-                      src={hero.src}
+                      src="/assets/auth-hero.png"
                       alt=""
-                      width={hero.width}
-                      height={hero.height}
+                      width={900}
+                      height={1120}
                       priority
                       sizes="(max-width: 860px) 88vw, 380px"
                     />
@@ -801,8 +792,10 @@ export default function AuthLanding({
           <section className="auth-panel">
             {/* Peekaboo: mata terbuka saat isi username/email, nutup saat fokus password */}
             <div className={"peekaboo" + (peeking ? " peeking" : "")} id="peekaboo" aria-hidden="true">
-              <Image className="peek-img peek-open" src="/assets/auth-banner-open.png" alt="" width={260} height={340} sizes="220px" />
-              <Image className="peek-img peek-closed" src="/assets/auth-banner-closed.png" alt="" width={260} height={340} sizes="220px" />
+              {/* Admin bisa ganti lewat bot — satu asset dipakai utk kedua state
+                  (open/closed); animasi peek tetap jalan, cuma gambarnya sama. */}
+              <Image className="peek-img peek-open" src={peekSrc || "/assets/auth-banner-open.png"} alt="" width={260} height={340} sizes="220px" />
+              <Image className="peek-img peek-closed" src={peekSrc || "/assets/auth-banner-closed.png"} alt="" width={260} height={340} sizes="220px" />
             </div>
 
             <div className="auth-body">

@@ -77,7 +77,7 @@ admin kirim foto di Telegram
   → disajikan via /api/assets/<kind>?v=<version> (proxy — repo private)
 ```
 
-- `kind`: `character` (hero maintenance page), `login-banner` (hero login).
+- `kind`: `character` (hero maintenance page), `login-banner` (peekaboo — karakter di atas form login "Selamat datang kembali", BUKAN hero marketing landing page).
 - Version = content hash → URL berubah hanya saat gambar berubah; browser
   boleh cache permanen per URL (immutable), upload baru otomatis
   mengganti tanpa deploy ulang.

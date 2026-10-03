@@ -28,7 +28,7 @@ import { fmtWIB } from "../format";
 /** Konfigurasi node asset: char ↔ character, banner ↔ loginBanner. */
 const ASSET_NODES = {
   char: { kind: "character" as AssetKind, prefix: "char" as const, title: "🎭 Character Aomi", where: "• Maintenance page (hero utama)" },
-  banner: { kind: "loginBanner" as AssetKind, prefix: "banner" as const, title: "🖼️ Login Banner", where: "• Halaman login (artwork hero)" },
+  banner: { kind: "loginBanner" as AssetKind, prefix: "banner" as const, title: "🖼️ Login Banner", where: "• Panel \"Masuk/Daftar\" di halaman login (karakter peekaboo di atas form)" },
 };
 
 function renderAssetView(node: keyof typeof ASSET_NODES, desc: string): View {
@@ -232,11 +232,14 @@ export const bannerHandler: MenuHandler = {
         text: [
           "📤 Ganti Login Banner",
           "",
-          "Kirim foto banner login baru di chat ini (sebagai gambar).",
+          "Kirim foto baru di chat ini (sebagai gambar) — dipakai untuk",
+          "karakter \"peekaboo\" di atas form Masuk/Daftar (bukan hero besar",
+          "di landing page).",
           "",
           "• Format: JPEG / PNG / WEBP, maks 5 MB",
-          "• Disarankan portrait ~900×1120 (rasio hero halaman login)",
-          "• Langsung aktif di halaman login — tanpa deploy",
+          "• Disarankan portrait ~260×340",
+          "• Satu foto dipakai utk kedua ekspresi (mata buka/tutup)",
+          "• Langsung aktif — tanpa deploy",
           "",
           "Tekan ❌ Batalkan untuk membatalkan.",
         ].join("\n"),
