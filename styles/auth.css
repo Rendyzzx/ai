@@ -309,6 +309,10 @@ h1, h2, h3 {
 .hero-visual {
   grid-area: visual;
   position: relative;
+  /* width eksplisit WAJIB: dengan margin-left:auto tapi tanpa width,
+     grid item jadi shrink-to-fit dan artwork collapse jadi kotak kecil
+     (regrasi "char kecil di kanan" di mode desktop window). */
+  width: 100%;
   max-width: 380px;
   margin: 0 -10px 0 auto; /* sedikit keluar ke kanan — controlled bleed */
   padding-bottom: 56px; /* ruang untuk kartu yang overlap di bawah */
