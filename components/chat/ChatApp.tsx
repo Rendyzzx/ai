@@ -468,7 +468,12 @@ export default function ChatApp() {
           { signal: ctrl.signal }
         );
         clearTimeout(timer);
-        if (!r.ok) {
+        const ct = r.headers.get("content-type") || "";
+        // Fix 2026-10: xrina kadang balas error JSON walau HTTP 200 (bukan
+        // cuma saat !r.ok) — cek content-type dulu, bukan cuma status, biar
+        // "Insufficient credits" selalu kedeteksi dan tidak jatuh ke pesan
+        // generik yang menyuruh user kirim ulang foto sia-sia.
+        if (!r.ok || !ct.startsWith("image/")) {
           const bodyText = await r.text().catch(() => "");
           if (/insufficient\s*credit/i.test(bodyText)) quotaIssue = true;
           throw new Error("edit http " + r.status);
