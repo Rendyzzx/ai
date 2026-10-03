@@ -7,6 +7,7 @@
 
 import crypto from "node:crypto";
 import { readJson, putJson, updateJson, deleteJson, listJsonPaths } from "@/lib/server/store";
+import { maintenanceBlockResponse } from "@/lib/server/maintenance";
 import { getSession } from "@/lib/server/auth";
 import { allowUser } from "@/lib/server/ratelimit";
 import { json, methodNotAllowed, readBody, tooMany, forbidden, originOk } from "@/lib/server/http";
@@ -39,6 +40,11 @@ async function touchIndex(uid: string, entry: ConversationItem): Promise<void> {
 export async function GET(req: Request) {
   const session = await getSession(req.headers);
   if (!session) return json({ error: "Belum login", code: "SESSION_INVALID" }, 401);
+
+  if (session) {
+    const maintGate = await maintenanceBlockResponse();
+    if (maintGate) return maintGate;
+  }
   const uid = session.user_id;
 
   const { searchParams } = new URL(req.url);
@@ -97,6 +103,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const session = await getSession(req.headers);
   if (!session) return json({ error: "Belum login", code: "SESSION_INVALID" }, 401);
+
+  if (session) {
+    const maintGate = await maintenanceBlockResponse();
+    if (maintGate) return maintGate;
+  }
   const uid = session.user_id;
 
   if (!originOk(req)) return forbidden();
@@ -165,6 +176,11 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const session = await getSession(req.headers);
   if (!session) return json({ error: "Belum login", code: "SESSION_INVALID" }, 401);
+
+  if (session) {
+    const maintGate = await maintenanceBlockResponse();
+    if (maintGate) return maintGate;
+  }
   const uid = session.user_id;
 
   if (!originOk(req)) return forbidden();

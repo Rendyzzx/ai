@@ -106,3 +106,52 @@ export async function deleteJson(path: string): Promise<boolean> {
   await cmd(["DEL", keyOf(path)]);
   return true;
 }
+
+/** Kirim command Redis mentah via REST (hanya mode Redis). */
+export async function redisCommand(args: unknown[]): Promise<unknown> {
+  if (!USE_REDIS) throw new Error("redisCommand: mode Redis tidak aktif");
+  return cmd(args);
+}
+
+/** Tulis JSON hanya jika key belum ada (Redis: SET NX EX). Return true jika baru ditulis. */
+export async function putJsonIfAbsent(
+  path: string,
+  data: unknown,
+  ttlSeconds: number
+): Promise<boolean> {
+  if (USE_REDIS) {
+    const out = (await cmd([
+      "SET",
+      keyOf(path),
+      JSON.stringify(data),
+      "NX",
+      "EX",
+      Math.max(1, Math.ceil(ttlSeconds)),
+    ])) as string | null;
+    return out === "OK";
+  }
+  // Mode GitHub: best-effort read-then-write (race kecil diterima, didokumentasikan).
+  const existing = await github.readJson(path);
+  if (existing) return false;
+  await github.putJson(path, data, "put if absent");
+  return true;
+}
+
+/** Hapus banyak key sekaligus (Redis: 1 DEL multi-key per chunk). */
+export async function deleteMany(paths: string[]): Promise<number> {
+  if (!paths.length) return 0;
+  if (!USE_REDIS) {
+    let n = 0;
+    for (const p of paths) {
+      if (await github.deleteJson(p)) n++;
+    }
+    return n;
+  }
+  let deleted = 0;
+  for (let i = 0; i < paths.length; i += 100) {
+    const chunk = paths.slice(i, i + 100).map(keyOf);
+    const out = (await cmd(["DEL", ...chunk])) as number;
+    deleted += Number(out) || 0;
+  }
+  return deleted;
+}

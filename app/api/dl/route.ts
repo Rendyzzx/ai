@@ -7,6 +7,8 @@
 // ============================================================
 
 import { getSession } from "@/lib/server/auth";
+import { maintenanceBlockResponse } from "@/lib/server/maintenance";
+import { getFlags } from "@/lib/server/features";
 import { allowUser } from "@/lib/server/ratelimit";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +40,11 @@ export async function GET(req: Request) {
       { status: 401 }
     );
   }
+
+  const maintGate = await maintenanceBlockResponse();
+  if (maintGate) return maintGate;
+  const featureFlags = await getFlags();
+  if (!featureFlags.dl) return Response.json({ error: "Fitur downloader sedang dinonaktifkan sementara oleh admin." }, { status: 503 });
 
   if (!allowUser("dl", session.user_id, req, 15, 60_000)) {
     return Response.json({ error: "Terlalu banyak unduhan. Tunggu sebentar." }, { status: 429 });

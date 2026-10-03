@@ -14,6 +14,8 @@
 // ============================================================
 
 import { getSession } from "@/lib/server/auth";
+import { maintenanceBlockResponse } from "@/lib/server/maintenance";
+import { getFlags } from "@/lib/server/features";
 import { allowUser } from "@/lib/server/ratelimit";
 import { savetubeAudio, MusicError } from "@/lib/server/music";
 
@@ -46,6 +48,11 @@ export async function GET(req: Request) {
   if (!session) {
     return errorJson("Sesi berakhir. Login ulang dulu ya.", 401);
   }
+
+  const maintGate = await maintenanceBlockResponse();
+  if (maintGate) return maintGate;
+  const featureFlags = await getFlags();
+  if (!featureFlags.music) return errorJson("Fitur musik sedang dinonaktifkan sementara oleh admin.", 503);
 
   if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) {
     return errorJson("ID lagu tidak valid.", 400);

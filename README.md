@@ -68,6 +68,15 @@ Browser → Route Handler /api/* (session via header X-Session-Id)
 └── .env.example
 ```
 
+## Admin via Telegram (bot webhook)
+
+Pusat administrasi Aomi (maintenance, feature flags, users, database,
+monitoring, pengumuman, audit log) bisa dikelola lewat bot Telegram.
+Setup: 3 env (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
+`TELEGRAM_ADMIN_IDS`) + setWebhook. Panduan lengkap:
+[docs/telegram-admin.md](docs/telegram-admin.md). Struktur key storage:
+[docs/redis.md](docs/redis.md).
+
 ## Pengembangan lokal
 
 ```bash

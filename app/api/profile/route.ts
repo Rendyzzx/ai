@@ -6,6 +6,7 @@
 // ============================================================
 
 import { readJson, putJson, updateJson } from "@/lib/server/store";
+import { maintenanceBlockResponse } from "@/lib/server/maintenance";
 import { getSession } from "@/lib/server/auth";
 import { allowUser } from "@/lib/server/ratelimit";
 import { json, methodNotAllowed, readBody, forbidden, originOk } from "@/lib/server/http";
@@ -66,6 +67,11 @@ function validateAvatar(value: unknown): string | null {
 export async function GET(req: Request) {
   const session = await getSession(req.headers);
   if (!session) return json({ error: "Sesi berakhir. Silakan login kembali.", code: "SESSION_INVALID" }, 401);
+
+  if (session) {
+    const maintGate = await maintenanceBlockResponse();
+    if (maintGate) return maintGate;
+  }
   const uid = session.user_id;
 
   if (!originOk(req)) return forbidden();
@@ -85,6 +91,11 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   const session = await getSession(req.headers);
   if (!session) return json({ error: "Sesi berakhir. Silakan login kembali.", code: "SESSION_INVALID" }, 401);
+
+  if (session) {
+    const maintGate = await maintenanceBlockResponse();
+    if (maintGate) return maintGate;
+  }
   const uid = session.user_id;
 
   const userFile = await readJson<StoredUser>(`users/${uid}.json`);

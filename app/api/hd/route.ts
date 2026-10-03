@@ -14,6 +14,8 @@
 // ============================================================
 
 import { getSession } from "@/lib/server/auth";
+import { maintenanceBlockResponse } from "@/lib/server/maintenance";
+import { getFlags } from "@/lib/server/features";
 import { allowUser } from "@/lib/server/ratelimit";
 import { pollHdJob, HD_RESULT_HOSTS, HD_JOB_RE, HdError } from "@/lib/server/hdvid";
 
@@ -43,6 +45,11 @@ export async function GET(req: Request) {
   if (!session) {
     return errorJson("Sesi berakhir. Login ulang dulu ya.", 401);
   }
+
+  const maintGate = await maintenanceBlockResponse();
+  if (maintGate) return maintGate;
+  const featureFlags = await getFlags();
+  if (!featureFlags.hd) return errorJson("Fitur HD sedang dinonaktifkan sementara oleh admin.", 503);
 
   if (!HD_JOB_RE.test(job)) {
     return errorJson("ID job HD tidak valid.", 400);

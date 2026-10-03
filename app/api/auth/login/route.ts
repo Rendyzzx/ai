@@ -15,6 +15,7 @@ import {
   recordLoginFail,
   clearLoginLock,
 } from "@/lib/server/auth";
+import { isUserSuspended } from "@/lib/server/adminsvc";
 import { json, methodNotAllowed, readBody } from "@/lib/server/http";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,9 @@ export async function POST(req: Request) {
 
   const user = userFile.data;
   if (!verifyPassword(b.password, user.password_hash)) return fail();
+  if (await isUserSuspended(user.id)) {
+    return json({ error: "Akun ini sedang dibekukan admin." }, 403);
+  }
 
   // Sukses → bersihkan lock, buat session
   await clearLoginLock(identifier, ip);

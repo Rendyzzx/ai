@@ -18,26 +18,15 @@ import { resolveMusicCard, MusicError } from "@/lib/server/music";
 import { submitHdJob, HdError } from "@/lib/server/hdvid";
 import { UPLOAD_HOST_RE } from "@/lib/server/uup";
 import { upscalePhoto, fetchUpscaledBytes, HdPhotoError } from "@/lib/server/hdphoto";
+import { LIMITS } from "@/lib/server/limits";
+import { maintenanceBlockResponse } from "@/lib/server/maintenance";
+import { getFlags } from "@/lib/server/features";
+import { isUserSuspended } from "@/lib/server/adminsvc";
 import type { BotConfig, Conversation, ConversationItem, DlCard, HdCard, Message } from "@/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const LIMITS = {
-  rateWindowMs: 60_000,
-  rateMax: 20,
-  messageMaxLen: 4000,
-  promptMaxLen: 1000,
-  responseMaxLen: 8000,
-  fetchBytes: 100_000,
-  geminiTimeout: 25_000,
-  maxMessages: 100,
-  contextSend: 8,
-  downloadTimeout: 30_000,
-  tempInputTtl: 3600,
-  tempResultTtl: 259_200,
-  editResultMax: 10_000_000,
-};
 
 const HOSTS = {
   geminiCookie: "https://gemini.google.com/_/BardChatUi/data/batchexecute",
@@ -604,6 +593,17 @@ export async function POST(req: Request) {
   if (!session) return json({ error: "Sesi berakhir. Silakan login kembali.", code: "SESSION_INVALID" }, 401);
   const uid = session.user_id;
 
+  // Gerbang maintenance + akun dibekukan + feature flag chat (server-side).
+  const maintGate = await maintenanceBlockResponse();
+  if (maintGate) return maintGate;
+  if (await isUserSuspended(uid)) {
+    return json({ error: "Akun kamu sedang dibekukan admin.", code: "SUSPENDED" }, 403);
+  }
+  const flags = await getFlags();
+  if (!flags.chat) {
+    return json({ error: "Chat sedang dinonaktifkan sementara oleh admin.", code: "FEATURE_DISABLED" }, 503);
+  }
+
   if (!originOk(req)) return forbidden();
 
   // Chat TIDAK dibatasi rate limit (permintaan owner) — pemakaian normal
@@ -654,6 +654,10 @@ export async function POST(req: Request) {
       name: sanitize(v.name, 80) || "video.mp4",
       size: Math.max(0, Number(v.size) || 0),
     };
+  }
+
+  if (videoInfo && !flags.video) {
+    return json({ error: "Fitur video sedang dinonaktifkan sementara oleh admin." }, 503);
   }
 
   // Frame video (opsional): maksimal 6 gambar JPEG hasil ekstraksi
@@ -899,6 +903,7 @@ export async function POST(req: Request) {
   // hdv4 (sinkron ±7 detik, aman di server). Alur: host input di
   // tempimg → hdv4 → unduh hasil → rehost tempimg (TTL 3 hari).
   if (imageBuffer && message && HD_TRIGGER_RE.test(message)) {
+    if (!flags.hd) return json({ error: "Fitur HD sedang dinonaktifkan sementara oleh admin." }, 503);
     if (!allowUser("chathd", uid, req, 4, 60_000)) {
       return json({ error: "Sabar, foto sebelumnya masih diproses. Coba lagi sebentar." }, 429);
     }
@@ -998,6 +1003,7 @@ export async function POST(req: Request) {
   // Simpan pesan user + host gambar sebagai URL temp, balas CEPAT dengan
   // job info. Browser yang menembak API edit eksternal.
   if (imageBuffer && message && EDIT_TRIGGER_RE.test(message)) {
+    if (!flags["image-edit"]) return json({ error: "Fitur edit foto sedang dinonaktifkan sementara oleh admin." }, 503);
     const tempId = crypto.randomUUID();
     await putJson(
       `tempimg/${tempId}.json`,
@@ -1204,6 +1210,7 @@ export async function POST(req: Request) {
   if (!imageBuffer && message) {
     const genPrompt = matchImageGenRequest(message);
     if (genPrompt) {
+      if (!flags.imggen) return json({ error: "Fitur generate gambar sedang dinonaktifkan sementara oleh admin." }, 503);
       if (!allowUser("chatimggen", uid, req, 6, 60_000)) {
         return json({ error: "Sabar, gambar sebelumnya masih diproses. Coba lagi sebentar." }, 429);
       }
@@ -1242,6 +1249,7 @@ export async function POST(req: Request) {
   // link — URL sudah ada dari /api/vupload). Alur kartu sama persis
   // dengan mode HD berbasis link.
   if (videoInfo && message && HD_TRIGGER_RE.test(message)) {
+    if (!flags.hd) return json({ error: "Fitur HD sedang dinonaktifkan sementara oleh admin." }, 503);
     if (!allowUser("chathd", uid, req, 4, 60_000)) {
       return json({ error: "Sabar, video sebelumnya masih diproses. Coba lagi sebentar." }, 429);
     }
@@ -1307,6 +1315,7 @@ export async function POST(req: Request) {
   if (!imageBuffer && !videoInfo && message) {
     const hdUrl = matchHdRequest(message);
     if (hdUrl) {
+      if (!flags.hd) return json({ error: "Fitur HD sedang dinonaktifkan sementara oleh admin." }, 503);
       if (!allowUser("chathd", uid, req, 4, 60_000)) {
         return json({ error: "Sabar, video sebelumnya masih diproses. Coba lagi sebentar." }, 429);
       }
@@ -1366,6 +1375,7 @@ export async function POST(req: Request) {
   if (!imageBuffer && message) {
     const musicQuery = matchMusicRequest(message);
     if (musicQuery) {
+      if (!flags.music) return json({ error: "Fitur musik sedang dinonaktifkan sementara oleh admin." }, 503);
       if (!allowUser("chatmusic", uid, req, 8, 60_000)) {
         return json({ error: "Sabar, lagu sebelumnya masih diproses. Coba lagi sebentar." }, 429);
       }

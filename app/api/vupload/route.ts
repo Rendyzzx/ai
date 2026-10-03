@@ -18,6 +18,8 @@
 
 import crypto from "node:crypto";
 import { getSession } from "@/lib/server/auth";
+import { maintenanceBlockResponse } from "@/lib/server/maintenance";
+import { getFlags } from "@/lib/server/features";
 import { allowIp, allowUser } from "@/lib/server/ratelimit";
 import { readJson, putJson, deleteJson, expireJson } from "@/lib/server/store";
 import { uploadToUguu, UupError } from "@/lib/server/uup";
@@ -49,6 +51,11 @@ interface ChunkFile {
 export async function POST(req: Request) {
   const session = await getSession(req.headers);
   if (!session) return json({ error: "Sesi berakhir. Login ulang dulu ya." }, 401);
+
+  const maintGate = await maintenanceBlockResponse();
+  if (maintGate) return maintGate;
+  const featureFlags = await getFlags();
+  if (!featureFlags.video) return json({ error: "Fitur video sedang dinonaktifkan sementara oleh admin." }, 503);
 
   const body = await readBody(req);
   const action = String(body.action || "");
