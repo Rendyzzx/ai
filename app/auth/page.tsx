@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "../../styles/auth.css";
 import AuthLanding from "@/components/auth/AuthLanding";
+import { getAssetInfo } from "@/lib/server/siteassets";
 
 const SITE = "https://cyronime.web.id";
 
@@ -44,7 +45,9 @@ export const viewport: Viewport = {
   themeColor: "#111210",
 };
 
-export default function AuthPage() {
+export default async function AuthPage() {
+  // Login banner bisa diganti admin lewat bot Telegram (fallback: artwork default).
+  const hero = await getAssetInfo("loginBanner").catch(() => null);
   return (
     <>
       {/* Font non-blocking: display=swap, FOUT singkat ok */}
@@ -54,7 +57,7 @@ export default function AuthPage() {
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600&family=IBM+Plex+Sans:wght@400;500&display=swap"
       />
-      <AuthLanding />
+      <AuthLanding heroSrc={hero?.url} heroWidth={hero?.width} heroHeight={hero?.height} />
     </>
   );
 }

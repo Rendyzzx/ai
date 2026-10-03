@@ -14,6 +14,7 @@ import { securityHandler } from "./security";
 import { settingsHandler } from "./settings";
 import { announcementHandler } from "./announcement";
 import { auditHandler } from "./audit";
+import { siteHandler, characterHandler, bannerHandler } from "./site";
 
 export const MENU_HANDLERS: Record<string, MenuHandler> = {
   MAIN: mainHandler,
@@ -26,6 +27,9 @@ export const MENU_HANDLERS: Record<string, MenuHandler> = {
   CFG: settingsHandler,
   ANN: announcementHandler,
   AUDIT: auditHandler,
+  SITE: siteHandler,
+  CHAR: characterHandler,
+  BANNER: bannerHandler,
 };
 
 export { renderMain } from "./main";
@@ -35,4 +39,5 @@ export { renderUsers } from "./users";
 export { renderFeatures } from "./features";
 export { renderSecurity } from "./security";
 export { renderConfig } from "./settings";
+export { renderSite } from "./site";
 export { renderAnnouncement } from "./announcement";

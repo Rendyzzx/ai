@@ -35,6 +35,7 @@ Website API + Bot Telegram (service layer sama)
 | `aomi:telegram/session/<id>.json` | state bot per admin | 10 menit |
 | `aomi:telegram/seen/<upid>.json` | update Telegram terproses | 1 jam |
 | `aomi:telegram/security.json` | statistik akses tanpa izin | — |
+| `aomi:assets/state.json` | reference asset situs (character, login banner) — **tanpa binary** | — |
 | `aomi:status/_healthcheck.json` | (tidak pernah dibuat) probe | — |
 
 Definisi key terpusat di `lib/redis/keys.ts` — jangan menulis
@@ -62,6 +63,26 @@ Tanpa env Upstash, semua operasi diteruskan ke repo `Rendyzzx/token`
 - `putJsonIfAbsent` read-then-write (race kecil mungkin).
 - Info Redis / DBSIZE tidak tersedia (menu Database jujur
   menampilkan mode fallback).
+
+## Asset gambar (upload dari bot)
+
+Binary gambar TIDAK disimpan di Redis. Flow:
+
+```
+admin kirim foto di Telegram
+  → validasi magic bytes (JPEG/PNG/WEBP, maks 5 MB)
+  → binary → repo token Rendyzzx/token, path assets/site/<kind>-<hash>.<ext>
+  → Redis aomi:assets/state.json: { storageKey, version=sha256[:12],
+    contentType, size, width, height, updatedAt, uploadedBy }
+  → disajikan via /api/assets/<kind>?v=<version> (proxy — repo private)
+```
+
+- `kind`: `character` (hero maintenance page), `login-banner` (hero login).
+- Version = content hash → URL berubah hanya saat gambar berubah; browser
+  boleh cache permanen per URL (immutable), upload baru otomatis
+  mengganti tanpa deploy ulang.
+- Proxy route mengembalikan `Cache-Control: public, max-age=31536000, immutable`.
+- Fallback sebelum ada upload: `/assets/auth-hero.png` (artwork statis repo).
 
 ## Keamanan
 

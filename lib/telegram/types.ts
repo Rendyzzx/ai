@@ -14,11 +14,21 @@ export interface TgChat {
   type?: string;
 }
 
+export interface TgPhotoSize {
+  file_id: string;
+  file_unique_id: string;
+  width: number;
+  height: number;
+  file_size?: number;
+}
+
 export interface TgMessage {
   message_id: number;
   chat: TgChat;
   from?: TgUser;
   text?: string;
+  /** Foto yang dikirim admin (upload asset character/banner). */
+  photo?: TgPhotoSize[];
 }
 
 export interface TgCallbackQuery {

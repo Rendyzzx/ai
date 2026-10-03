@@ -67,7 +67,21 @@ const GOOGLE_ERRORS: Record<string, string> = {
   google_session_failed: "Session gagal dibuat. Coba lagi sebentar.",
 };
 
-export default function AuthLanding() {
+export default function AuthLanding({
+  heroSrc,
+  heroWidth,
+  heroHeight,
+}: {
+  /** Banner login dari admin (fallback artwork default di sini). */
+  heroSrc?: string;
+  heroWidth?: number;
+  heroHeight?: number;
+}) {
+  const hero = {
+    src: heroSrc || "/assets/auth-hero.png",
+    width: heroWidth || 900,
+    height: heroHeight || 1120,
+  };
   const [panel, setPanel] = useState<"login" | "register">("login");
   const [capLogin, setCapLogin] = useState<CapData | null>(null);
   const [capRegister, setCapRegister] = useState<CapData | null>(null);
@@ -407,10 +421,10 @@ export default function AuthLanding() {
                 <div className="hero-visual-idle">
                   <figure className="hero-visual-art" aria-hidden="true">
                     <Image
-                      src="/assets/auth-hero.png"
+                      src={hero.src}
                       alt=""
-                      width={900}
-                      height={1120}
+                      width={hero.width}
+                      height={hero.height}
                       priority
                       sizes="(max-width: 860px) 88vw, 380px"
                     />

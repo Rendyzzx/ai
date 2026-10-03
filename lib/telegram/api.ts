@@ -94,3 +94,45 @@ export async function sendDocument(
     console.error("[telegram] sendDocument gagal:", (err as Error).message);
   }
 }
+
+/** getFile → file_path server Telegram (untuk download bytes). */
+export async function getFile(fileId: string): Promise<string | null> {
+  const r = await call("getFile", { file_id: fileId });
+  if (!r || typeof r !== "object" || !("file_path" in r)) return null;
+  return (r as { file_path?: string }).file_path ?? null;
+}
+
+/** Download bytes file dari server Telegram (setelah getFile). */
+export async function downloadTgFile(filePath: string): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(`${API}/file/bot${token()}/${filePath}`, { cache: "no-store" });
+    if (!res.ok) {
+      console.error(`[telegram] download file http ${res.status}`);
+      return null;
+    }
+    return new Uint8Array(await res.arrayBuffer());
+  } catch (err) {
+    console.error("[telegram] download file gagal:", (err as Error).message);
+    return null;
+  }
+}
+
+/** Kirim foto dari bytes (preview asset di menu bot). */
+export async function sendPhotoBytes(
+  chatId: number,
+  bytes: Uint8Array,
+  mime: string,
+  caption?: string
+): Promise<boolean> {
+  try {
+    const form = new FormData();
+    form.append("chat_id", String(chatId));
+    if (caption) form.append("caption", caption.slice(0, 900));
+    form.append("photo", new Blob([bytes as BlobPart], { type: mime }), "asset.jpg");
+    const res = await fetch(`${API}/bot${token()}/sendPhoto`, { method: "POST", body: form });
+    return res.ok;
+  } catch (err) {
+    console.error("[telegram] sendPhoto gagal:", (err as Error).message);
+    return false;
+  }
+}

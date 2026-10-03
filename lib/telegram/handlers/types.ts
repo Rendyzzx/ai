@@ -5,7 +5,7 @@
    ============================================================ */
 
 import type { AdminUser } from "../admin";
-import type { BotSession, TgInlineKeyboard } from "../types";
+import type { BotSession, TgInlineKeyboard, TgPhotoSize } from "../types";
 
 export interface Ctx {
   admin: AdminUser;
@@ -29,6 +29,9 @@ export interface MenuHandler {
   onAction(action: string, ctx: Ctx, confirmed: boolean): Promise<View | null>;
   /** Input teks saat session.input aktif di node ini. Return null jika tidak menangani. */
   onInput(text: string, ctx: Ctx): Promise<View | null>;
+  /** Input foto saat session.input foto aktif (upload asset). Opsional.
+   *  chatId = chat asal pesan (untuk kirim konfirmasi/preview). */
+  onPhoto?(photo: TgPhotoSize[], ctx: Ctx, chatId: number): Promise<View | null>;
 }
 
 export const DENIED = "⛔ Akses ditolak untuk aksi ini.";

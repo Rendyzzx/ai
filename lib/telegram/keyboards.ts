@@ -18,7 +18,7 @@ export function mainMenu(statusLine: string): TgInlineKeyboard {
     [["🖥 Website", "web"], ["🛠 Maintenance", "nav:MAINT"]],
     [["👥 Users", "nav:USERS"], ["🗄 Database", "nav:DB"]],
     [["🤖 AI & Tools", "nav:FEAT"], ["📊 Monitoring", "nav:MON"]],
-    [["⚙️ Configuration", "nav:CFG"], ["🔐 Security", "nav:SEC"]],
+    [["⚙️ Pengaturan Website", "nav:SITE"], ["🔐 Security", "nav:SEC"]],
     [["📢 Announcement", "nav:ANN"], ["🧾 Audit Log", "nav:AUDIT"]],
     [["🔄 Refresh", "menu"]],
   ]);
@@ -126,4 +126,28 @@ export function userDetailKeyboard(userId: string, suspended: boolean): TgInline
     ? ["✅ Unsuspend", `userunsuspend:${userId}`]
     : ["⛔ Suspend", `usersuspend:${userId}`];
   return kb([[action], [["⬅️ Kembali", "nav:USERS"]]]);
+}
+
+/** Submenu ⚙️ Pengaturan Website. */
+export function siteMenu(): TgInlineKeyboard {
+  return kb([
+    [["🛠 Maintenance", "nav:MAINT"]],
+    [["🎭 Character", "nav:CHAR"], ["🖼️ Login Banner", "nav:BANNER"]],
+    [["🌐 Tampilan & Limits", "nav:CFG"]],
+    ...BACK_MAIN,
+  ]);
+}
+
+/** Menu satu asset (character / banner). */
+export function assetMenu(prefix: "char" | "banner"): TgInlineKeyboard {
+  return kb([
+    [["📤 Ganti", `${prefix}:replace`], ["👁 Lihat", `${prefix}:view`]],
+    [["🗑 Hapus (kembali ke default)", `${prefix}:delete`]],
+    [["⬅️ Kembali", "nav:SITE"]],
+  ]);
+}
+
+/** Keyboard saat bot menunggu admin mengirim foto. */
+export function awaitingPhotoMenu(prefix: "char" | "banner"): TgInlineKeyboard {
+  return kb([[["❌ Batalkan", "cancel"]]]);
 }

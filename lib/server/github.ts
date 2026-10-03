@@ -120,3 +120,68 @@ export async function deleteJson(path: string): Promise<boolean> {
   });
   return res.ok;
 }
+
+/* ============================================================
+   Binary asset storage (upload dari bot Telegram).
+   File gambar TIDAK pernah disimpan sebagai JSON/base64 di Redis —
+   binary disimpan di repo token (path assets/site/*), Redis hanya
+   menyimpan reference (lihat lib/server/siteassets.ts).
+   ============================================================ */
+
+function b64FromBytes(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString("base64");
+}
+
+/** Simpan file binary baru. Return sha file (untuk delete nanti). */
+export async function putBinary(path: string, bytes: Uint8Array, message: string): Promise<string | null> {
+  const res = await ghFetch(`${BASE}/${path.replace(/^\//, "")}`, {
+    method: "PUT",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ message, content: b64FromBytes(bytes) }),
+  });
+  if (!res.ok) {
+    console.error(`[github] putBinary http ${res.status} ${path}`);
+    return null;
+  }
+  const out = (await res.json()) as { content?: { sha?: string } };
+  return out.content?.sha ?? null;
+}
+
+/** Baca file binary → bytes | null. */
+export async function getBinary(path: string): Promise<Uint8Array | null> {
+  const res = await ghFetch(`${BASE}/${path.replace(/^\//, "")}?ref=main`, {
+    headers: { ...apiHeaders(), Accept: "application/vnd.github.raw+json" },
+  });
+  if (!res.ok) {
+    console.error(`[github] getBinary http ${res.status} ${path}`);
+    return null;
+  }
+  const buf = new Uint8Array(await res.arrayBuffer());
+  return buf.length ? buf : null;
+}
+
+/** Ambil sha file binary (untuk operasi delete). Null jika tidak ada. */
+async function shaOf(path: string): Promise<string | null> {
+  try {
+    const res = await ghFetch(`${BASE}/${path.replace(/^\//, "")}?ref=main`, {
+      headers: apiHeaders(),
+    });
+    if (!res.ok) return null;
+    const out = (await res.json()) as { sha?: string };
+    return out.sha ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Hapus file binary (best-effort — sha dicari otomatis jika tidak ada). */
+export async function deleteBinary(path: string): Promise<boolean> {
+  const sha = await shaOf(path);
+  if (!sha) return false;
+  const res = await ghFetch(`${BASE}/${path.replace(/^\//, "")}`, {
+    method: "DELETE",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ message: `chore: hapus asset ${path}`, sha }),
+  });
+  return res.ok;
+}

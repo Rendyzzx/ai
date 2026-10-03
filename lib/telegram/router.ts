@@ -123,9 +123,36 @@ export async function handleUpdate(update: TgUpdate, admin: AdminUser): Promise<
     }
   }
 
-  // ---- Pesan teks ----
+  // ---- Pesan (teks ATAU foto upload asset) ----
   const msg = update.message || update.edited_message;
-  if (!msg || !msg.text) return;
+  if (!msg) return;
+
+  // Foto dari admin (upload character / login banner).
+  if (msg.photo?.length) {
+    const io: BotIO = { chatId: msg.chat.id, messageId: null };
+    const session = await loadSession(admin.id);
+    try {
+      const handler = MENU_HANDLERS[session.node];
+      if (handler?.onPhoto) {
+        const view = await handler.onPhoto(msg.photo, ctxOf(admin, session), io.chatId);
+        if (view) {
+          await sendMessage(io.chatId, view.text, view.kb);
+          await saveSession(admin.id, session);
+          return;
+        }
+      }
+      // Foto tidak dikenal node saat ini → abaikan (jangan bocorkan state)
+      await saveSession(admin.id, session);
+      return;
+    } catch (err) {
+      console.error("[telegram] photo error:", (err as Error).message);
+      await sendMessage(io.chatId, "❌ Upload gagal. Detail tercatat di log server.").catch(() => {});
+      await saveSession(admin.id, session).catch(() => {});
+      return;
+    }
+  }
+
+  if (!msg.text) return;
   const text = msg.text.trim();
   const io: BotIO = { chatId: msg.chat.id, messageId: null };
   const session = await loadSession(admin.id);

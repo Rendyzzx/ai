@@ -36,6 +36,8 @@ function evalActive(state: MaintState, now: number): boolean {
 
 async function maintenanceActive(origin: string): Promise<boolean> {
   if (cache && Date.now() - cache.at < 5000) return cache.active;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 1500); // cek maintenance tidak boleh menggantungkan halaman
 
   let active = false;
   const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -48,6 +50,7 @@ async function maintenanceActive(origin: string): Promise<boolean> {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(["GET", "aomi:maintenance/state.json"]),
         cache: "no-store",
+        signal: ctrl.signal,
       });
       if (res.ok) {
         const out = (await res.json()) as { result?: string | null };
@@ -69,7 +72,7 @@ async function maintenanceActive(origin: string): Promise<boolean> {
   } else {
     // Mode fallback GitHub — baca lewat endpoint internal ringan.
     try {
-      const res = await fetch(`${origin}/api/maintenance-check`, { cache: "no-store" });
+      const res = await fetch(`${origin}/api/maintenance-check`, { cache: "no-store", signal: ctrl.signal });
       if (res.ok) {
         const d = (await res.json()) as { active?: boolean };
         active = d.active === true;
@@ -79,6 +82,7 @@ async function maintenanceActive(origin: string): Promise<boolean> {
     }
   }
 
+  clearTimeout(timer);
   cache = { active, at: Date.now() };
   return active;
 }

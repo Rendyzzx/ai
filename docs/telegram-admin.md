@@ -52,6 +52,14 @@ bisa dipicu ulang.
 
 ## 3. Struktur menu
 
+```
+Pengaturan Website (SITE)
+├── 🛠 Maintenance            → node MAINT (sudah ada)
+├── 🎭 Character             → node CHAR  (upload/hapus/preview)
+├── 🖼️ Login Banner          → node BANNER (upload/hapus/preview)
+└── 🌐 Tampilan & Limits     → node CFG   (sudah ada)
+```
+
 `/start` atau `/menu`:
 
 ```
@@ -67,6 +75,14 @@ Status: 🟢 Website Online
 ```
 
 - **Website** — status, environment, version, storage.
+- **Pengaturan Website** — 🛠 Maintenance, 🎭 Character (hero maintenance
+  page), 🖼️ Login Banner (artwork hero login), 🌐 Tampilan & limits.
+  Upload asset: admin kirim FOTO → validasi magic bytes (JPEG/PNG/WEBP
+  saja, maks 5 MB — SVG/GIF/executable ditolak; filename Telegram tidak
+  pernah dipercaya) → binary ke repo token (`assets/site/*`) →
+  reference di Redis (`aomi:assets/state.json`) → audit log. Asset baru
+  langsung aktif tanpa deploy; URL berversi konten-hash sehingga cache
+  browser/CDN otomatis diperbarui (bukan cache-busting per render).
 - **Maintenance** — on/off (konfirmasi), ubah judul/pesan/estimasi,
   jadwal (WIB, format `YYYY-MM-DD HH:mm-HH:mm`), preview.
 - **Users** — cari (email/username/ID), terbaru, statistik,
@@ -77,7 +93,7 @@ Status: 🟢 Website Online
   hd, dl, video). Dicek **di server** di route API.
 - **Monitoring** — status jujur: hanya yang benar-benar diverifikasi
   (ping storage, probe AI nyata). Tidak ada status palsu.
-- **Configuration** — nilai penting read-only (limits, version,
+- **Tampilan & Limits (Configuration)** — nilai penting read-only (limits, version,
   environment). Tidak ada SET ENV mentah.
 - **Security** — statistik akses tanpa izin + revoke semua sesi
   (owner, konfirmasi).

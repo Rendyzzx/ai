@@ -13,6 +13,7 @@ import {
   normalizeState,
   parseScheduleInput,
 } from "../lib/server/maintenance-pure.ts";
+import { detectImageType, validateUpload, MAX_ASSET_BYTES } from "../lib/server/imagedata.ts";
 
 let pass = 0;
 let fail = 0;
@@ -104,6 +105,43 @@ check(
   "jadwal lintas setengah malam valid",
   parseScheduleInput("2026-10-05 23:00-01:00") === null // 01:00 dianggap hari sama → invalid (dijelaskan di docs)
 );
+
+// ---------- Validasi upload asset (magic bytes, tanpa percaya filename) ----------
+console.log("Validasi upload asset:");
+const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70, 0, 1, 2, 0, 0, 1]);
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 1, 2, 3]);
+const WEBP = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 1, 2]);
+const SVG = new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>");
+const GIF = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 1, 2, 3, 4, 5, 6, 7, 8]);
+const EXE = new Uint8Array([0x4d, 0x5a, 0x90, 0x00, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+check("JPEG dikenali", detectImageType(JPEG)?.ext === "jpg");
+check("PNG dikenali", detectImageType(PNG)?.ext === "png");
+check("WEBP dikenali", detectImageType(WEBP)?.ext === "webp");
+check("SVG ditolak (script)", detectImageType(SVG) === null);
+check("GIF ditolak", detectImageType(GIF) === null);
+check("executable ditolak", detectImageType(EXE) === null);
+check("file terlalu pendek ditolak", detectImageType(new Uint8Array([0xff, 0xd8])) === null);
+try {
+  validateUpload(JPEG);
+  check("upload JPEG valid", true);
+} catch {
+  check("upload JPEG valid", false);
+}
+try {
+  validateUpload(SVG);
+  check("upload SVG ditolak dengan error ramah", false);
+} catch (err) {
+  check("upload SVG ditolak dengan error ramah", /Format tidak didukung/.test(err.message));
+}
+const big = new Uint8Array(MAX_ASSET_BYTES + 1);
+big.set([0xff, 0xd8, 0xff, 0xe0], 0);
+try {
+  validateUpload(big);
+  check("file > 5MB ditolak", false);
+} catch (err) {
+  check("file > 5MB ditolak", /terlalu besar/.test(err.message));
+}
 
 console.log(`\n${pass} lulus, ${fail} gagal`);
 process.exit(fail ? 1 : 0);
