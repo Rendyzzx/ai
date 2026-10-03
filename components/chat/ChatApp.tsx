@@ -457,13 +457,22 @@ export default function ChatApp() {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), EDIT_BROWSER_TIMEOUT);
       let blob: Blob | null = null;
+      // Fix 2026-10: API eksternal (Rin API/xrina) balas JSON "Insufficient
+      // credits" saat kuota gratisnya habis — itu bukan soal fotonya, jadi
+      // dibedakan dari pesan generik supaya user tidak disuruh kirim ulang
+      // foto sia-sia.
+      let quotaIssue = false;
       try {
         const r = await fetch(
           `${EDIT_API}?image=${encodeURIComponent(job.input_url)}&prompt=${encodeURIComponent(job.prompt)}`,
           { signal: ctrl.signal }
         );
         clearTimeout(timer);
-        if (!r.ok) throw new Error("edit http " + r.status);
+        if (!r.ok) {
+          const bodyText = await r.text().catch(() => "");
+          if (/insufficient\s*credit/i.test(bodyText)) quotaIssue = true;
+          throw new Error("edit http " + r.status);
+        }
         blob = await r.blob();
         if (!blob.type.startsWith("image/")) throw new Error("bukan gambar: " + blob.type);
         if (blob.size > EDIT_RESULT_MAX) throw new Error("hasil terlalu besar");
@@ -474,7 +483,9 @@ export default function ChatApp() {
           {
             message_id: "",
             role: "assistant",
-            content: "Ngeditnya kelamaan atau gagal. Kirim ulang fotonya bareng instruksinya ya.",
+            content: quotaIssue
+              ? "Fitur edit foto lagi nggak bisa dipakai — kuota API provider-nya habis (bukan karena fotonya). Coba lagi nanti ya."
+              : "Ngeditnya kelamaan atau gagal. Kirim ulang fotonya bareng instruksinya ya.",
             timestamp: new Date().toISOString(),
           },
         ]);
@@ -484,7 +495,9 @@ export default function ChatApp() {
           body: JSON.stringify({
             action: "edit-fail",
             conversation_id: cid,
-            message: "edit foto tadi gagal (kelamaan/gangguan) — kirim ulang fotonya ya.",
+            message: quotaIssue
+              ? "edit foto tadi gagal — kuota API provider habis, coba lagi nanti ya."
+              : "edit foto tadi gagal (kelamaan/gangguan) — kirim ulang fotonya ya.",
           }),
         }).catch(() => {});
         refreshSidebar();

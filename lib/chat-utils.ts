@@ -112,11 +112,13 @@ export function matchImageGenRequest(raw: string): string | null {
   return prompt.slice(0, 300);
 }
 
-// Deteksi permintaan HD video: "hdkan <link>", "jadiin hd", "bikin hd".
+// Deteksi permintaan HD video: "hdkan <link>", "hd kan <link>", "jadiin hd", "bikin hd".
+// Fix 2026-10: "hd" dan "kan"/"in" bisa dipisah spasi (bukan cuma strip)
+// — sebelumnya "hd kan video ini" tidak terdeteksi dan nyasar ke chat biasa.
 // SALINAN dari HD_TRIGGER_RE di server — server tetap yang memutuskan
 // rute; ini hanya memilih animasi loading yang tepat.
 export const HD_TRIGGER_RE =
-  /\b(?:hdfy|hd-?kan|hd-?in|jadi(?:in|kan)?\s+hd|bikin(?:in|kan)?\s+hd|ubah(?:in)?\s+jadi\s+hd|upgrade(?:\s+ke)?\s+hd)\b/i;
+  /\b(?:hdfy|hd[\s-]*kan|hd[\s-]*in|jadi(?:in|kan)?\s+hd|bikin(?:in|kan)?\s+hd|ubah(?:in)?\s+jadi\s+hd|upgrade(?:\s+ke)?\s+hd)\b/i;
 
 /**
  * Balik URL video bila pesan adalah permintaan upgrade HD,
