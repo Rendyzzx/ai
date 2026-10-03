@@ -3,7 +3,8 @@
    Redirect user ke /maintenance saat maintenance aktif.
    - Halaman saja (API punya gerbang sendiri di route handler)
    - /maintenance dikecualikan → tidak pernah redirect loop
-   - /auth tetap bisa diakses
+   - /auth JUGA digerbang (login manual tidak diperlukan — admin
+     mengelola lewat bot Telegram, bukan via login saat maintenance)
    - Cek state: Redis REST langsung (env Upstash) atau fallback ke
      /api/maintenance-check. Cache in-memory 5 detik per instance
      (cache — bukan sumber kebenaran; state tetap di storage).
@@ -85,8 +86,10 @@ async function maintenanceActive(origin: string): Promise<boolean> {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Halaman ini sendiri & auth tidak pernah diblokir.
-  if (pathname === "/maintenance" || pathname.startsWith("/auth")) {
+  // Hanya halaman maintenance sendiri yang tidak pernah diblokir
+  // (mencegah redirect loop). /auth TIDAK dikecualikan — bug sebelumnya
+  // bikin landing/login tetap kebuka penuh saat maintenance ON.
+  if (pathname === "/maintenance") {
     return NextResponse.next();
   }
   // API tidak di-redirect (gerbang 503 ada di route handler masing-masing).

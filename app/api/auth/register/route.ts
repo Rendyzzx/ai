@@ -7,6 +7,7 @@
 
 import crypto from "node:crypto";
 import { readJson, putJson, updateJson } from "@/lib/server/store";
+import { maintenanceBlockResponse } from "@/lib/server/maintenance";
 import { allowIp, securityLog, clientIp } from "@/lib/server/ratelimit";
 import {
   hashPassword,
@@ -24,6 +25,9 @@ interface UserIndex {
 }
 
 export async function POST(req: Request) {
+  const maintGate = await maintenanceBlockResponse();
+  if (maintGate) return maintGate;
+
   const ip = clientIp(req.headers);
   if (!allowIp("register", req, 5, 10 * 60 * 1000)) {
     return json({ error: "Terlalu banyak percobaan. Coba lagi nanti." }, 429);

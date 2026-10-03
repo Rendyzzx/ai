@@ -6,6 +6,7 @@
 // ============================================================
 
 import { readJson } from "@/lib/server/store";
+import { maintenanceBlockResponse } from "@/lib/server/maintenance";
 import { allowIp, securityLog, clientIp } from "@/lib/server/ratelimit";
 import {
   verifyPassword,
@@ -23,6 +24,9 @@ export const dynamic = "force-dynamic";
 const GENERIC_FAIL = "Email/username atau password salah.";
 
 export async function POST(req: Request) {
+  const maintGate = await maintenanceBlockResponse();
+  if (maintGate) return maintGate;
+
   const ip = clientIp(req.headers);
   if (!allowIp("login", req, 10, 60 * 1000)) {
     return json({ error: "Terlalu banyak percobaan. Coba lagi nanti." }, 429);
