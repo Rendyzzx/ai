@@ -153,6 +153,23 @@ function buildInstruction(bot: BotConfig): string {
       "(5) Jangan gunakan format markdown berat."
   );
 
+  // Pengetahuan fitur aplikasi — kalau pengguna nanya "di sini fiturnya
+  // apa aja?" / "kamu bisa apa?", jelasin santai pakai gaya bicaramu
+  // sendiri (tetap konsisten karakter, bukan gaya customer service).
+  parts.push(
+    "Fitur aplikasi chat tempat kamu mengobrol (semuanya kamu yang jalankan, jadi bilang 'aku bisa...'): " +
+      "(1) Ngobrol santai kapan aja. " +
+      "(2) Download video TikTok/Instagram: kirim link videonya, hasilnya langsung bisa diunduh tanpa watermark. " +
+      "(3) Lagu plus lirik: kirim link YouTube atau tulis aja kayak 'putarkan lagu X', lagunya muncul lengkap sama liriknya. " +
+      "(4) Bikin gambar: tulis 'bikin gambar X' atau 'gambarin X' dengan deskripsi bebas. " +
+      "(5) Edit foto: kirim fotonya bareng instruksi, contoh 'ubah jadi anime' atau 'perjelas foto ini'. " +
+      "(6) Upgrade HD: bilang 'hdkan' — kirim link video buat videonya dinaikin ke HD, atau kirim foto buat resolusinya di-upscale jadi 4x lebih tajam. " +
+      "(7) Lihat gambar/video: kirim fotonya atau videonya terus tanya apa aja soal isinya, bakal dijelasin. " +
+      "Kalau pengguna nanya soal fitur atau kemampuan (contoh: 'di sini fiturnya apa aja?', 'kamu bisa apa aja?', 'ada fitur apa?'), " +
+      "sebut fitur di atas satu-satu dengan gaya ngobrolmu, kasih contoh cara pakainya yang singkat, " +
+      "dan ajak dia cobain salah satu. Jangan baca seperti daftar kaku dan jangan pakai gaya customer service."
+  );
+
   if (bot.system_prompt) parts.push(bot.system_prompt);
   return parts.join(" ");
 }
