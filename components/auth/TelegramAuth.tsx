@@ -15,6 +15,7 @@
    ============================================================ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "@/lib/client-api";
 
 export type TgMode = "login" | "link";
 
@@ -57,7 +58,8 @@ export default function TelegramAuth({
       setStarting(true);
       setStartErr(null);
       try {
-        const res = await fetch("/api/auth/telegram/start", {
+        // api() → header X-Session-Id ikut (mode link butuh session valid)
+        const res = await api("/api/auth/telegram/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(mode === "link" ? { link: true } : {}),
@@ -100,7 +102,7 @@ export default function TelegramAuth({
     setTimeout(() => {
       (async () => {
         try {
-          const res = await fetch("/api/auth/telegram/start", {
+          const res = await api("/api/auth/telegram/start", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(mode === "link" ? { link: true } : {}),
@@ -123,7 +125,7 @@ export default function TelegramAuth({
     setErr(null);
     setNotice(null);
     try {
-      const res = await fetch("/api/auth/telegram/verify", {
+      const res = await api("/api/auth/telegram/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ attempt_id: attemptId, code }),
@@ -159,7 +161,7 @@ export default function TelegramAuth({
     setErr(null);
     setNotice(null);
     try {
-      const res = await fetch("/api/auth/telegram/resend", {
+      const res = await api("/api/auth/telegram/resend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ attempt_id: attemptId }),
