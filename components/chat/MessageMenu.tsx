@@ -2,13 +2,14 @@
 
 /* ============================================================
    Aomi — components/chat/MessageMenu.tsx
-   Menu aksi pesan (contextual menu, bukan tombol besar):
-   copy / kirim ulang / edit (user), regenerate (+ opsi gaya),
-   simpan (bookmark), feedback 👍/👎, ke awal pesan, delete.
-   Konfirmasi & submenu ada di sini; aksi di ChatApp.
+   Menu aksi pesan — kecil & dekat pesan, BUKAN panel besar.
+   Assistant: Salin, Regenerate (opsi gaya), Simpan, Feedback, Hapus.
+   User: Salin, Kirim ulang, Ubah, Hapus.
+   Semua icon dari sprite (/icons.svg) — tidak ada emoji.
    ============================================================ */
 
 import { useLayoutEffect, useRef, useState } from "react";
+import Icon from "@/components/ui/Icon";
 
 export interface MenuState {
   x: number;
@@ -17,11 +18,9 @@ export interface MenuState {
   role: "user" | "assistant";
   hasText: boolean;
   isLast: boolean;
-  /** Panjang isi (karakter) → tampil "Ke awal pesan" kalau panjang. */
-  contentLen?: number;
   /** Pesan punya gambar/video → "Kirim ulang" tidak relevan. */
   hasMedia?: boolean;
-  /** Feedback tersimpan: 1 (👍) / -1 (👎) / 0 (belum). */
+  /** Feedback tersimpan: 1 (suka) / -1 (tidak suka) / 0 (belum). */
   feedback?: number;
   /** Sudah ada di "Simpanan". */
   bookmarked?: boolean;
@@ -37,7 +36,7 @@ export type RegenVariant =
   | "indonesian";
 
 const REGEN_OPTIONS: { variant: RegenVariant; label: string }[] = [
-  { variant: "", label: "↻ Biasa saja" },
+  { variant: "", label: "Biasa saja" },
   { variant: "shorter", label: "Lebih singkat" },
   { variant: "detailed", label: "Lebih detail" },
   { variant: "casual", label: "Lebih santai" },
@@ -46,8 +45,7 @@ const REGEN_OPTIONS: { variant: RegenVariant; label: string }[] = [
   { variant: "indonesian", label: "Bahasa Indonesia" },
 ];
 
-/** Batas "pesan panjang" → opsi "Ke awal pesan" muncul di menu. */
-const LONG_MESSAGE = 900;
+const MENU_W = 190;
 
 export default function MessageMenu({
   menu,
@@ -59,7 +57,6 @@ export default function MessageMenu({
   onRegenerate,
   onBookmark,
   onFeedback,
-  onJumpTop,
 }: {
   menu: MenuState | null;
   onClose: () => void;
@@ -70,7 +67,6 @@ export default function MessageMenu({
   onRegenerate: (mid: string, variant: RegenVariant) => void;
   onBookmark: (mid: string, bookmarked: boolean) => void;
   onFeedback: (mid: string, value: 1 | -1) => void;
-  onJumpTop: (mid: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
@@ -82,8 +78,8 @@ export default function MessageMenu({
       setPos(null);
       return;
     }
-    const mw = ref.current.offsetWidth || 180;
-    const mh = ref.current.offsetHeight || 150;
+    const mw = ref.current.offsetWidth || MENU_W;
+    const mh = ref.current.offsetHeight || 120;
     const left = Math.min(Math.max(8, menu.x - mw / 2), window.innerWidth - mw - 8);
     const above = menu.y - mh - 10;
     const top =
@@ -110,11 +106,8 @@ export default function MessageMenu({
   if (!menu) return null;
 
   const assistant = menu.role === "assistant";
-  const canSave = assistant && !!menu.mid;
-  const showFeedback = assistant && !!menu.mid;
-  const showJump = (menu.contentLen || 0) > LONG_MESSAGE;
 
-  // ---- Submenu opsi regenerate (request baru BARU setelah user memilih) ----
+  // ---- Submenu opsi regenerate ----
   if (regenOpen) {
     return (
       <div
@@ -122,12 +115,9 @@ export default function MessageMenu({
         ref={ref}
         style={pos ? { left: pos.left, top: pos.top } : { visibility: "hidden", left: 0, top: 0 }}
       >
-        <button
-          className="msg-menu-item msg-menu-back"
-          type="button"
-          onClick={() => setRegenOpen(false)}
-        >
-          ‹ Kembali
+        <button className="msg-menu-item msg-menu-back" type="button" onClick={() => setRegenOpen(false)}>
+          <Icon id="chevron-left" />
+          <span>Kembali</span>
         </button>
         {REGEN_OPTIONS.map((opt) => (
           <button
@@ -161,10 +151,11 @@ export default function MessageMenu({
           onClose();
         }}
       >
-        Salin pesan
+        <Icon id="copy" />
+        <span>Salin</span>
       </button>
 
-      {/* Pesan user: kirim ulang (hanya teks) + edit */}
+      {/* Pesan user: kirim ulang (hanya teks) + ubah */}
       <button
         className="msg-menu-item"
         type="button"
@@ -174,7 +165,8 @@ export default function MessageMenu({
           onClose();
         }}
       >
-        Kirim ulang
+        <Icon id="refresh" />
+        <span>Kirim ulang</span>
       </button>
       <button
         className="msg-menu-item"
@@ -185,65 +177,58 @@ export default function MessageMenu({
           onClose();
         }}
       >
-        Ubah pesan
+        <Icon id="edit" />
+        <span>Ubah pesan</span>
       </button>
 
-      {/* Jawaban Aomi: regenerate (dengan opsi), simpan, feedback */}
+      {/* Jawaban Aomi: regenerate, simpan, feedback */}
       <button
         className="msg-menu-item"
         type="button"
         hidden={!(assistant && menu.mid && menu.isLast)}
         onClick={() => setRegenOpen(true)}
       >
-        ↻ Regenerate…
+        <Icon id="refresh" />
+        <span>Regenerate</span>
       </button>
       <button
         className="msg-menu-item"
         type="button"
-        hidden={!canSave}
+        hidden={!(assistant && menu.mid)}
         onClick={() => {
           onBookmark(menu.mid, Boolean(menu.bookmarked));
           onClose();
         }}
       >
-        {menu.bookmarked ? "Hapus dari Simpanan" : "🔖 Simpan"}
+        <Icon id="bookmark" className={menu.bookmarked ? "fill" : undefined} />
+        <span>{menu.bookmarked ? "Hapus dari Simpanan" : "Simpan"}</span>
       </button>
-      {showFeedback && (
+      {assistant && menu.mid && (
         <div className="msg-menu-row">
           <button
-            className={"msg-menu-item msg-menu-fb" + (menu.feedback === 1 ? " active" : "")}
             type="button"
+            className={"msg-menu-fb" + (menu.feedback === 1 ? " active" : "")}
+            aria-label="Jawaban membantu"
             onClick={() => {
               onFeedback(menu.mid, 1);
               onClose();
             }}
           >
-            👍
+            <Icon id="thumb-up" />
           </button>
           <button
-            className={"msg-menu-item msg-menu-fb" + (menu.feedback === -1 ? " active" : "")}
             type="button"
+            className={"msg-menu-fb" + (menu.feedback === -1 ? " active" : "")}
+            aria-label="Jawaban kurang membantu"
             onClick={() => {
               onFeedback(menu.mid, -1);
               onClose();
             }}
           >
-            👎
+            <Icon id="thumb-down" />
           </button>
         </div>
       )}
-
-      <button
-        className="msg-menu-item"
-        type="button"
-        hidden={!showJump}
-        onClick={() => {
-          onJumpTop(menu.mid);
-          onClose();
-        }}
-      >
-        Ke awal pesan ini
-      </button>
 
       <button
         className="msg-menu-item danger"
@@ -254,7 +239,8 @@ export default function MessageMenu({
           onClose();
         }}
       >
-        Hapus pesan
+        <Icon id="trash" />
+        <span>Hapus pesan</span>
       </button>
     </div>
   );

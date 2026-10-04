@@ -52,6 +52,7 @@ export default function Sidebar({
   onLogout,
   onOpen,
   onDelete,
+  onRename,
   onPin,
   onArchive,
   onRecover,
@@ -74,6 +75,7 @@ export default function Sidebar({
   onLogout: () => void | Promise<void>;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => void;
   onPin: (id: string, value: boolean) => void;
   onArchive: (id: string, value: boolean) => void;
   onRecover: () => Promise<void>;
@@ -85,8 +87,11 @@ export default function Sidebar({
   const [viewArchived, setViewArchived] = useState(false);
   // Hasil pencarian server (isi percakapan); null = tidak sedang mencari via server
   const [serverResults, setServerResults] = useState<SearchItem[] | null>(null);
-  // Menu ⋯ per item percakapan
-  const [itemMenuFor, setItemMenuFor] = useState<string | null>(null);
+  // Menu ⋯ per item percakapan — posisi FIXED (di luar <aside>) supaya
+  // tidak terpotong overflow-y milik .sb-history / drawer transform.
+  const [itemMenu, setItemMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  // Rename inline (input di tempat judul)
+  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -168,13 +173,14 @@ export default function Sidebar({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (itemMenuFor) setItemMenuFor(null);
+      if (renaming) setRenaming(null);
+      else if (itemMenu) setItemMenu(null);
       else if (menuOpen) setMenuOpen(false);
       else onCloseDrawer();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onCloseDrawer, menuOpen, itemMenuFor]);
+  }, [onCloseDrawer, menuOpen, itemMenu, renaming]);
 
   // Klik di luar menu profil / menu item → tutup
   useEffect(() => {
@@ -187,13 +193,16 @@ export default function Sidebar({
   }, [menuOpen]);
 
   useEffect(() => {
-    if (!itemMenuFor) return;
+    if (!itemMenu) return;
     const onDown = (e: MouseEvent) => {
-      if (itemMenuRef.current && !itemMenuRef.current.contains(e.target as Node)) setItemMenuFor(null);
+      // Klik pada tombol ⋯ ditangani click handler-nya sendiri (toggle);
+      // jangan tutup duluan di mousedown supaya toggle tetap akurat.
+      if ((e.target as HTMLElement).closest?.(".sb-item-more")) return;
+      if (itemMenuRef.current && !itemMenuRef.current.contains(e.target as Node)) setItemMenu(null);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [itemMenuFor]);
+  }, [itemMenu]);
 
   // Mode tampilan: normal (aktif, non-arsip) / arsip. Pinned tetap di atas
   // mode normal. Saat mencari → semua dicari (termasuk arsip, ditandai).
@@ -210,7 +219,7 @@ export default function Sidebar({
   const groups = useMemo(() => groupByTime(visible), [visible]);
   const archivedCount = useMemo(() => items.filter((c) => c.archived === true).length, [items]);
 
-  const itemMenuTarget = itemMenuFor ? items.find((c) => c.conversation_id === itemMenuFor) : null;
+  const itemMenuTarget = itemMenu ? items.find((c) => c.conversation_id === itemMenu.id) : null;
 
   return (
     <>
@@ -281,7 +290,7 @@ export default function Sidebar({
             <>
               <p className="sb-empty">
                 {query
-                  ? "Tidak ada hasil."
+                  ? "Tidak ada percakapan yang cocok."
                   : viewArchived
                     ? "Arsip kosong."
                     : "Belum pernah ngobrol di sini."}
@@ -309,7 +318,7 @@ export default function Sidebar({
               {groups.map((group) => (
               <div className="sb-group" key={group.label + group.items[0].conversation_id}>
                 <div className="sb-group-label">
-                  {group.label === "" ? "📌 Disematkan" : group.label}
+                  {group.label === "" ? "Disematkan" : group.label}
                 </div>
                 {group.items.map((conv) => (
                   <div
@@ -323,57 +332,61 @@ export default function Sidebar({
                     }}
                   >
                     <span className="sb-item-main">
-                      <span className="sb-item-title">{conv.title || "Chat baru"}</span>
+                      {renaming?.id === conv.conversation_id ? (
+                        <input
+                          className="sb-item-rename"
+                          value={renaming.title}
+                          autoFocus
+                          maxLength={80}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => setRenaming({ id: conv.conversation_id, title: e.target.value })}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === "Enter") {
+                              const t = renaming.title.trim();
+                              setRenaming(null);
+                              if (t && t !== (conv.title || "Chat baru")) onRename(conv.conversation_id, t);
+                            } else if (e.key === "Escape") {
+                              setRenaming(null);
+                            }
+                          }}
+                          onBlur={() => {
+                            const t = renaming.title.trim();
+                            setRenaming(null);
+                            if (t && t !== (conv.title || "Chat baru")) onRename(conv.conversation_id, t);
+                          }}
+                          aria-label="Nama percakapan baru"
+                        />
+                      ) : (
+                        <span className="sb-item-title">{conv.title || "Chat baru"}</span>
+                      )}
                       {conv.snippet && <span className="sb-item-snippet">{conv.snippet}</span>}
                     </span>
-                    <button
-                      className="sb-item-more"
-                      aria-label="Opsi percakapan"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setItemMenuFor(itemMenuFor === conv.conversation_id ? null : conv.conversation_id);
-                      }}
-                    >
-                      <svg className="icon" aria-hidden="true"><use href="/icons.svg#more" /></svg>
-                    </button>
-                    {itemMenuFor === conv.conversation_id && (
-                      <div className="sb-item-menu" ref={itemMenuRef} role="menu">
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setItemMenuFor(null);
-                            onPin(conv.conversation_id, !conv.pinned);
-                          }}
-                        >
-                          {conv.pinned ? "Lepas dari sematan" : "📌 Sematkan"}
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setItemMenuFor(null);
-                            onArchive(conv.conversation_id, !conv.archived);
-                          }}
-                        >
-                          {conv.archived ? "Keluarkan dari arsip" : "🗂 Arsipkan"}
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="danger"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setItemMenuFor(null);
-                            onDelete(conv.conversation_id);
-                          }}
-                        >
-                          Hapus
-                        </button>
-                      </div>
+                    {renaming?.id === conv.conversation_id ? null : (
+                      <button
+                        className="sb-item-more"
+                        aria-label="Opsi percakapan"
+                        aria-expanded={itemMenu?.id === conv.conversation_id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (itemMenu?.id === conv.conversation_id) {
+                            setItemMenu(null);
+                            return;
+                          }
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          const W = 196, H = 178;
+                          const x = Math.max(8, Math.min(rect.right - W, window.innerWidth - W - 8));
+                          const y =
+                            rect.bottom + 6 + H > window.innerHeight
+                              ? Math.max(8, rect.top - H - 6)
+                              : rect.bottom + 6;
+                          setItemMenu({ id: conv.conversation_id, x, y });
+                        }}
+                      >
+                        <svg className="icon" aria-hidden="true"><use href="/icons.svg#more" /></svg>
+                      </button>
                     )}
+
                   </div>
                 ))}
               </div>
@@ -403,7 +416,8 @@ export default function Sidebar({
                   onOpenSaved();
                 }}
               >
-                🔖 Simpanan
+                <svg className="icon" aria-hidden="true"><use href="/icons.svg#bookmark" /></svg>
+                <span>Simpanan</span>
               </button>
               <button
                 type="button"
@@ -461,6 +475,64 @@ export default function Sidebar({
           </div>
         </footer>
       </aside>
+
+      {/* Menu ⋯ percakapan — fixed, di luar <aside>, tidak bisa terpotong
+          overflow scroll / transform drawer. Item menu memakai data target
+          supaya tetap sinkron dengan daftar. */}
+      {itemMenu && itemMenuTarget && (
+        <div
+          className="sb-item-menu"
+          ref={itemMenuRef}
+          role="menu"
+          style={{ left: itemMenu.x, top: itemMenu.y }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setItemMenu(null);
+              setRenaming({ id: itemMenuTarget.conversation_id, title: itemMenuTarget.title || "Chat baru" });
+            }}
+          >
+            <svg className="icon" aria-hidden="true"><use href="/icons.svg#edit" /></svg>
+            <span>Ganti nama</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setItemMenu(null);
+              onPin(itemMenuTarget.conversation_id, !itemMenuTarget.pinned);
+            }}
+          >
+            <svg className="icon" aria-hidden="true"><use href="/icons.svg#pin" /></svg>
+            <span>{itemMenuTarget.pinned ? "Lepas sematan" : "Sematkan"}</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setItemMenu(null);
+              onArchive(itemMenuTarget.conversation_id, !itemMenuTarget.archived);
+            }}
+          >
+            <svg className="icon" aria-hidden="true"><use href="/icons.svg#archive" /></svg>
+            <span>{itemMenuTarget.archived ? "Keluarkan dari arsip" : "Arsipkan"}</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="danger"
+            onClick={() => {
+              setItemMenu(null);
+              onDelete(itemMenuTarget.conversation_id);
+            }}
+          >
+            <svg className="icon" aria-hidden="true"><use href="/icons.svg#trash" /></svg>
+            <span>Hapus</span>
+          </button>
+        </div>
+      )}
     </>
   );
 }

@@ -242,6 +242,29 @@ export async function POST(req: Request) {
     return json({ ok: true, recovered: items.length });
   }
 
+  // ---------------- action=rename: ganti judul percakapan ----------------
+  if (body.action === "rename") {
+    const cid = String(body.conversation_id || "");
+    if (!validId(cid)) return json({ error: "ID tidak valid" }, 400);
+    const title = String(body.title || "").trim().slice(0, 80);
+    if (!title) return json({ error: "Judul tidak boleh kosong" }, 400);
+
+    const file = await readJson<Conversation>(convPath(uid, cid));
+    if (!file) return json({ error: "Percakapan tidak ditemukan" }, 404);
+    const conv = file.data;
+    conv.title = title;
+    conv.updated_at = conv.updated_at || nowIso(); // waktu update tidak berubah krn rename
+    await putJson(convPath(uid, cid), conv, "conversation rename");
+
+    await updateJson<ConversationItem[]>(idxPath(uid), "conversation index", (current) => {
+      const items = Array.isArray(current) ? current : [];
+      const i = items.findIndex((c) => c.conversation_id === cid);
+      if (i >= 0) items[i] = { ...items[i], title };
+      return items;
+    });
+    return json({ ok: true, title });
+  }
+
   // ---------------- action=pin / archive ----------------
   // Field di entri index existing (migration-safe: lama = undefined/false).
   if (body.action === "pin" || body.action === "archive") {

@@ -39,10 +39,10 @@ const DOM_CAP = 150;
 
 /** Quick action (layar sambutan): isi composer, user yang kirim. */
 const QUICK_ACTIONS = [
-  { icon: "💡", label: "Cari ide", text: "bantu aku cari ide menarik ya" },
-  { icon: "💻", label: "Coding", text: "aku mau nanya soal coding, bantuin ya" },
-  { icon: "✍️", label: "Menulis", text: "bantuin aku bikin tulisan ya" },
-  { icon: "📚", label: "Jelaskan", text: "jelasin sesuatu ke aku dengan cara yang gampang dipahami ya" },
+  { icon: "idea", label: "Cari ide", text: "bantu aku cari ide menarik ya" },
+  { icon: "code", label: "Coding", text: "aku mau nanya soal coding, bantuin ya" },
+  { icon: "edit", label: "Menulis", text: "bantuin aku bikin tulisan ya" },
+  { icon: "book", label: "Jelaskan", text: "jelasin sesuatu ke aku dengan cara yang gampang dipahami ya" },
 ];
 
 const DEFAULT_USER: UserProfile = {
@@ -902,7 +902,6 @@ export default function ChatApp() {
         role: m.role,
         hasText: !!m.content,
         isLast: m.role === "assistant" && isLast,
-        contentLen: (m.content || "").length,
         hasMedia: Boolean(m.image || m.image_url || m.video || m.dl || m.music || m.hd),
         feedback: typeof m.feedback === "number" ? m.feedback : 0,
         bookmarked: Boolean(m.bookmarked),
@@ -1081,7 +1080,7 @@ export default function ChatApp() {
 
   /* ---------------- Feedback / Simpan / Kirim ulang / Pin / Arsip ---------------- */
 
-  /** Feedback 👍/👎: toggle server-side, update lokal instan. */
+  /** Feedback suka/tidak suka: toggle server-side, update lokal instan. */
   const doFeedback = useCallback(
     async (mid: string, value: 1 | -1) => {
       const cid = currentIdRef.current;
@@ -1113,7 +1112,7 @@ export default function ChatApp() {
     [showToast]
   );
 
-  /** 🔖 Simpan jawaban Aomi (atau hapus dari Simpanan). */
+  /** Simpan jawaban Aomi ke Simpanan (atau hapus dari sana). */
   const doBookmark = useCallback(
     async (mid: string, bookmarked: boolean) => {
       const cid = currentIdRef.current;
@@ -1132,7 +1131,7 @@ export default function ChatApp() {
           }),
         });
         if (res.ok) {
-          showToast(bookmarked ? "Dihapus dari Simpanan" : "Disimpan ke Simpanan 🔖");
+          showToast(bookmarked ? "Dihapus dari Simpanan" : "Disimpan ke Simpanan");
         } else {
           throw new Error("gagal");
         }
@@ -1155,13 +1154,6 @@ export default function ChatApp() {
     },
     [send]
   );
-
-  /** Gulir ke awal sebuah pesan (menu "Ke awal pesan ini"). */
-  const jumpToMessage = useCallback((mid: string) => {
-    if (!mid) return;
-    const el = columnRef.current?.querySelector<HTMLElement>(`[data-mid="${mid}"]`);
-    el?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
 
   /** Pin / arsip percakapan (state index, update lokal + server). */
   const doConvFlag = useCallback(
@@ -1189,6 +1181,24 @@ export default function ChatApp() {
       }
     },
     [refreshSidebar, resetView]
+  );
+
+  /** Ganti judul percakapan (optimistik + server). */
+  const doRename = useCallback(
+    async (id: string, title: string) => {
+      setItems((prev) => prev.map((c) => (c.conversation_id === id ? { ...c, title } : c)));
+      try {
+        const res = await api("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "rename", conversation_id: id, title }),
+        });
+        if (!res.ok) throw new Error("gagal");
+      } catch {
+        void refreshSidebar();
+      }
+    },
+    [refreshSidebar]
   );
 
   /* ---------------- Long-press (mobile) untuk menu pesan ---------------- */
@@ -1233,7 +1243,6 @@ export default function ChatApp() {
             isLast:
               msg.role === "assistant" &&
               loadedRef.current[loadedRef.current.length - 1]?.message_id === mid,
-            contentLen: (msg.content || "").length,
             hasMedia: Boolean(msg.image || msg.image_url || msg.video || msg.dl || msg.music || msg.hd),
             feedback: typeof msg.feedback === "number" ? msg.feedback : 0,
             bookmarked: Boolean(msg.bookmarked),
@@ -1292,6 +1301,7 @@ export default function ChatApp() {
         onEditText={(text) => m.message_id && void saveEdit(m.message_id, text)}
         onEditCancel={() => setEditMid(null)}
         onContextMenu={(e) => openMenu(e, m)}
+        onMenuButton={(e) => openMenu(e, m)}
       />
     );
   });
@@ -1379,6 +1389,7 @@ export default function ChatApp() {
           }}
           onPin={(id, value) => void doConvFlag(id, "pin", value)}
           onArchive={(id, value) => void doConvFlag(id, "archive", value)}
+          onRename={(id, title) => void doRename(id, title)}
           onOpenSaved={() => {
             setSidebarOpen(false);
             setSavedOpen(true);
@@ -1469,7 +1480,7 @@ export default function ChatApp() {
                           inputRef.current?.focus();
                         }}
                       >
-                        <span aria-hidden="true">{a.icon}</span>
+                        <svg className="icon" aria-hidden="true"><use href={`/icons.svg#${a.icon}`} /></svg>
                         {a.label}
                       </button>
                     ))}
@@ -1667,7 +1678,6 @@ export default function ChatApp() {
         onRegenerate={(mid, variant) => void doRegenerate(mid, variant)}
         onBookmark={(mid, bookmarked) => void doBookmark(mid, bookmarked)}
         onFeedback={(mid, value) => void doFeedback(mid, value)}
-        onJumpTop={(mid) => jumpToMessage(mid)}
       />
 
       {/* Simpanan (bookmark jawaban Aomi) */}

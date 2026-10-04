@@ -2,7 +2,7 @@
 
 /* ============================================================
    Aomi — components/chat/SavedView.tsx
-   Panel "Simpanan": jawaban Aomi yang user tandai 🔖.
+   Panel "Simpanan": jawaban Aomi yang user tandai (bookmark).
    Overlay ringan gaya settings — bukan halaman baru. Data dari
    GET /api/conversations?bookmarks=1 (snapshot, tetap ada walau
    percakapan sumbernya dihapus).
@@ -83,7 +83,10 @@ export default function SavedView({
     <div className="saved-overlay" role="dialog" aria-label="Simpanan">
       <div className="saved-panel">
         <header className="saved-head">
-          <span className="saved-title">🔖 Simpanan</span>
+          <span className="saved-head-left">
+            <svg className="icon" aria-hidden="true"><use href="/icons.svg#bookmark" /></svg>
+            <span className="saved-title">Simpanan</span>
+          </span>
           <button className="icon-btn" aria-label="Tutup Simpanan" onClick={onClose}>
             <svg className="icon" aria-hidden="true"><use href="/icons.svg#close" /></svg>
           </button>

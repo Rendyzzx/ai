@@ -380,6 +380,7 @@ export default function MessageRow({
   onEditText,
   onEditCancel,
   onContextMenu,
+  onMenuButton,
   children,
 }: {
   role: Role;
@@ -404,6 +405,8 @@ export default function MessageRow({
   onEditText?: (text: string) => void;
   onEditCancel?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
+  /** Tombol ⋯ kecil di bawah bubble (assistant, hover desktop). */
+  onMenuButton?: (e: React.MouseEvent) => void;
   children?: React.ReactNode;
 }) {
   const avatar = (
@@ -476,6 +479,18 @@ export default function MessageRow({
         )}
         {children}
       </div>
+      {/* ⋯ kecil di bawah bubble — jalan menu aksi selain
+          klik-kanan/long-press. Muncul saat hover (desktop). */}
+      {role === "assistant" && mid && onMenuButton && (
+        <button
+          type="button"
+          className="msg-act"
+          aria-label="Aksi pesan"
+          onClick={onMenuButton}
+        >
+          <Icon id="more" />
+        </button>
+      )}
     </div>
   );
 

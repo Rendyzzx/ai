@@ -982,6 +982,49 @@
 }
 
 /* ---------------- Menu aksi pesan (klik kanan / long-press) ---------------- */
+/* Tombol ⋯ di bawah bubble jawaban (jalan menu selain klik-kanan).
+   Tanpa dampak layout (absolute), muncul saat hover row. */
+.message-body {
+  position: relative;
+}
+
+.msg-act {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: -2px;
+  width: 24px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  opacity: 0;
+  border-radius: var(--radius-s);
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.msg-act .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.message-row:hover .msg-act,
+.msg-act:focus-visible {
+  opacity: 1;
+}
+
+.msg-act:hover {
+  background: var(--surface-2);
+}
+
+/* Mobile: long-press sudah ada → tombol hover tidak perlu */
+@media (hover: none) {
+  .msg-act { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-act { transition: none; }
+}
+
 /* Menu konteks = overlay nyata → boleh bayangan. Masuk 120ms. */
 .msg-menu {
   position: fixed;
@@ -1006,12 +1049,25 @@
 }
 
 .msg-menu-item {
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
   border-radius: var(--radius);
   font-size: 13px;
   text-align: left;
   color: var(--text);
   transition: background 0.12s;
+}
+
+.msg-menu-item .icon {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+
+.msg-menu-item:hover .icon {
+  color: var(--text);
 }
 
 .msg-menu-item:hover {
@@ -1151,13 +1207,33 @@
 
 .msg-menu-row .msg-menu-fb {
   flex: 1;
-  text-align: center;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 0;
+  color: var(--muted);
+  border-radius: var(--radius);
+  transition: background 0.12s, color 0.12s;
+}
+
+.msg-menu-row .msg-menu-fb .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.msg-menu-row .msg-menu-fb:hover {
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .msg-menu-fb.active {
   background: var(--surface-3);
   color: var(--accent);
+}
+
+/* Bookmark aktif: icon terisi */
+.icon.fill {
+  fill: currentColor;
 }
 
 /* ---------------- Tombol "Lanjut ke pesan terbaru" ---------------- */
@@ -1219,18 +1295,27 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   font-size: 12.5px;
   color: var(--muted);
   background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  transition: color 0.15s, border-color 0.15s;
+  border: 0;
+  border-radius: var(--radius-s);
+  transition: color 0.15s, background 0.15s;
+}
+
+.quick-action .icon {
+  width: 14px;
+  height: 14px;
 }
 
 .quick-action:hover {
   color: var(--text);
-  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.quick-action:active {
+  background: var(--surface-3);
 }
 
 /* ---------------- Blok kode: toggle collapse ---------------- */
@@ -1297,6 +1382,19 @@
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
   flex: none;
+}
+
+.saved-head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.saved-head-left .icon {
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
 }
 
 .saved-title {

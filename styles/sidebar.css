@@ -206,6 +206,19 @@
   font-weight: 500;
 }
 
+/* Rename inline: input menggantikan judul sementara */
+.sb-item-rename {
+  width: 100%;
+  min-width: 0;
+  padding: 3px 7px;
+  font-size: 14.5px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-s);
+  outline: none;
+}
+
 /* Tombol hapus: muncul saat hover/fokus agar daftar tetap bersih */
 .sb-item-del {
   flex: none;
@@ -354,12 +367,21 @@
 }
 
 .sb-menu button {
-  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
   border-radius: var(--radius-s);
   text-align: left;
   font-size: 13.5px;
   color: var(--text);
   transition: background 0.12s;
+}
+
+.sb-menu button .icon {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
 }
 
 .sb-menu button:hover {
@@ -595,12 +617,12 @@
 }
 
 /* Menu kecil per item: pin / arsip / hapus */
+/* FIXED + dirender di luar <aside>: tidak bisa terpotong overflow
+   milik .sb-history, tidak kena transform drawer di mobile. */
 .sb-item-menu {
-  position: absolute;
-  right: 10px;
-  top: calc(100% - 4px);
-  z-index: 30;
-  min-width: 170px;
+  position: fixed;
+  z-index: 60;
+  width: 186px;
   padding: 5px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -618,12 +640,25 @@
 }
 
 .sb-item-menu button {
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
   font-size: 13px;
   text-align: left;
   color: var(--text);
   border-radius: var(--radius);
   transition: background 0.12s;
+}
+
+.sb-item-menu button .icon {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+
+.sb-item-menu button:hover .icon {
+  color: var(--text);
 }
 
 .sb-item-menu button:hover {
