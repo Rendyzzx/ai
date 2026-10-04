@@ -687,6 +687,32 @@ h1, h2, h3 {
   overflow: hidden;
 }
 
+/* Desktop: split composition (artwork kiri, form kanan) — bukan satu
+   card besar yang menumpuk banner di atas form. Peekaboo berhenti
+   memakai aspect-ratio di sini: align-items:stretch pada baris flex
+   membuat tingginya otomatis mengikuti tinggi form di sebelahnya. */
+@media (min-width: 860px) {
+  .auth-panel {
+    display: flex;
+    align-items: stretch;
+    max-width: 760px;
+  }
+  .peekaboo {
+    flex: 0 0 300px;
+    aspect-ratio: auto;
+    max-height: none;
+    border-bottom: none;
+    border-right: 1px solid var(--border);
+  }
+  .auth-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+}
+
 /* Peekaboo: karakter di atas form, full-bleed di tepi atas panel.
    Tinggi proporsional ke lebar panel (bukan px fix) — box 150px lama
    terlalu pipih utk portrait (rasio ~2.67:1), bikin karakter kepotong
@@ -715,14 +741,15 @@ h1, h2, h3 {
 
 .auth-body { padding: 28px 32px 32px; }
 
-.auth-head { text-align: center; margin-bottom: 24px; }
+.auth-head { text-align: center; margin-bottom: 20px; }
 .auth-mobile-logo { display: none; }
 .auth-head h2 {
-  font-size: 20px;
+  font-size: 23px;
   font-weight: 600;
+  line-height: 1.25;
   margin-bottom: 6px;
 }
-.auth-head p { font-size: 14px; color: var(--text-muted); }
+.auth-head p { font-size: 14.5px; line-height: 1.4; color: var(--text-muted); }
 
 /* Tab Masuk / Daftar */
 .auth-tabs {
@@ -1181,8 +1208,26 @@ h1, h2, h3 {
 
   .about-copy h2 { font-size: 24px; margin-bottom: 12px; }
 
-  .auth-body { padding: 24px 20px 24px; }
-  .auth-section { padding: 64px 0; }
+  /* Login/register compact: banner pendek, spacing diperketat, input
+     sedikit lebih tinggi (nyaman disentuh), supaya step 1 nyaris
+     seluruhnya terlihat tanpa scroll panjang (target 320-430px). */
+  .auth-section { padding: 28px 0 56px; }
+  .auth-panel { max-width: 420px; }
+  .peekaboo { aspect-ratio: 16 / 6.2; max-height: 140px; }
+  .auth-body { padding: 20px 18px 22px; }
+  .auth-head { margin-bottom: 16px; }
+  .auth-head h2 { font-size: 26px; }
+  .auth-head p { font-size: 15px; }
+  .auth-tabs { margin-bottom: 18px; }
+  .auth-form { gap: 14px; }
+  .form-step { gap: 14px; }
+  .auth-field > span:first-child { margin-bottom: 6px; }
+  .input-pill,
+  .verify-row,
+  .auth-submit { height: 54px; }
+  .auth-divider { margin: 14px 0 2px; }
+  .provider-alt-label { margin-bottom: 8px; }
+
   .closing { padding: 64px 0 96px; }
   .foot-inner { flex-wrap: wrap; gap: 8px 20px; }
   .foot-line { flex-basis: 100%; order: 3; }
