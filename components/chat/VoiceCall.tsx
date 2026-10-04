@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ensureMicPermission,
   getSpeechRecognition,
   pickVoice,
   stripForSpeech,
@@ -16,12 +17,23 @@ import {
   type SpeechRecognitionLike,
 } from "@/lib/voice";
 
-export type VoicePhase = "idle" | "listening" | "thinking" | "speaking";
+export type VoicePhase = "idle" | "listening" | "thinking" | "speaking" | "error";
 
-const PHASE_LABEL: Record<Exclude<VoicePhase, "idle">, string> = {
+const PHASE_LABEL: Record<Exclude<VoicePhase, "idle" | "error">, string> = {
   listening: "Mendengarkan…",
   thinking: "Menyambung…",
   speaking: "Aomi menjawab…",
+};
+
+/** Pesan error ramah user per kode kegagalan mic/STT. */
+const ERR_TEXT: Record<string, string> = {
+  not_allowed:
+    "Izin mikrofon ditolak. Klik ikon kunci/gembok di address bar → izinkan Mikrofon, lalu coba lagi.",
+  no_mic: "Mikrofon tidak ditemukan. Pastikan mic terpasang & tidak dipakai aplikasi lain.",
+  network: "Layanan suara terputus dari internet. Cek koneksi, lalu coba lagi.",
+  service: "Browser ini memblokir layanan suara. Coba Chrome, Edge, atau Safari.",
+  unsupported:
+    "Browser ini tidak mendukung panggilan suara. Coba Chrome, Edge, atau Safari.",
 };
 
 /**
@@ -32,6 +44,7 @@ export function useVoiceCall(onSendText: (text: string) => Promise<string | null
   const [active, setActive] = useState(false);
   const [phase, setPhase] = useState<VoicePhase>("idle");
   const [transcript, setTranscript] = useState("");
+  const [errorText, setErrorText] = useState("");
 
   const stopRef = useRef(false);
   const runningRef = useRef(false);
@@ -70,17 +83,18 @@ export function useVoiceCall(onSendText: (text: string) => Promise<string | null
   /**
    * Satu sesi dengar. Resolve:
    * - string   → hasil akhir user (bisa "" kalau cuma hening)
-   * - null     → error fatal (izin mic ditolak / layanan STT mati) → loop berhenti
+   * - { fatal: kode } → error fatal; kode dipetakan ke pesan ramah user
    */
   const listenOnce = useCallback(() => {
-    return new Promise<string | null>((resolve) => {
+    type Res = string | { fatal: string };
+    return new Promise<Res>((resolve) => {
       const Ctor = getSpeechRecognition();
-      if (!Ctor) return resolve(null);
+      if (!Ctor) return resolve({ fatal: "unsupported" });
       let rec: SpeechRecognitionLike;
       try {
         rec = new Ctor();
       } catch {
-        return resolve(null);
+        return resolve({ fatal: "service" });
       }
       rec.lang = "id-ID";
       rec.continuous = false;
@@ -89,7 +103,7 @@ export function useVoiceCall(onSendText: (text: string) => Promise<string | null
 
       let settled = false;
       let finalText = "";
-      const finish = (t: string | null) => {
+      const finish = (t: Res) => {
         if (settled) return;
         settled = true;
         try {
@@ -111,12 +125,17 @@ export function useVoiceCall(onSendText: (text: string) => Promise<string | null
         setTranscript((finalText + " " + interim).trim());
       };
       rec.onerror = (e) => {
-        const err = e?.error;
+        const err = String(e?.error || "");
         if (err === "no-speech" || err === "aborted") {
           finish(finalText);
+        } else if (err === "not-allowed" || err === "service-not-allowed") {
+          finish({ fatal: "not_allowed" });
+        } else if (err === "audio-capture") {
+          finish({ fatal: "no_mic" });
+        } else if (err === "network") {
+          finish({ fatal: "network" });
         } else {
-          // not-allowed / audio-capture / network / service-not-allowed → stop loop
-          finish(null);
+          finish({ fatal: "service" });
         }
       };
       rec.onend = () => {
@@ -127,7 +146,7 @@ export function useVoiceCall(onSendText: (text: string) => Promise<string | null
       try {
         rec.start();
       } catch {
-        finish(null);
+        finish({ fatal: "service" });
       }
     });
   }, []);
@@ -137,13 +156,31 @@ export function useVoiceCall(onSendText: (text: string) => Promise<string | null
     runningRef.current = true;
     stopRef.current = false;
     setActive(true);
+    setErrorText("");
     setPhase("listening");
 
     void (async () => {
+      // Precheck izin mic — prompt izin muncul jelas di browser;
+      // kalau ditolak, tampilkan pesan (bukan kedip senyap seperti dulu).
+      const perm = await ensureMicPermission();
+      if (stopRef.current) return;
+      if (perm !== "granted") {
+        runningRef.current = false;
+        setErrorText(ERR_TEXT[perm === "denied" ? "not_allowed" : "unsupported"]);
+        setPhase("error");
+        return;
+      }
+
       while (!stopRef.current) {
         const t = await listenOnce();
         if (stopRef.current) break;
-        if (t === null) break; // error fatal (mis. izin mic ditolak)
+        if (typeof t !== "string") {
+          // error fatal → tampilkan pesan; tetap terlihat sampai user menutup
+          runningRef.current = false;
+          setErrorText(ERR_TEXT[t.fatal] || ERR_TEXT.service);
+          setPhase("error");
+          return;
+        }
         const text = t.trim();
         setTranscript("");
         if (!text) continue; // cuma hening → dengar lagi
@@ -176,6 +213,7 @@ export function useVoiceCall(onSendText: (text: string) => Promise<string | null
 
   const stop = useCallback(() => {
     stopRef.current = true;
+    setErrorText("");
     try {
       window.speechSynthesis?.cancel();
     } catch {
@@ -198,32 +236,49 @@ export function useVoiceCall(onSendText: (text: string) => Promise<string | null
     };
   }, []);
 
-  return { active, phase, transcript, start, stop };
+  return { active, phase, transcript, errorText, start, stop };
 }
 
 /** Pil melayang status telepon (fixed, atas tengah). */
 export function VoiceCallOverlay({
   phase,
   transcript,
+  errorText,
   onStop,
 }: {
   phase: VoicePhase;
   transcript: string;
+  errorText?: string;
   onStop: () => void;
 }) {
   if (phase === "idle") return null;
+  const isError = phase === "error";
   return (
-    <div className="voice-call" role="status" aria-live="polite">
+    <div
+      className="voice-call"
+      data-error={isError ? "" : undefined}
+      role={isError ? "alert" : "status"}
+      aria-live={isError ? "assertive" : "polite"}
+    >
       <span className="voice-dot" data-phase={phase} aria-hidden="true" />
       <div className="voice-info">
-        <strong>{PHASE_LABEL[phase]}</strong>
-        {transcript && <span className="voice-transcript">“{transcript}”</span>}
+        {isError ? (
+          <>
+            <strong>Telepon suara gagal mulai</strong>
+            <span className="voice-transcript">{errorText}</span>
+          </>
+        ) : (
+          <>
+            <strong>{PHASE_LABEL[phase]}</strong>
+            {transcript && <span className="voice-transcript">“{transcript}”</span>}
+          </>
+        )}
       </div>
       <button type="button" className="voice-end" onClick={onStop}>
         <svg className="icon" aria-hidden="true">
           <use href="/icons.svg#phone" />
         </svg>
-        Akhiri
+        {isError ? "Tutup" : "Akhiri"}
       </button>
     </div>
   );

@@ -1652,3 +1652,21 @@
   height: 16px;
   stroke-width: 2.2;
 }
+
+/* Fase error — pesan jelas, bukan kedip senyap */
+.voice-dot[data-phase="error"] {
+  background: var(--danger);
+  animation: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 18%, transparent);
+}
+.voice-call[data-error] {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  max-width: min(560px, calc(100vw - 24px));
+}
+.voice-call[data-error] .voice-transcript {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

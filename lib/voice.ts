@@ -98,3 +98,26 @@ export function pickVoice(): SpeechSynthesisVoice | null {
     return null;
   }
 }
+
+/**
+ * Minta izin mikrofon SECARA EKPLISIT sebelum mode telepon mulai.
+ * SpeechRecognition di Chrome memanggil prompt izin juga, tapi kalau
+ * izin sudah "ditolak" di setelan browser, ia gagal SENYAP → dulu
+ * pil status cuma kedip lalu hilang tanpa pesan. Dengan precheck ini
+ * kita tahu persis status izin dan bisa menampilkan pesan yang jelas.
+ *
+ * Track mic langsung dilepas setelah dicek — kita hanya butuh izinnya.
+ */
+export async function ensureMicPermission(): Promise<
+  "granted" | "denied" | "unsupported"
+> {
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) return "unsupported";
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // langsung lepas — cuma butuh persetujuan izinnya
+    for (const t of stream.getTracks()) t.stop();
+    return "granted";
+  } catch {
+    return "denied";
+  }
+}

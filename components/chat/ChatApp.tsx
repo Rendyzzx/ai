@@ -1561,7 +1561,7 @@ export default function ChatApp() {
             </div>
           </section>
 
-          <VoiceCallOverlay phase={voice.phase} transcript={voice.transcript} onStop={voice.stop} />
+          <VoiceCallOverlay phase={voice.phase} transcript={voice.transcript} errorText={voice.errorText} onStop={voice.stop} />
           <div className="composer-wrap">
             {/* Smart scroll: user lagi baca pesan lama → jangan paksa gulir;
                 kasih jalan pintas ke pesan terbaru (di atas komposer). */}
