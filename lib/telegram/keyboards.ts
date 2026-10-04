@@ -141,7 +141,7 @@ export function siteMenu(): TgInlineKeyboard {
 }
 
 /** Menu satu asset (character / banner). */
-export function assetMenu(prefix: "char" | "banner"): TgInlineKeyboard {
+export function assetMenu(prefix: "char" | "banner" | "bannerm"): TgInlineKeyboard {
   return kb([
     [["📤 Ganti", `${prefix}:replace`], ["👁 Lihat", `${prefix}:view`]],
     [["🗑 Hapus (kembali ke default)", `${prefix}:delete`]],
@@ -149,7 +149,18 @@ export function assetMenu(prefix: "char" | "banner"): TgInlineKeyboard {
   ]);
 }
 
+/** Menu Login Banner — dua komposisi terpisah (desktop vs mobile).
+ *  Mengganti satu TIDAK menyentuh yang lain. */
+export function bannerMenu(): TgInlineKeyboard {
+  return kb([
+    [["🖥 Ganti Desktop", "banner:replace"], ["📱 Ganti Mobile", "bannerm:replace"]],
+    [["👁 Lihat Desktop", "banner:view"], ["👁 Lihat Mobile", "bannerm:view"]],
+    [["🗑 Hapus Desktop", "banner:delete"], ["🗑 Hapus Mobile", "bannerm:delete"]],
+    [["⬅️ Kembali", "nav:SITE"]],
+  ]);
+}
+
 /** Keyboard saat bot menunggu admin mengirim foto. */
-export function awaitingPhotoMenu(prefix: "char" | "banner"): TgInlineKeyboard {
+export function awaitingPhotoMenu(prefix: "char" | "banner" | "bannerm"): TgInlineKeyboard {
   return kb([[["❌ Batalkan", "cancel"]]]);
 }

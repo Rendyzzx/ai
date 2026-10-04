@@ -52,8 +52,13 @@ export const dynamic = "force-dynamic";
 
 export default async function AuthPage() {
   // Peekaboo (karakter di atas form login) bisa diganti admin lewat bot
-  // Telegram (fallback: artwork default auth-banner-open/closed).
-  const peekaboo = await getAssetInfo("loginBanner").catch(() => null);
+  // Telegram — dua komposisi terpisah: desktop (split layout ≥860px) dan
+  // mobile (banner pendek <860px). Fallback: artwork default bila kosong.
+  // Paralel — keduanya baca storage yang sama (bukan waterfall).
+  const [peekaboo, peekabooMobile] = await Promise.all([
+    getAssetInfo("loginBanner").catch(() => null),
+    getAssetInfo("loginBannerMobile").catch(() => null),
+  ]);
   return (
     <>
       {/* Font tidak dimuat dari Google: CSP (style-src 'self') memblokir
@@ -61,7 +66,7 @@ export default async function AuthPage() {
           request mati + dependensi jaringan ekstra. Font sudah self-host
           via next/font (layout.tsx), yang dipakai auth.css:
           var(--font-plusjakarta) untuk display, Manrope default utk body. */}
-      <AuthLanding peekSrc={peekaboo?.url} />
+      <AuthLanding peekSrc={peekaboo?.url} peekMobileSrc={peekabooMobile?.url} />
     </>
   );
 }

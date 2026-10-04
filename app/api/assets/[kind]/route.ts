@@ -21,6 +21,7 @@ export const dynamic = "force-dynamic";
 const KINDS: Record<string, AssetKind> = {
   character: "character",
   "login-banner": "loginBanner",
+  "login-banner-mobile": "loginBannerMobile",
 };
 
 export async function GET(

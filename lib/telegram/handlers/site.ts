@@ -10,7 +10,7 @@
    ============================================================ */
 
 import { can } from "../admin";
-import { siteMenu, assetMenu, awaitingPhotoMenu, mainMenu } from "../keyboards";
+import { siteMenu, assetMenu, awaitingPhotoMenu, bannerMenu, mainMenu } from "../keyboards";
 import {
   ASSET_KINDS,
   describeAsset,
@@ -28,8 +28,10 @@ import { fmtWIB } from "../format";
 /** Konfigurasi node asset: char ↔ character, banner ↔ loginBanner. */
 const ASSET_NODES = {
   char: { kind: "character" as AssetKind, prefix: "char" as const, title: "🎭 Character Aomi", where: "• Maintenance page (hero utama)" },
-  banner: { kind: "loginBanner" as AssetKind, prefix: "banner" as const, title: "🖼️ Login Banner", where: "• Panel \"Masuk/Daftar\" di halaman login (karakter peekaboo di atas form)" },
+  banner: { kind: "loginBanner" as AssetKind, prefix: "banner" as const, title: "🖼️ Login Banner Desktop", where: "• Halaman login desktop (kolom artwork split layout, ≥860px)" },
+  bannerm: { kind: "loginBannerMobile" as AssetKind, prefix: "bannerm" as const, title: "📱 Login Banner Mobile", where: "• Halaman login mobile (banner pendek di atas form, <860px)" },
 };
+
 
 function renderAssetView(node: keyof typeof ASSET_NODES, desc: string): View {
   const cfg = ASSET_NODES[node];
@@ -221,24 +223,45 @@ export const bannerHandler: MenuHandler = {
   node: "BANNER",
 
   async render(): Promise<View> {
-    return renderAssetView("banner", await describeAsset(ASSET_NODES.banner.kind));
+    const [desk, mob] = await Promise.all([
+      describeAsset(ASSET_NODES.banner.kind),
+      describeAsset(ASSET_NODES.bannerm.kind),
+    ]);
+    const hasMob = !mob.startsWith("Belum ada upload") && !mob.startsWith("Status tidak");
+    return {
+      text: [
+        "🖼️ Login Banner",
+        "",
+        "Dua komposisi terpisah — ganti satu tidak menyentuh yang lain:",
+        "",
+        "🖥 Desktop:",
+        desk,
+        "",
+        "📱 Mobile:",
+        mob,
+        hasMob ? "" : "⚠️ Belum diatur — mobile memakai komposisi desktop sebagai fallback.",
+        "",
+        "📤 Ganti — kirim foto, langsung aktif tanpa deploy.",
+      ].filter((l) => l !== "").join("\n"),
+      kb: bannerMenu(),
+    };
   },
 
   async onAction(action, ctx, confirmed): Promise<View | null> {
+    // Ganti banner: DESKTOP (komposisi split layout ≥860px)
     if (action === "banner:replace") {
-      if (!can(ctx.admin, "manage")) return { text: "⛔ Akses ditolak.", kb: assetMenu("banner") };
+      if (!can(ctx.admin, "manage")) return { text: "⛔ Akses ditolak.", kb: bannerMenu() };
       ctx.session.input = "banner_photo";
       return {
         text: [
-          "📤 Ganti Login Banner",
+          "📤 Ganti Login Banner Desktop",
           "",
-          "Kirim foto baru di chat ini (sebagai gambar) — dipakai untuk",
-          "karakter \"peekaboo\" di atas form Masuk/Daftar (bukan hero besar",
-          "di landing page).",
+          "Kirim foto baru di chat ini (sebagai gambar) — dipakai di kolom",
+          "artwork split layout halaman login desktop (≥860px).",
           "",
           "• Format: JPEG / PNG / WEBP, maks 5 MB",
-          "• Disarankan portrait ~260×340",
-          "• Satu foto dipakai utk kedua ekspresi (mata buka/tutup)",
+          "• Disarankan portrait ~300×460 (mengikuti tinggi form)",
+          "• Komposisi MOBILE tidak tersentuh",
           "• Langsung aktif — tanpa deploy",
           "",
           "Tekan ❌ Batalkan untuk membatalkan.",
@@ -246,54 +269,99 @@ export const bannerHandler: MenuHandler = {
         kb: awaitingPhotoMenu("banner"),
       };
     }
-    if (action === "banner:view") {
-      if (!can(ctx.admin, "read")) return { text: "⛔ Akses ditolak.", kb: assetMenu("banner") };
-      const asset = await readAssetBytes(ASSET_NODES.banner.kind).catch(() => null);
+    // Ganti banner: MOBILE (banner pendek di atas form <860px)
+    if (action === "bannerm:replace") {
+      if (!can(ctx.admin, "manage")) return { text: "⛔ Akses ditolak.", kb: bannerMenu() };
+      ctx.session.input = "bannerm_photo";
+      return {
+        text: [
+          "📤 Ganti Login Banner Mobile",
+          "",
+          "Kirim foto baru di chat ini (sebagai gambar) — dipakai sebagai",
+          "banner pendek di atas form Masuk/Daftar di mobile (<860px).",
+          "",
+          "• Format: JPEG / PNG / WEBP, maks 5 MB",
+          "• Disarankan landscape lebar ~620×400 (area tampil pendek)",
+          "• Subjek utama di bagian atas-tengah agar tidak terpotong",
+          "• Komposisi DESKTOP tidak tersentuh",
+          "• Langsung aktif — tanpa deploy",
+          "",
+          "Tekan ❌ Batalkan untuk membatalkan.",
+        ].join("\n"),
+        kb: awaitingPhotoMenu("bannerm"),
+      };
+    }
+    // Lihat: preview masing-masing
+    if (action === "banner:view" || action === "bannerm:view") {
+      const isMob = action === "bannerm:view";
+      if (!can(ctx.admin, "read")) return { text: "⛔ Akses ditolak.", kb: bannerMenu() };
+      const asset = await readAssetBytes((isMob ? ASSET_NODES.bannerm : ASSET_NODES.banner).kind).catch(() => null);
       if (asset) {
-        const ok = await sendPhotoBytes(ctx.admin.id, asset.data, asset.contentType, "🖼️ Login banner saat ini");
+        const ok = await sendPhotoBytes(
+          ctx.admin.id,
+          asset.data,
+          asset.contentType,
+          isMob ? "📱 Login banner mobile saat ini" : "🖥 Login banner desktop saat ini"
+        );
         if (ok) return null;
       }
       return {
-        text: "Belum ada upload — halaman login memakai artwork default Aomi (auth-hero).",
-        kb: assetMenu("banner"),
+        text: isMob
+          ? "Belum ada upload — mobile memakai komposisi desktop / artwork default Aomi."
+          : "Belum ada upload — halaman login memakai artwork default Aomi.",
+        kb: bannerMenu(),
       };
     }
-    if (action !== "banner:delete") return null;
-    if (!can(ctx.admin, "manage")) return { text: "⛔ Akses ditolak.", kb: siteMenu() };
-    if (!confirmed) {
+    // Hapus: masing-masing, dengan konfirmasi
+    if (action === "banner:delete" || action === "bannerm:delete") {
+      const isMob = action === "bannerm:delete";
+      const cfg = isMob ? ASSET_NODES.bannerm : ASSET_NODES.banner;
+      if (!can(ctx.admin, "manage")) return { text: "⛔ Akses ditolak.", kb: siteMenu() };
+      if (!confirmed) {
+        return {
+          text: isMob
+            ? "Hapus Login Banner Mobile? (mobile kembali memakai komposisi desktop / default)"
+            : "Hapus Login Banner Desktop? (desktop kembali memakai artwork default)",
+          kb: { inline_keyboard: [
+            [{ text: "❌ Batalkan", callback_data: "cancel" }],
+            [{ text: "🗑 Ya, hapus", callback_data: "yes" }],
+          ] },
+        };
+      }
+      const deleted = await deleteAsset(cfg.kind).catch(() => false);
+      if (deleted) {
+        await auditLog({ admin_id: ctx.admin.id, role: ctx.admin.role, action: `delete_asset:${cfg.kind}`, target: "asset", result: "ok", detail: "kembali ke default" });
+      }
       return {
-        text: "Hapus login banner yang sudah diupload dan kembali ke artwork default?",
-        kb: { inline_keyboard: [
-          [{ text: "❌ Batalkan", callback_data: "cancel" }],
-          [{ text: "🗑 Ya, hapus", callback_data: "yes" }],
-        ] },
+        text: deleted
+          ? `✅ Login banner ${isMob ? "mobile" : "desktop"} dihapus.`
+          : "Tidak ada upload yang perlu dihapus (memakai default).",
+        kb: bannerMenu(),
       };
     }
-    const deleted = await deleteAsset(ASSET_NODES.banner.kind).catch(() => false);
-    if (deleted) {
-      await auditLog({ admin_id: ctx.admin.id, role: ctx.admin.role, action: "delete_asset:loginBanner", target: "asset", result: "ok", detail: "kembali ke default" });
-    }
-    return {
-      text: deleted
-        ? "✅ Login banner dihapus. Halaman login kembali memakai artwork default Aomi."
-        : "Tidak ada upload yang perlu dihapus (memakai default).",
-      kb: siteMenu(),
-    };
+    return null;
   },
 
   async onInput(text, ctx): Promise<View | null> {
-    if (ctx.session.input !== "banner_photo") return null;
+    if (ctx.session.input !== "banner_photo" && ctx.session.input !== "bannerm_photo") return null;
+    const mob = ctx.session.input === "bannerm_photo";
     ctx.session.input = null;
     if (text.toLowerCase() === "batal") return renderSite();
     return {
       text: "Kirim fotonya sebagai gambar (bukan teks, bukan file) ya 📸",
-      kb: awaitingPhotoMenu("banner"),
+      kb: awaitingPhotoMenu(mob ? "bannerm" : "banner"),
     };
   },
 
   async onPhoto(photo, ctx, chatId): Promise<View | null> {
-    if (ctx.session.input !== "banner_photo") return null;
-    ctx.session.input = null;
-    return processPhotoUpload("banner", photo, ctx, chatId);
+    if (ctx.session.input === "banner_photo") {
+      ctx.session.input = null;
+      return processPhotoUpload("banner", photo, ctx, chatId);
+    }
+    if (ctx.session.input === "bannerm_photo") {
+      ctx.session.input = null;
+      return processPhotoUpload("bannerm", photo, ctx, chatId);
+    }
+    return null;
   },
 };

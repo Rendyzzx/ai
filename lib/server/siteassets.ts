@@ -23,14 +23,21 @@ import { getBinary, putBinary, deleteBinary } from "./github";
 import { KEYS } from "@/lib/redis/keys";
 import { validateUpload, type AssetExt } from "./imagedata";
 
-export type AssetKind = "character" | "loginBanner";
+export type AssetKind = "character" | "loginBanner" | "loginBannerMobile";
 
 /** loginBanner = peekaboo (karakter di atas form "Selamat datang kembali"),
  *  BUKAN hero marketing di landing page. Satu upload dipakai utk kedua
- *  state peek (open/closed) — animasi tetap jalan, gambarnya sama. */
+ *  state peek (open/closed) — animasi tetap jalan, gambarnya sama.
+ *
+ *  loginBanner vs loginBannerMobile — art direction per viewport:
+ *  - loginBanner       → komposisi kolom artwork split layout desktop (≥860px)
+ *  - loginBannerMobile → banner pendek di atas form login mobile (<860px)
+ *  Keduanya ASSET TERPISAH: ganti mobile tidak menyentuh desktop dan
+ *  sebaliknya. Frontend memakai mobile bila ada, fallback ke desktop. */
 export const ASSET_KINDS: Record<AssetKind, { label: string; urlKind: string; fallback: string }> = {
   character: { label: "Character", urlKind: "character", fallback: "/assets/auth-hero.png" },
-  loginBanner: { label: "Login Banner (peekaboo)", urlKind: "login-banner", fallback: "/assets/auth-banner-open.png" },
+  loginBanner: { label: "Login Banner Desktop", urlKind: "login-banner", fallback: "/assets/auth-banner-open.png" },
+  loginBannerMobile: { label: "Login Banner Mobile", urlKind: "login-banner-mobile", fallback: "/assets/auth-banner-open.png" },
 };
 
 export interface AssetRecord {
@@ -49,6 +56,7 @@ export interface AssetRecord {
 interface SiteAssetsState {
   character?: AssetRecord | null;
   loginBanner?: AssetRecord | null;
+  loginBannerMobile?: AssetRecord | null;
 }
 
 /** Cache instance 30 detik — tulis selalu mem-bust cache. */

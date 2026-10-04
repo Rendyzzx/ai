@@ -103,9 +103,12 @@ const OAUTH_ERRORS: Record<string, string> = {
 
 export default function AuthLanding({
   peekSrc,
+  peekMobileSrc,
 }: {
   /** Peekaboo (karakter di atas form login) dari admin — fallback: artwork default. */
   peekSrc?: string;
+  /** Komposisi khusus mobile (banner pendek <860px) — fallback: asset desktop. */
+  peekMobileSrc?: string;
 }) {
   const [panel, setPanel] = useState<"login" | "register">("login");
   const [capLogin, setCapLogin] = useState<CapData | null>(null);
@@ -1105,12 +1108,20 @@ export default function AuthLanding({
         {/* ================= MASUK / DAFTAR ================= */}
         <section className="auth-section" id="masuk" ref={registerSectionRef}>
           <section className="auth-panel">
-            {/* Peekaboo: mata terbuka saat isi username/email, nutup saat fokus password */}
+            {/* Peekaboo: mata terbuka saat isi username/email, nutup saat fokus password.
+                Art direction per viewport — DUA asset terpisah dari bot Telegram:
+                desktop (kolom split ≥860px) vs mobile (banner pendek <860px).
+                Pasangan display:none + lazy berarti browser HANYA mengunduh
+                komposisi yang tampil di viewport-nya, bukan keduanya. */}
             <div className={"peekaboo" + (peeking ? " peeking" : "")} id="peekaboo" aria-hidden="true">
-              {/* Admin bisa ganti lewat bot — satu asset dipakai utk kedua state
-                  (open/closed); animasi peek tetap jalan, cuma gambarnya sama. */}
-              <Image className="peek-img peek-open" src={peekSrc || "/assets/auth-banner-open.png"} alt="" width={260} height={340} sizes="220px" />
-              <Image className="peek-img peek-closed" src={peekSrc || "/assets/auth-banner-closed.png"} alt="" width={260} height={340} sizes="220px" />
+              {/* Komposisi desktop — satu asset dipakai utk kedua state
+                  (open/closed); animasi peek tetap jalan, gambarnya sama. */}
+              <Image className="peek-img peek-open peek-desktop" src={peekSrc || "/assets/auth-banner-open.png"} alt="" width={260} height={340} sizes="300px" />
+              <Image className="peek-img peek-closed peek-desktop" src={peekSrc || "/assets/auth-banner-closed.png"} alt="" width={260} height={340} sizes="300px" />
+              {/* Komposisi mobile — asset khusus mobile bila admin sudah atur;
+                  fallback ke asset desktop, lalu artwork default. */}
+              <Image className="peek-img peek-open peek-mobile" src={peekMobileSrc || peekSrc || "/assets/auth-banner-open.png"} alt="" width={620} height={400} sizes="(max-width: 859px) 92vw, 300px" />
+              <Image className="peek-img peek-closed peek-mobile" src={peekMobileSrc || peekSrc || "/assets/auth-banner-closed.png"} alt="" width={620} height={400} sizes="(max-width: 859px) 92vw, 300px" />
             </div>
 
             <div className="auth-body">

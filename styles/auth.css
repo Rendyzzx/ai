@@ -740,6 +740,22 @@ h1, h2, h3 {
   object-position: 50% 18%;
   transition: opacity 0.28s ease;
 }
+/* Art direction dua komposisi (asset Telegram terpisah):
+   mobile = banner pendek di atas form; desktop = kolom split layout.
+   display:none + lazy (bawaan next/image) → hanya komposisi yang
+   tampil yang diunduh browser. */
+.peek-desktop { display: none; }
+.peek-mobile {
+  display: block;
+  /* object-position sama dengan komposisi lama (artwork default sudah
+     di-tune di 18%) — admin tetap bisa komposisikan asset mobile-nya
+     sendiri utk area banner yang pendek */
+  object-position: 50% 18%;
+}
+@media (min-width: 860px) {
+  .peek-mobile { display: none; }
+  .peek-desktop { display: block; }
+}
 .peek-open    { opacity: 1; }
 .peek-closed  { opacity: 0; }
 .peekaboo.peeking .peek-open   { opacity: 0; }
@@ -1139,6 +1155,18 @@ h1, h2, h3 {
 
 /* ---------- Responsif ---------- */
 
+/* Satu kolom tapi lebar menengah (tablet portrait) — spacing compact
+   seperti mobile, heading tetap proporsional. Peek dibatasi supaya
+   tidak makan tinggi (dulu 257px di 768px). */
+@media (max-width: 859px) {
+  .auth-section { padding: 40px 0 64px; }
+  .auth-body { padding: 20px 22px 24px; }
+  .auth-head { margin-bottom: 12px; }
+  .auth-tabs { margin-bottom: 16px; }
+  .auth-divider { margin: 10px 0 2px; }
+  .peekaboo { max-height: 170px; }
+}
+
 @media (max-width: 900px) {
   .nav-links, .nav-right .nav-signin { display: none; }
   .nav-burger { display: flex; }
@@ -1217,22 +1245,28 @@ h1, h2, h3 {
   /* Login/register compact: banner pendek, spacing diperketat, input
      sedikit lebih tinggi (nyaman disentuh), supaya step 1 nyaris
      seluruhnya terlihat tanpa scroll panjang (target 320-430px). */
-  .auth-section { padding: 28px 0 56px; }
+  /* Compact mobile: spacing diperketat lagi (audit visual Okt 2026:
+     panel step-1 730px di 390px — heading 26px lebih besar dari desktop,
+     gap form→provider 68px. Target: seluruh step-1 muat satu viewport
+     nyaman di 320-430px tanpa scroll.) */
+  .auth-section { padding: 24px 0 48px; }
   .auth-panel { max-width: 420px; }
   .peekaboo { aspect-ratio: 16 / 6.2; max-height: 140px; }
-  .auth-body { padding: 20px 18px 22px; }
-  .auth-head { margin-bottom: 16px; }
-  .auth-head h2 { font-size: 26px; }
-  .auth-head p { font-size: 15px; }
-  .auth-tabs { margin-bottom: 18px; }
-  .auth-form { gap: 14px; }
-  .form-step { gap: 14px; }
+  .auth-body { padding: 16px 18px 18px; }
+  .auth-head { margin-bottom: 10px; }
+  .auth-head h2 { font-size: 19px; }
+  .auth-head p { font-size: 13.5px; }
+  .step-dots { margin-top: 9px; }
+  .auth-tabs { gap: 20px; margin-bottom: 14px; }
+  .auth-tab { padding-bottom: 10px; }
+  .auth-form { gap: 12px; }
+  .form-step { gap: 12px; }
   .auth-field > span:first-child { margin-bottom: 6px; }
   .input-pill,
   .verify-row,
-  .auth-submit { height: 54px; }
-  .auth-divider { margin: 14px 0 2px; }
-  .provider-alt-label { margin-bottom: 8px; }
+  .auth-submit { height: 52px; }
+  .auth-divider { margin: 8px 0 2px; }
+  .provider-alt-label { margin-bottom: 6px; font-size: 11.5px; }
 
   .closing { padding: 64px 0 96px; }
   .foot-inner { flex-wrap: wrap; gap: 8px 20px; }
@@ -1505,8 +1539,11 @@ body.splash-on { overflow: hidden; }
   flex: none;
 }
 
-/* Mobile: icon saja, 4 sejajar, touch target tetap nyaman */
-@media (max-width: 560px) {
+/* Icon-only: breakpoint 560 lama hanya berdasarkan angka; viewport nyata
+   320/360/375/390/412/430 (dan tablet portrait sempit) semua lebih baik
+   icon-only — tiga label teks tidak muat simetris. ≤699px = icon saja
+   (+ nama tetap ada utk screen reader, visually-hidden). */
+@media (max-width: 699px) {
   .provider-btn .provider-name {
     position: absolute;
     width: 1px;
