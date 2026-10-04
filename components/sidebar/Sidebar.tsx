@@ -374,7 +374,7 @@ export default function Sidebar({
                             return;
                           }
                           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                          const W = 200, H = 158;
+                          const W = 224, H = 184;
                           const x = Math.max(8, Math.min(rect.right - W, window.innerWidth - W - 8));
                           const y =
                             rect.bottom + 6 + H > window.innerHeight
@@ -408,6 +408,7 @@ export default function Sidebar({
         <footer className="sb-foot" ref={menuRef}>
           {menuOpen && (
             <div className="sb-menu" role="menu">
+              <div className="sb-menu-label">Lainnya</div>
               <button
                 type="button"
                 role="menuitem"
@@ -427,7 +428,8 @@ export default function Sidebar({
                   onOpenSettings("profile");
                 }}
               >
-                Pengaturan
+                <svg className="icon" aria-hidden="true"><use href="/icons.svg#gear" /></svg>
+                <span>Pengaturan</span>
               </button>
               <button
                 type="button"
@@ -437,8 +439,10 @@ export default function Sidebar({
                   onOpenSettings("account");
                 }}
               >
-                Akun
+                <svg className="icon" aria-hidden="true"><use href="/icons.svg#user" /></svg>
+                <span>Akun</span>
               </button>
+              <div className="sb-menu-divider" role="separator" />
               <button
                 type="button"
                 role="menuitem"
@@ -448,13 +452,14 @@ export default function Sidebar({
                   void onLogout();
                 }}
               >
-                Keluar
+                <svg className="icon" aria-hidden="true"><use href="/icons.svg#logout" /></svg>
+                <span>Keluar</span>
               </button>
             </div>
           )}
           <div className="sb-profile">
             <button type="button" className="sb-profile-main" onClick={() => onOpenSettings("profile")}>
-              <span className="avatar small">
+              <span className="avatar sb-profile-avatar">
                 {userAvatar ? (
                   <img src={userAvatar} alt="" aria-hidden="true" decoding="async" />
                 ) : (
