@@ -51,6 +51,30 @@ function friendlyError(status: number, data: { error?: string }): string {
 
 const LANG_COLORS = ["var(--accent)", "#6f6a56", "#46453d", "var(--border)"];
 
+/** Indikator step kecil -- "sudah lewat" (done) lebih kecil & redup,
+    "sekarang" (active) accent, "belum" (upcoming) cuma outline. Subtle,
+    bukan progress bar besar; label aria untuk screen reader. */
+function StepDots({ step, total }: { step: number; total: number }) {
+  return (
+    <div
+      className="step-dots"
+      role="progressbar"
+      aria-valuemin={1}
+      aria-valuemax={total}
+      aria-valuenow={step}
+      aria-label={`Langkah ${step} dari ${total}`}
+    >
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          key={i}
+          className={"step-dot" + (i + 1 === step ? " active" : i + 1 < step ? " done" : "")}
+          aria-hidden="true"
+        />
+      ))}
+    </div>
+  );
+}
+
 /* Layout effect isomorfik: jalankan SEBELUM paint di client supaya
    section [data-reveal] tidak pernah flash terlihat lalu menghilang. */
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -81,6 +105,20 @@ export default function AuthLanding({
   const [btnLogin, setBtnLogin] = useState("Masuk");
   const [btnRegister, setBtnRegister] = useState("Buat akun");
   const [busy, setBusy] = useState(false);
+
+  // ---------------- Multi-step auth (UI saja, endpoint tetap satu kali
+  // panggil per form, di step terakhir -- backend tidak berubah) ----------------
+  // Login: 1 email/username, 2 password. Register: 1 email, 2 password,
+  // 3 username, 4 verifikasi. "dir" cuma arah animasi (maju/mundur), bukan
+  // logic -- field TIDAK pernah unmount jadi nilai yang sudah diisi tidak
+  // hilang saat Lanjut/Kembali.
+  const [loginNav, setLoginNav] = useState<{ step: 1 | 2; dir: "fwd" | "back" }>({ step: 1, dir: "fwd" });
+  const [regNav, setRegNav] = useState<{ step: 1 | 2 | 3 | 4; dir: "fwd" | "back" }>({ step: 1, dir: "fwd" });
+  // Error validasi per-field, ditampilkan dekat field terkait (bukan alert).
+  const [fieldErr, setFieldErr] = useState<Record<string, string | null>>({});
+  const panelTouchedRef = useRef(false);
+  const loginStepRef = useRef<Record<number, HTMLDivElement | null>>({});
+  const regStepRef = useRef<Record<number, HTMLDivElement | null>>({});
   const [peeking, setPeeking] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
@@ -269,7 +307,7 @@ export default function AuthLanding({
   ) => {
     setErr((e) => ({ ...e, [kind]: null }));
     setBusy(true);
-    setBtnLogin(kind === "login" ? "Memproses…" : "Masuk");
+    setBtnLogin(kind === "login" ? "Masuk…" : "Masuk");
     setBtnRegister(kind === "register" ? "Membuat akun…" : "Buat akun");
 
     try {
@@ -284,6 +322,23 @@ export default function AuthLanding({
         // Simpan HANYA session id opaque — bukan password/token/API key.
         setSessionId(data.session_id);
         goToApp();
+        return;
+      }
+
+      // Register: email/username duplikat baru diketahui backend di step
+      // terakhir (satu endpoint, bukan availability-check tersendiri).
+      // Lempar user balik ke step field yang bermasalah supaya errornya
+      // muncul dekat field terkait, bukan nyangkut di step verifikasi.
+      if (kind === "register" && res.status === 409) {
+        const msg409 = data?.error || "Data sudah dipakai.";
+        if (/email/i.test(msg409)) {
+          setFieldError("regEmail", msg409);
+          setRegNav({ step: 1, dir: "back" });
+        } else {
+          setFieldError("regUsername", msg409);
+          setRegNav({ step: 3, dir: "back" });
+        }
+        void loadCaptcha(kind);
         return;
       }
 
@@ -303,7 +358,21 @@ export default function AuthLanding({
   const showPanel = (name: "login" | "register") => {
     setPanel(name);
     setErr({ login: null, register: null });
+    setFieldErr({});
+    setLoginNav({ step: 1, dir: "fwd" });
+    setRegNav({ step: 1, dir: "fwd" });
+    panelTouchedRef.current = true;
   };
+
+  // Fokuskan field pertama form aktif saat GANTI panel via klik user
+  // (bukan saat load halaman -- keyboard mobile tidak boleh nongol
+  // begitu landing dibuka). preventScroll supaya tidak meyentak scroll.
+  useEffect(() => {
+    if (!panelTouchedRef.current) return;
+    const form = document.querySelector(".auth-form:not([hidden])") as HTMLFormElement | null;
+    const first = form?.querySelector("input:not([type=checkbox])") as HTMLInputElement | null;
+    first?.focus({ preventScroll: true });
+  }, [panel]);
 
   const gotoRegister = () => {
     setNavOpen(false);
@@ -321,6 +390,140 @@ export default function AuthLanding({
     setPeeking(e.target.type === "password");
   };
 
+  // ---------------- Navigasi step (validasi ringan di client; backend
+  // tetap sumber kebenaran -- tetap divalidasi ulang saat submit akhir) ----------------
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
+
+  const setFieldError = (key: string, msg: string | null) =>
+    setFieldErr((f) => ({ ...f, [key]: msg }));
+
+  const loginNext = () => {
+    const el = document.getElementById("loginIdentifier") as HTMLInputElement | null;
+    const v = el?.value.trim() || "";
+    if (!v) {
+      setFieldError("loginIdentifier", "Masukkan email kamu.");
+      el?.focus();
+      return;
+    }
+    setFieldError("loginIdentifier", null);
+    setErr((e) => ({ ...e, login: null }));
+    setLoginNav({ step: 2, dir: "fwd" });
+  };
+
+  const regNextEmail = () => {
+    const el = document.getElementById("regEmail") as HTMLInputElement | null;
+    const v = el?.value.trim() || "";
+    if (!EMAIL_RE.test(v)) {
+      setFieldError("regEmail", "Format email tidak valid.");
+      el?.focus();
+      return;
+    }
+    setFieldError("regEmail", null);
+    setRegNav({ step: 2, dir: "fwd" });
+  };
+
+  const regNextPassword = () => {
+    const pw = document.getElementById("regPw") as HTMLInputElement | null;
+    const pw2 = document.getElementById("regPw2") as HTMLInputElement | null;
+    const v = pw?.value || "";
+    const v2 = pw2?.value || "";
+    if (v.length < 8) {
+      setFieldError("regPw", "Password minimal 8 karakter.");
+      pw?.focus();
+      return;
+    }
+    if (v !== v2) {
+      setFieldError("regPw2", "Konfirmasi password tidak sama.");
+      pw2?.focus();
+      return;
+    }
+    setFieldError("regPw", null);
+    setFieldError("regPw2", null);
+    setRegNav({ step: 3, dir: "fwd" });
+  };
+
+  const regNextUsername = () => {
+    const el = document.getElementById("regUsername") as HTMLInputElement | null;
+    const v = el?.value.trim() || "";
+    if (!USERNAME_RE.test(v)) {
+      setFieldError("regUsername", "Username 3-20 karakter, hanya huruf, angka, dan underscore.");
+      el?.focus();
+      return;
+    }
+    setFieldError("regUsername", null);
+    setErr((e) => ({ ...e, register: null }));
+    setRegNav({ step: 4, dir: "fwd" });
+  };
+
+  // Enter di field "Lanjut" tidak boleh men-submit form (step berikutnya
+  // belum terisi) -- intersep di sini, step terakhir biarkan submit native.
+  const onLoginStep1Key = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      loginNext();
+    }
+  };
+  const onRegEmailKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      regNextEmail();
+    }
+  };
+  const onRegPwKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      document.getElementById("regPw2")?.focus();
+    }
+  };
+  const onRegPw2Key = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      regNextPassword();
+    }
+  };
+  const onRegUsernameKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      regNextUsername();
+    }
+  };
+
+  // Re-trigger animasi step tanpa unmount (reflow trick) + autofocus field
+  // pertama dari step baru. Dilakukan via effect karena DOM (atribut
+  // `hidden`) baru update setelah render, bukan di saat setState dipanggil.
+  const playStepAnim = (
+    map: Record<number, HTMLDivElement | null>,
+    step: number,
+    dir: "fwd" | "back",
+    focusField: boolean
+  ) => {
+    const el = map[step];
+    if (!el) return;
+    el.classList.remove("step-fwd", "step-back");
+    void el.offsetWidth;
+    el.classList.add(dir === "back" ? "step-back" : "step-fwd");
+    // Jangan mencuri fokus saat load halaman — keyboard mobile tidak
+    // boleh nongol begitu landing dibuka, hanya saat user pindah step.
+    if (!focusField) return;
+    const first = el.querySelector("input") as HTMLInputElement | null;
+    first?.focus({ preventScroll: true });
+  };
+
+  const loginFirstRun = useRef(true);
+  useEffect(() => {
+    playStepAnim(loginStepRef.current, loginNav.step, loginNav.dir, !loginFirstRun.current);
+    loginFirstRun.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loginNav]);
+
+  const regFirstRun = useRef(true);
+  useEffect(() => {
+    playStepAnim(regStepRef.current, regNav.step, regNav.dir, !regFirstRun.current);
+    regFirstRun.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regNav]);
+
   const langTotalKnown = langStats.languages.reduce((sum: number, l: { percent: number }) => sum + l.percent, 0);
   const langOther = Math.max(0, Math.round((100 - langTotalKnown) * 10) / 10);
   const buildDate = new Date(langStats.generated_at).toLocaleDateString("id-ID", {
@@ -328,6 +531,22 @@ export default function AuthLanding({
     month: "long",
     year: "numeric",
   });
+
+  // Judul/subjudul berubah per step -- user selalu tahu konteksnya tanpa
+  // field yang belum relevan ikut tampil.
+  const authHead =
+    panel === "login"
+      ? loginNav.step === 1
+        ? { title: "Selamat datang kembali.", sub: "Masuk untuk melanjutkan percakapanmu dengan Aomi." }
+        : { title: "Masukkan password.", sub: "" }
+      : regNav.step === 1
+      ? { title: "Buat akun Aomi.", sub: "Mulai dengan email yang akan kamu gunakan." }
+      : regNav.step === 2
+      ? { title: "Buat password.", sub: "" }
+      : regNav.step === 3
+      ? { title: "Pilih nama kamu.", sub: "" }
+      : { title: "Verifikasi akun.", sub: "" };
+  const showGoogle = (panel === "login" ? loginNav.step : regNav.step) === 1;
 
   return (
     <>
@@ -801,14 +1020,14 @@ export default function AuthLanding({
             <div className="auth-body">
               <header className="auth-head">
                 <svg className="icon auth-mobile-logo"><use href="/icons.svg#logo" /></svg>
-                <h2 id="authHeading">
-                  {panel === "login" ? "Selamat datang kembali" : "Buat akun baru"}
-                </h2>
-                <p id="authSubtitle">
-                  {panel === "login"
-                    ? "Masuk untuk melanjutkan percakapanmu."
-                    : "Daftar untuk mulai mengobrol dengan Aomi."}
-                </p>
+                <h2 id="authHeading">{authHead.title}</h2>
+                {/* Sub kosong tetap render sebagai baris kosong supaya tinggi
+                    header stabil saat ganti step (tidak lompat). */}
+                <p id="authSubtitle">{authHead.sub || "\u00a0"}</p>
+                <StepDots
+                  step={panel === "login" ? loginNav.step : regNav.step}
+                  total={panel === "login" ? 2 : 4}
+                />
               </header>
 
               <div className="auth-tabs" role="tablist">
@@ -831,11 +1050,12 @@ export default function AuthLanding({
                 </button>
               </div>
 
-              {/* ===== GOOGLE OAUTH ===== */}
+              {/* ===== GOOGLE OAUTH — alternatif, hanya di langkah pertama ===== */}
               <a
                 className="google-btn"
                 href="/api/auth/google"
-                aria-label={panel === "login" ? "Masuk dengan Google" : "Lanjutkan dengan Google"}
+                hidden={!showGoogle}
+                aria-label={panel === "login" ? "Lanjutkan dengan Google" : "Daftar dengan Google"}
               >
                 <svg className="google-icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -843,12 +1063,12 @@ export default function AuthLanding({
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
                 </svg>
-                {panel === "login" ? "Masuk dengan Google" : "Lanjutkan dengan Google"}
+                {panel === "login" ? "Lanjutkan dengan Google" : "Daftar dengan Google"}
               </a>
               <p className="google-error" hidden={!googleError}>{googleError}</p>
-              <div className="auth-divider" role="separator" aria-label="atau">atau</div>
+              <div className="auth-divider" role="separator" aria-label="atau" hidden={!showGoogle}>atau</div>
 
-              {/* ===== LOGIN ===== */}
+              {/* ===== LOGIN — step 1: email/username, step 2: password ===== */}
               <form
                 className="auth-form"
                 hidden={panel !== "login"}
@@ -870,68 +1090,96 @@ export default function AuthLanding({
                   });
                 }}
               >
-                <label className="auth-field">
-                  <span>Email atau username</span>
-                  <div className="input-pill">
-                    <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#mail" /></svg>
-                    <input
-                      type="text"
-                      name="identifier"
-                      autoComplete="username"
-                      required
-                      onFocus={onFieldFocus}
-                    />
-                  </div>
-                </label>
-
-                <label className="auth-field">
-                  <span>Password</span>
-                  <div className="input-pill">
-                    <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#key" /></svg>
-                    <PasswordInput id="loginPw" name="password" autoComplete="current-password" onFocus={onFieldFocus} />
-                  </div>
-                </label>
-
-                <label className="auth-check">
-                  <input type="checkbox" name="remember" className="auth-check-input" />
-                  <span className="auth-check-box" aria-hidden="true">
-                    <svg className="icon"><use href="/icons.svg#check" /></svg>
-                  </span>
-                  <span>Ingat saya selama 30 hari</span>
-                </label>
-
-                <div className="verify">
-                  <div className="verify-label">Verifikasi manusia</div>
-                  <div className="verify-row">
-                    <span className="verify-num" id="capNumLogin">{capLogin?.number || "····"}</span>
-                    <span className="verify-divider" aria-hidden="true"></span>
-                    <input
-                      type="text"
-                      id="capAnsLogin"
-                      inputMode="numeric"
-                      maxLength={4}
-                      autoComplete="off"
-                      placeholder="Ketik angka"
-                      aria-label="Ketik angka verifikasi"
-                    />
-                    <button
-                      type="button"
-                      className="verify-refresh"
-                      aria-label="Angka baru"
-                      onClick={() => void loadCaptcha("login")}
-                    >
-                      <svg className="icon"><use href="/icons.svg#chevron-down" /></svg>
-                    </button>
-                  </div>
+                <div
+                  className="form-step"
+                  ref={(el) => { loginStepRef.current[1] = el; }}
+                  hidden={loginNav.step !== 1}
+                >
+                  <label className="auth-field">
+                    <span>Email atau username</span>
+                    <div className="input-pill">
+                      <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#mail" /></svg>
+                      <input
+                        type="text"
+                        id="loginIdentifier"
+                        name="identifier"
+                        autoComplete="username"
+                        required
+                        onKeyDown={onLoginStep1Key}
+                        onFocus={onFieldFocus}
+                      />
+                    </div>
+                  </label>
+                  <p className="field-error" aria-live="polite" hidden={!fieldErr.loginIdentifier}>
+                    {fieldErr.loginIdentifier}
+                  </p>
+                  <button type="button" className="auth-submit" onClick={loginNext} disabled={busy}>
+                    Lanjut
+                  </button>
                 </div>
 
-                <button className="auth-submit" id="loginSubmit" type="submit" disabled={busy}>
-                  {btnLogin}
-                </button>
-                <p className="auth-error" id="errLogin" hidden={!err.login}>{err.login}</p>
+                <div
+                  className="form-step"
+                  ref={(el) => { loginStepRef.current[2] = el; }}
+                  hidden={loginNav.step !== 2}
+                >
+                  <label className="auth-field">
+                    <span>Password</span>
+                    <div className="input-pill">
+                      <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#key" /></svg>
+                      <PasswordInput id="loginPw" name="password" autoComplete="current-password" onFocus={onFieldFocus} />
+                    </div>
+                  </label>
+
+                  <label className="auth-check">
+                    <input type="checkbox" name="remember" className="auth-check-input" />
+                    <span className="auth-check-box" aria-hidden="true">
+                      <svg className="icon"><use href="/icons.svg#check" /></svg>
+                    </span>
+                    <span>Ingat saya selama 30 hari</span>
+                  </label>
+
+                  <div className="verify">
+                    <div className="verify-label">Verifikasi manusia</div>
+                    <div className="verify-row">
+                      <span className="verify-num" id="capNumLogin">{capLogin?.number || "····"}</span>
+                      <span className="verify-divider" aria-hidden="true"></span>
+                      <input
+                        type="text"
+                        id="capAnsLogin"
+                        inputMode="numeric"
+                        maxLength={4}
+                        autoComplete="off"
+                        placeholder="Ketik angka"
+                        aria-label="Ketik angka verifikasi"
+                      />
+                      <button
+                        type="button"
+                        className="verify-refresh"
+                        aria-label="Angka baru"
+                        onClick={() => void loadCaptcha("login")}
+                      >
+                        <svg className="icon"><use href="/icons.svg#chevron-down" /></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <button className="auth-submit" id="loginSubmit" type="submit" disabled={busy}>
+                    {btnLogin}
+                  </button>
+                  <button
+                    type="button"
+                    className="link-back"
+                    onClick={() => setLoginNav({ step: 1, dir: "back" })}
+                  >
+                    <svg className="icon" aria-hidden="true"><use href="/icons.svg#chevron-left" /></svg>
+                    Kembali
+                  </button>
+                  <p className="auth-error" id="errLogin" hidden={!err.login}>{err.login}</p>
+                </div>
               </form>
 
-              {/* ===== REGISTER ===== */}
+              {/* ===== REGISTER — step 1 email, 2 password, 3 username, 4 verifikasi ===== */}
               <form
                 className="auth-form"
                 hidden={panel !== "register"}
@@ -949,11 +1197,13 @@ export default function AuthLanding({
 
                   // Validasi frontend untuk UX (backend tetap memvalidasi ulang)
                   if (f.password.value !== pw2?.value) {
-                    setErr((er) => ({ ...er, register: "Konfirmasi password tidak sama." }));
+                    setFieldError("regPw2", "Konfirmasi password tidak sama.");
+                    setRegNav({ step: 2, dir: "back" });
                     return;
                   }
                   if (f.password.value.length < 8) {
-                    setErr((er) => ({ ...er, register: "Password minimal 8 karakter." }));
+                    setFieldError("regPw", "Password minimal 8 karakter.");
+                    setRegNav({ step: 2, dir: "back" });
                     return;
                   }
 
@@ -966,75 +1216,170 @@ export default function AuthLanding({
                   });
                 }}
               >
-                <label className="auth-field">
-                  <span>Username</span>
-                  <div className="input-pill">
-                    <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#user" /></svg>
-                    <input
-                      type="text"
-                      name="username"
-                      autoComplete="username"
-                      maxLength={20}
-                      placeholder="3-20 karakter"
-                      required
-                      onFocus={onFieldFocus}
-                    />
-                  </div>
-                </label>
-
-                <label className="auth-field">
-                  <span>Email</span>
-                  <div className="input-pill">
-                    <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#mail" /></svg>
-                    <input type="email" name="email" autoComplete="email" required onFocus={onFieldFocus} />
-                  </div>
-                </label>
-
-                <label className="auth-field">
-                  <span>Password</span>
-                  <div className="input-pill">
-                    <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#key" /></svg>
-                    <PasswordInput id="regPw" name="password" autoComplete="new-password" placeholder="Minimal 8 karakter" onFocus={onFieldFocus} />
-                  </div>
-                </label>
-
-                <label className="auth-field">
-                  <span>Konfirmasi password</span>
-                  <div className="input-pill">
-                    <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#key" /></svg>
-                    <PasswordInput id="regPw2" autoComplete="new-password" onFocus={onFieldFocus} />
-                  </div>
-                </label>
-
-                <div className="verify">
-                  <div className="verify-label">Verifikasi manusia</div>
-                  <div className="verify-row">
-                    <span className="verify-num" id="capNumRegister">{capRegister?.number || "····"}</span>
-                    <span className="verify-divider" aria-hidden="true"></span>
-                    <input
-                      type="text"
-                      id="capAnsRegister"
-                      inputMode="numeric"
-                      maxLength={4}
-                      autoComplete="off"
-                      placeholder="Ketik angka"
-                      aria-label="Ketik angka verifikasi"
-                    />
-                    <button
-                      type="button"
-                      className="verify-refresh"
-                      aria-label="Angka baru"
-                      onClick={() => void loadCaptcha("register")}
-                    >
-                      <svg className="icon"><use href="/icons.svg#chevron-down" /></svg>
-                    </button>
-                  </div>
+                {/* Step 1 — email */}
+                <div
+                  className="form-step"
+                  ref={(el) => { regStepRef.current[1] = el; }}
+                  hidden={regNav.step !== 1}
+                >
+                  <label className="auth-field">
+                    <span>Email</span>
+                    <div className="input-pill">
+                      <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#mail" /></svg>
+                      <input
+                        type="email"
+                        id="regEmail"
+                        name="email"
+                        autoComplete="email"
+                        required
+                        onKeyDown={onRegEmailKey}
+                        onFocus={onFieldFocus}
+                      />
+                    </div>
+                  </label>
+                  <p className="field-error" aria-live="polite" hidden={!fieldErr.regEmail}>
+                    {fieldErr.regEmail}
+                  </p>
+                  <button type="button" className="auth-submit" onClick={regNextEmail} disabled={busy}>
+                    Lanjut
+                  </button>
                 </div>
 
-                <button className="auth-submit" id="registerSubmit" type="submit" disabled={busy}>
-                  {btnRegister}
-                </button>
-                <p className="auth-error" id="errRegister" hidden={!err.register}>{err.register}</p>
+                {/* Step 2 — password */}
+                <div
+                  className="form-step"
+                  ref={(el) => { regStepRef.current[2] = el; }}
+                  hidden={regNav.step !== 2}
+                >
+                  <label className="auth-field">
+                    <span>Password</span>
+                    <div className="input-pill">
+                      <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#key" /></svg>
+                      <PasswordInput
+                        id="regPw"
+                        name="password"
+                        autoComplete="new-password"
+                        placeholder="Minimal 8 karakter"
+                        onKeyDown={onRegPwKey}
+                        onFocus={onFieldFocus}
+                      />
+                    </div>
+                  </label>
+                  <p className="field-error" aria-live="polite" hidden={!fieldErr.regPw}>
+                    {fieldErr.regPw}
+                  </p>
+                  <label className="auth-field">
+                    <span>Konfirmasi password</span>
+                    <div className="input-pill">
+                      <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#key" /></svg>
+                      <PasswordInput
+                        id="regPw2"
+                        autoComplete="new-password"
+                        placeholder="Ulangi password"
+                        onKeyDown={onRegPw2Key}
+                        onFocus={onFieldFocus}
+                      />
+                    </div>
+                  </label>
+                  <p className="field-error" aria-live="polite" hidden={!fieldErr.regPw2}>
+                    {fieldErr.regPw2}
+                  </p>
+                  <button type="button" className="auth-submit" onClick={regNextPassword} disabled={busy}>
+                    Lanjut
+                  </button>
+                  <button
+                    type="button"
+                    className="link-back"
+                    onClick={() => setRegNav({ step: 1, dir: "back" })}
+                  >
+                    <svg className="icon" aria-hidden="true"><use href="/icons.svg#chevron-left" /></svg>
+                    Kembali
+                  </button>
+                </div>
+
+                {/* Step 3 — username */}
+                <div
+                  className="form-step"
+                  ref={(el) => { regStepRef.current[3] = el; }}
+                  hidden={regNav.step !== 3}
+                >
+                  <label className="auth-field">
+                    <span>Username</span>
+                    <div className="input-pill">
+                      <svg className="icon input-pill-icon" aria-hidden="true"><use href="/icons.svg#user" /></svg>
+                      <input
+                        type="text"
+                        id="regUsername"
+                        name="username"
+                        autoComplete="username"
+                        maxLength={20}
+                        placeholder="3-20 karakter"
+                        required
+                        onKeyDown={onRegUsernameKey}
+                        onFocus={onFieldFocus}
+                      />
+                    </div>
+                  </label>
+                  <p className="field-error" aria-live="polite" hidden={!fieldErr.regUsername}>
+                    {fieldErr.regUsername}
+                  </p>
+                  <button type="button" className="auth-submit" onClick={regNextUsername} disabled={busy}>
+                    Lanjut
+                  </button>
+                  <button
+                    type="button"
+                    className="link-back"
+                    onClick={() => setRegNav({ step: 2, dir: "back" })}
+                  >
+                    <svg className="icon" aria-hidden="true"><use href="/icons.svg#chevron-left" /></svg>
+                    Kembali
+                  </button>
+                </div>
+
+                {/* Step 4 — verifikasi */}
+                <div
+                  className="form-step"
+                  ref={(el) => { regStepRef.current[4] = el; }}
+                  hidden={regNav.step !== 4}
+                >
+                  <div className="verify">
+                    <div className="verify-label">Verifikasi manusia</div>
+                    <div className="verify-row">
+                      <span className="verify-num" id="capNumRegister">{capRegister?.number || "····"}</span>
+                      <span className="verify-divider" aria-hidden="true"></span>
+                      <input
+                        type="text"
+                        id="capAnsRegister"
+                        inputMode="numeric"
+                        maxLength={4}
+                        autoComplete="off"
+                        placeholder="Ketik angka"
+                        aria-label="Ketik angka verifikasi"
+                      />
+                      <button
+                        type="button"
+                        className="verify-refresh"
+                        aria-label="Angka baru"
+                        onClick={() => void loadCaptcha("register")}
+                      >
+                        <svg className="icon"><use href="/icons.svg#chevron-down" /></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <button className="auth-submit" id="registerSubmit" type="submit" disabled={busy}>
+                    {btnRegister}
+                  </button>
+                  <button
+                    type="button"
+                    className="link-back"
+                    onClick={() => setRegNav({ step: 3, dir: "back" })}
+                  >
+                    <svg className="icon" aria-hidden="true"><use href="/icons.svg#chevron-left" /></svg>
+                    Kembali
+                  </button>
+                  <p className="auth-error" id="errRegister" hidden={!err.register}>{err.register}</p>
+                </div>
               </form>
 
               <p className="auth-note">
@@ -1070,12 +1415,14 @@ function PasswordInput({
   autoComplete,
   placeholder,
   onFocus,
+  onKeyDown,
 }: {
   id: string;
   name?: string;
   autoComplete?: string;
   placeholder?: string;
   onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) {
   const [show, setShow] = useState(false);
   return (
@@ -1088,6 +1435,7 @@ function PasswordInput({
         placeholder={placeholder}
         required
         onFocus={onFocus}
+        onKeyDown={onKeyDown}
       />
       <button
         type="button"

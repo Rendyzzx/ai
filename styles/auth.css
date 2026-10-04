@@ -823,6 +823,83 @@ h1, h2, h3 {
 
 .auth-form { display: flex; flex-direction: column; gap: 20px; }
 
+/* ---------- Multi-step ---------- */
+
+.form-step {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Indikator langkah: titik kecil, bukan progress bar.
+   Titik "sekarang" memanjang (pill pendek), yang sudah dilewati
+   redup, yang belum cuma outline. */
+.step-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+.step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background-color 0.2s ease, width 0.2s ease, opacity 0.2s ease;
+}
+.step-dot.active {
+  width: 16px;
+  background: var(--accent);
+}
+.step-dot.done {
+  background: var(--text-muted);
+  opacity: 0.45;
+}
+
+/* Error per-field: dekat field, subtle tapi jelas. */
+.field-error {
+  font-size: 13px;
+  color: var(--danger);
+}
+
+/* Tombol Kembali — ghost kecil di bawah submit utama. */
+.link-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.link-back:hover { color: var(--text); }
+.link-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.link-back .icon { width: 14px; height: 14px; display: block; }
+
+/* Transisi antar step: opacity + geser kecil, tanpa bounce. */
+.form-step.step-fwd { animation: stepInFwd 0.22s ease both; }
+.form-step.step-back { animation: stepInBack 0.22s ease both; }
+@keyframes stepInFwd {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes stepInBack {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .form-step.step-fwd,
+  .form-step.step-back { animation: none; }
+}
+
 .auth-field { display: block; }
 .auth-field > span:first-child {
   display: block;
