@@ -15,6 +15,10 @@ export const FEATURE_NAMES = [
   "hd",
   "dl",
   "video",
+  "pin",
+  "bookmark",
+  "search",
+  "feedback",
 ] as const;
 
 export type FeatureName = (typeof FEATURE_NAMES)[number];
@@ -28,6 +32,10 @@ export const DEFAULT_FLAGS: FeatureFlags = {
   hd: true,
   dl: true,
   video: true,
+  pin: true,
+  bookmark: true,
+  search: true,
+  feedback: true,
 };
 
 const FLAG_LABELS: Record<FeatureName, string> = {
@@ -38,6 +46,10 @@ const FLAG_LABELS: Record<FeatureName, string> = {
   hd: "HD foto & video",
   dl: "Downloader TikTok/IG",
   video: "Upload video + AI vision",
+  pin: "Pin & arsip percakapan",
+  bookmark: "Simpanan (bookmark jawaban)",
+  search: "Pencarian isi percakapan",
+  feedback: "Feedback jawaban (👍/👎)",
 };
 
 export function featureLabel(name: FeatureName): string {

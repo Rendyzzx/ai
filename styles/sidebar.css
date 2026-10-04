@@ -511,3 +511,129 @@
   color: var(--text);
   border-color: var(--text-muted);
 }
+
+/* ---------------- Tab Semua / Arsip + menu item ⋯ + snippet ---------------- */
+
+.sb-views {
+  display: flex;
+  gap: 4px;
+  padding: 2px 6px 8px;
+}
+
+.sb-view {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  transition: color 0.15s, background 0.15s;
+}
+
+.sb-view:hover {
+  color: var(--text);
+}
+
+.sb-view.active {
+  color: var(--text);
+  background: var(--surface-3);
+  border-color: var(--border);
+}
+
+.sb-item {
+  position: relative;
+}
+
+.sb-item-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sb-item-snippet {
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tombol ⋯ (ganti trash selalu-tampil) — target sentuh nyaman */
+.sb-item-more {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  border-radius: var(--radius);
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.sb-item:hover .sb-item-more,
+.sb-item:focus-within .sb-item-more,
+.sb-item.active .sb-item-more {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .sb-item-more { opacity: 1; }
+}
+
+.sb-item-more:hover {
+  color: var(--text);
+}
+
+.sb-item-more .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Menu kecil per item: pin / arsip / hapus */
+.sb-item-menu {
+  position: absolute;
+  right: 10px;
+  top: calc(100% - 4px);
+  z-index: 30;
+  min-width: 170px;
+  padding: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--overlay-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: sb-item-menu-in 0.12s ease-out;
+}
+
+@keyframes sb-item-menu-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.sb-item-menu button {
+  padding: 8px 12px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  border-radius: var(--radius);
+  transition: background 0.12s;
+}
+
+.sb-item-menu button:hover {
+  background: var(--surface-3);
+}
+
+.sb-item-menu button.danger {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-item-menu { animation: none; }
+}

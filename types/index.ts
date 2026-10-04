@@ -19,14 +19,39 @@ export interface Message {
   music?: MusicCard | null;      // kartu lagu (mode musik)
   hd?: HdCard | null;           // kartu HD video (mode upgrade)
   video?: { url: string; name: string } | null; // video hasil upload (pesan user)
+  /** Feedback user pada jawaban assistant: 1 (👍), -1 (👎), 0/undefined (belum). */
+  feedback?: number;
+  /** true jika pesan ini disimpan user ke "Simpanan" (mirror dari _bookmarks.json). */
+  bookmarked?: boolean;
   timestamp: string;
 }
 
-/** Enri indeks riwayat percakapan. */
+/** Enri indeks riwayat percakapan.
+ *  pinned/archived opsional (migration-safe): entri lama tanpa field
+ *  dianggap false. */
 export interface ConversationItem {
   conversation_id: string;
   title: string;
   updated_at: string;
+  pinned?: boolean;
+  archived?: boolean;
+}
+
+/** Satu entri "Simpanan" (bookmark jawaban Aomi) — file _bookmarks.json.
+ *  Menyimpan snapshot isi supaya tetap bisa dibaca walau percakapan
+ *  aslinya sudah dihapus. */
+export interface BookmarkEntry {
+  message_id: string;
+  conversation_id: string;
+  conversation_title: string;
+  /** Snapshot teks jawaban (cap 8000 karakter). */
+  content: string;
+  saved_at: string;
+}
+
+/** Hasil pencarian isi percakapan (snippet di sekitar kecocokan). */
+export interface SearchItem extends ConversationItem {
+  snippet?: string;
 }
 
 /** Percakapan penuh (GET /api/conversations?id=). */

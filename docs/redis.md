@@ -24,8 +24,9 @@ Website API + Bot Telegram (service layer sama)
 | `aomi:users/suspended.json` | daftar id user dibekukan | — |
 | `aomi:sessions/<sid>.json` | sesi login | s.d. expiry sesi |
 | `aomi:locks/login-<hash>.json` | lock brute-force login | sisa window |
-| `aomi:chats/<uid>/_index.json` | indeks percakapan | — |
-| `aomi:chats/<uid>/<cid>.json` | isi percakapan | — |
+| `aomi:chats/<uid>/_index.json` | indeks percakapan (entri: `pinned`/`archived` opsional) | — |
+| `aomi:chats/<uid>/<cid>.json` | isi percakapan (pesan bisa punya `feedback`, `bookmarked`) | — |
+| `aomi:chats/<uid>/_bookmarks.json` | Simpanan: snapshot jawaban yang di-bookmark user | cap 200 entri |
 | `aomi:tempimg/<id>.json` | gambar sementara (b64) | input 1 jam / hasil 3 hari |
 | `aomi:maintenance/state.json` | mode off/on/scheduled + jadwal ISO | — |
 | `aomi:maintenance/config.json` | judul/pesan/estimasi halaman | — |

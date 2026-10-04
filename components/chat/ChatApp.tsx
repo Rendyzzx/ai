@@ -20,6 +20,7 @@ import MessageRow, {
 } from "@/components/chat/MessageRow";
 import MessageMenu, { type MenuState } from "@/components/chat/MessageMenu";
 import ConfirmDialog from "@/components/chat/ConfirmDialog";
+import SavedView from "@/components/chat/SavedView";
 // Settings (±40KB) jarang dibuka → dynamic import, keluar dari
 // initial chat bundle. ssr:false aman: ChatApp sendiri client-only.
 import dynamic from "next/dynamic";
@@ -35,6 +36,14 @@ import type { BotConfig, ChatResponse, Conversation, ConversationItem, Message, 
 
 const RENDER_BATCH = 30;
 const DOM_CAP = 150;
+
+/** Quick action (layar sambutan): isi composer, user yang kirim. */
+const QUICK_ACTIONS = [
+  { icon: "💡", label: "Cari ide", text: "bantu aku cari ide menarik ya" },
+  { icon: "💻", label: "Coding", text: "aku mau nanya soal coding, bantuin ya" },
+  { icon: "✍️", label: "Menulis", text: "bantuin aku bikin tulisan ya" },
+  { icon: "📚", label: "Jelaskan", text: "jelasin sesuatu ke aku dengan cara yang gampang dipahami ya" },
+];
 
 const DEFAULT_USER: UserProfile = {
   username: "",
@@ -114,6 +123,7 @@ export default function ChatApp() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsCat, setSettingsCat] = useState("profile");
+  const [savedOpen, setSavedOpen] = useState(false);
 
   const loadingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -185,6 +195,16 @@ export default function ChatApp() {
     setFirstHidden(0);
     setCurrentId(null);
   }, []);
+
+  /** Baris pesan error lokal (tanpa mid server, gak bisa dimodifikasi). */
+  const pushError = useCallback(
+    (text: string) => {
+      pushMessages([
+        { message_id: "", role: "assistant", content: text, timestamp: new Date().toISOString(), isErrorHint: true } as Message,
+      ]);
+    },
+    [pushMessages]
+  );
 
   /* ---------------- Boot ---------------- */
 
@@ -646,6 +666,55 @@ export default function ChatApp() {
     [pushMessages, refreshSidebar, persistEditThumb]
   );
 
+  /** Satu jalur lampiran (dipakai tombol +, drag&drop, paste):
+   *  validasi → preview → untuk video: upload + ekstrak frame. */
+  const handleFileSelected = useCallback(
+    async (file: File) => {
+      if (isVideoFile(file)) {
+        if (file.size > 50 * 1024 * 1024) {
+          pushError("Video maksimal 50MB ya.");
+          return;
+        }
+        const id = Math.random().toString(36).slice(2);
+        setPendingVideo({
+          id,
+          name: file.name,
+          size: file.size,
+          status: "uploading",
+          progress: 0,
+          frames: [],
+          poster: null,
+        });
+        // frame diekstrak paralel dengan upload
+        void extractVideoFrames(file).then(({ frames, poster }) => {
+          setPendingVideo((v) => (v && v.id === id ? { ...v, frames, poster } : v));
+        });
+        try {
+          const url = await uploadVideo(file, (r) => {
+            setPendingVideo((v) => (v && v.id === id ? { ...v, progress: r } : v));
+          });
+          setPendingVideo((v) => (v && v.id === id ? { ...v, status: "ready", url } : v));
+        } catch (err) {
+          setPendingVideo((v) => (v && v.id === id ? { ...v, status: "error" } : v));
+          pushError((err as Error).message || "Gagal mengunggah video. Coba lagi ya.");
+        }
+        return;
+      }
+      if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) {
+        pushError("Tipe file ini belum didukung. Pakai gambar atau video ya.");
+        return;
+      }
+      try {
+        const dataUrl = await compressImage(file, 1024, 0.82);
+        const thumb = await compressImage(file, 360, 0.68);
+        setPendingImage({ dataUrl, thumb });
+      } catch {
+        pushError("Gagal memproses gambar. Coba file lain ya.");
+      }
+    },
+    [pushError]
+  );
+
   /* ---------------- Kirim pesan ---------------- */
 
   const send = useCallback(
@@ -822,7 +891,7 @@ export default function ChatApp() {
   const openMenu = useCallback(
     (e: React.MouseEvent, m: Message) => {
       e.preventDefault();
-      if (!m.content) return;
+      if (!m.message_id) return; // pesan optimistik/error lokal belum ada di server
       const isLast =
         loadedRef.current[loadedRef.current.length - 1]?.message_id === m.message_id &&
         loadedRef.current[loadedRef.current.length - 1]?.role === m.role;
@@ -833,6 +902,10 @@ export default function ChatApp() {
         role: m.role,
         hasText: !!m.content,
         isLast: m.role === "assistant" && isLast,
+        contentLen: (m.content || "").length,
+        hasMedia: Boolean(m.image || m.image_url || m.video || m.dl || m.music || m.hd),
+        feedback: typeof m.feedback === "number" ? m.feedback : 0,
+        bookmarked: Boolean(m.bookmarked),
       });
     },
     []
@@ -958,7 +1031,7 @@ export default function ChatApp() {
   );
 
   const doRegenerate = useCallback(
-    async (mid: string) => {
+    async (mid: string, variant: string = "") => {
       const cid = currentIdRef.current;
       if (!mid || !cid || loadingRef.current) return;
       loadingRef.current = true;
@@ -977,7 +1050,7 @@ export default function ChatApp() {
         const res = await api("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "regenerate", conversation_id: cid }),
+          body: JSON.stringify({ action: "regenerate", conversation_id: cid, ...(variant ? { variant } : {}) }),
         });
         const data = (await res.json().catch(() => null)) as ChatResponse | null;
         setIndicator(null);
@@ -1004,6 +1077,118 @@ export default function ChatApp() {
       if (ok && autoScroll && nearBottomRef.current) scrollToBottom(true);
     },
     [loadConversation, pushMessages, refreshSidebar, runEditJob, scrollToBottom, autoScroll]
+  );
+
+  /* ---------------- Feedback / Simpan / Kirim ulang / Pin / Arsip ---------------- */
+
+  /** Feedback 👍/👎: toggle server-side, update lokal instan. */
+  const doFeedback = useCallback(
+    async (mid: string, value: 1 | -1) => {
+      const cid = currentIdRef.current;
+      if (!mid || !cid) return;
+      const current =
+        loadedRef.current.find((m) => m.message_id === mid)?.feedback ?? 0;
+      const next = current === value ? 0 : value; // klik ulang = hapus
+      setLoaded((prev) =>
+        prev.map((m) => (m.message_id === mid ? { ...m, feedback: next } : m))
+      );
+      try {
+        await api("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "feedback",
+            conversation_id: cid,
+            message_id: mid,
+            value: next,
+          }),
+        });
+        if (next !== 0) showToast(next === 1 ? "Makasih masukannya~" : "Noted, aku coba lebih baik.");
+      } catch {
+        setLoaded((prev) =>
+          prev.map((m) => (m.message_id === mid ? { ...m, feedback: current } : m))
+        );
+      }
+    },
+    [showToast]
+  );
+
+  /** 🔖 Simpan jawaban Aomi (atau hapus dari Simpanan). */
+  const doBookmark = useCallback(
+    async (mid: string, bookmarked: boolean) => {
+      const cid = currentIdRef.current;
+      if (!mid || !cid) return;
+      setLoaded((prev) =>
+        prev.map((m) => (m.message_id === mid ? { ...m, bookmarked: !bookmarked } : m))
+      );
+      try {
+        const res = await api("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: bookmarked ? "unbookmark" : "bookmark",
+            conversation_id: cid,
+            message_id: mid,
+          }),
+        });
+        if (res.ok) {
+          showToast(bookmarked ? "Dihapus dari Simpanan" : "Disimpan ke Simpanan 🔖");
+        } else {
+          throw new Error("gagal");
+        }
+      } catch {
+        setLoaded((prev) =>
+          prev.map((m) => (m.message_id === mid ? { ...m, bookmarked } : m))
+        );
+        showToast("Gagal. Coba lagi ya.");
+      }
+    },
+    [showToast]
+  );
+
+  /** Kirim ulang pesan user (hanya teks) sebagai pesan baru. */
+  const doRetry = useCallback(
+    (mid: string) => {
+      const msg = loadedRef.current.find((m) => m.message_id === mid);
+      if (!msg || loadingRef.current || !msg.content) return;
+      void send(msg.content);
+    },
+    [send]
+  );
+
+  /** Gulir ke awal sebuah pesan (menu "Ke awal pesan ini"). */
+  const jumpToMessage = useCallback((mid: string) => {
+    if (!mid) return;
+    const el = columnRef.current?.querySelector<HTMLElement>(`[data-mid="${mid}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  /** Pin / arsip percakapan (state index, update lokal + server). */
+  const doConvFlag = useCallback(
+    async (id: string, action: "pin" | "archive", value: boolean) => {
+      setItems((prev) =>
+        prev.map((c) =>
+          c.conversation_id === id
+            ? { ...c, [action === "pin" ? "pinned" : "archived"]: value }
+            : c
+        )
+      );
+      try {
+        const res = await api("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, conversation_id: id, value }),
+        });
+        if (!res.ok) throw new Error("gagal");
+        if (action === "archive" && value && currentIdRef.current === id) {
+          // Arsipkan yang sedang terbuka → tutup view-nya
+          resetView();
+        }
+      } catch {
+        void refreshSidebar(); // gagal → sinkron ulang dari server
+      }
+    },
+    [refreshSidebar, resetView]
   );
 
   /* ---------------- Long-press (mobile) untuk menu pesan ---------------- */
@@ -1038,7 +1223,7 @@ export default function ChatApp() {
         navigator.vibrate?.(8);
         const mid = lpTarget?.dataset.mid || "";
         const msg = loadedRef.current.find((m) => m.message_id === mid);
-        if (msg) {
+        if (msg && msg.message_id) {
           setMenu({
             x: lpX,
             y: lpY,
@@ -1048,6 +1233,10 @@ export default function ChatApp() {
             isLast:
               msg.role === "assistant" &&
               loadedRef.current[loadedRef.current.length - 1]?.message_id === mid,
+            contentLen: (msg.content || "").length,
+            hasMedia: Boolean(msg.image || msg.image_url || msg.video || msg.dl || msg.music || msg.hd),
+            feedback: typeof msg.feedback === "number" ? msg.feedback : 0,
+            bookmarked: Boolean(msg.bookmarked),
           });
         }
       }, LP_MS);
@@ -1106,17 +1295,6 @@ export default function ChatApp() {
       />
     );
   });
-
-  // Tandai pesan error lokal (content tanpa mid yang dibuat flow error)
-  // dilakukan via prop isErrorHint di atas; error rows dibuat dengan helper:
-  const pushError = useCallback(
-    (text: string) => {
-      pushMessages([
-        { message_id: "", role: "assistant", content: text, timestamp: new Date().toISOString(), isErrorHint: true } as Message,
-      ]);
-    },
-    [pushMessages]
-  );
 
   /* ---------------- Boot states ---------------- */
 
@@ -1199,6 +1377,12 @@ export default function ChatApp() {
               await refreshSidebar();
             } catch { /* gagal → tetap tampil */ }
           }}
+          onPin={(id, value) => void doConvFlag(id, "pin", value)}
+          onArchive={(id, value) => void doConvFlag(id, "archive", value)}
+          onOpenSaved={() => {
+            setSidebarOpen(false);
+            setSavedOpen(true);
+          }}
         />
 
         <div className="backdrop" hidden={!sidebarOpen} onClick={() => setSidebarOpen(false)} />
@@ -1230,7 +1414,19 @@ export default function ChatApp() {
             </button>
           </header>
 
-          <section className="chat-scroll" ref={scrollRef}>
+          <section
+            className="chat-scroll"
+            ref={scrollRef}
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+            }}
+            onDrop={(e) => {
+              const file = e.dataTransfer.files?.[0];
+              if (!file) return;
+              e.preventDefault();
+              void handleFileSelected(file);
+            }}
+          >
             <div className="chat-column" ref={columnRef}>
               {/* Layar sambutan */}
               {!hasMessages && !indicator && (
@@ -1260,6 +1456,24 @@ export default function ChatApp() {
                       </button>
                     ))}
                   </div>
+                  {/* Quick actions ringan: isi composer (gak auto-kirim) —
+                      memakai kemampuan chat yang sudah ada, bukan fitur palsu. */}
+                  <div className="quick-actions" aria-label="Aksi cepat">
+                    {QUICK_ACTIONS.map((a) => (
+                      <button
+                        key={a.label}
+                        type="button"
+                        className="quick-action"
+                        onClick={() => {
+                          setInput(a.text);
+                          inputRef.current?.focus();
+                        }}
+                      >
+                        <span aria-hidden="true">{a.icon}</span>
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -1285,6 +1499,20 @@ export default function ChatApp() {
           </section>
 
           <div className="composer-wrap">
+            {/* Smart scroll: user lagi baca pesan lama → jangan paksa gulir;
+                kasih jalan pintas ke pesan terbaru (di atas komposer). */}
+            {hasMessages && !nearBottom && (
+              <div className="jump-row">
+                <button
+                  type="button"
+                  className="jump-latest"
+                  onClick={() => scrollToBottom(true)}
+                >
+                  <svg className="icon" aria-hidden="true"><use href="/icons.svg#chevron-down" /></svg>
+                  Lanjut ke pesan terbaru
+                </button>
+              </div>
+            )}
             {pendingImage && (
               <div className="attach-preview">
                 <img src={pendingImage.thumb} alt="Pratinjau gambar" />
@@ -1350,54 +1578,10 @@ export default function ChatApp() {
                 accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
                 hidden
                 ref={fileRef}
-                onChange={async (e) => {
+                onChange={(e) => {
                   const file = e.target.files?.[0];
                   e.target.value = "";
-                  if (!file) return;
-                  if (isVideoFile(file)) {
-                    if (file.size > 50 * 1024 * 1024) {
-                      pushError("Video maksimal 50MB ya.");
-                      return;
-                    }
-                    const id = Math.random().toString(36).slice(2);
-                    setPendingVideo({
-                      id,
-                      name: file.name,
-                      size: file.size,
-                      status: "uploading",
-                      progress: 0,
-                      frames: [],
-                      poster: null,
-                    });
-                    // frame diekstrak paralel dengan upload
-                    void extractVideoFrames(file).then(({ frames, poster }) => {
-                      setPendingVideo((v) => (v && v.id === id ? { ...v, frames, poster } : v));
-                    });
-                    try {
-                      const url = await uploadVideo(file, (r) => {
-                        setPendingVideo((v) => (v && v.id === id ? { ...v, progress: r } : v));
-                      });
-                      setPendingVideo((v) =>
-                        v && v.id === id ? { ...v, status: "ready", url } : v
-                      );
-                    } catch (err) {
-                      setPendingVideo((v) =>
-                        v && v.id === id
-                          ? { ...v, status: "error" }
-                          : v
-                      );
-                      pushError((err as Error).message || "Gagal mengunggah video. Coba lagi ya.");
-                    }
-                    return;
-                  }
-                  if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) return;
-                  try {
-                    const dataUrl = await compressImage(file, 1024, 0.82);
-                    const thumb = await compressImage(file, 360, 0.68);
-                    setPendingImage({ dataUrl, thumb });
-                  } catch {
-                    pushError("Gagal memproses gambar. Coba file lain ya.");
-                  }
+                  if (file) void handleFileSelected(file);
                 }}
               />
               <textarea
@@ -1415,7 +1599,23 @@ export default function ChatApp() {
                   ta.style.height = "auto";
                   ta.style.height = ta.scrollHeight + "px";
                 }}
+                onPaste={(e) => {
+                  // Paste gambar dari clipboard (screenshot/copy image)
+                  const file = Array.from(e.clipboardData.files || []).find((f) =>
+                    /^image\/(png|jpe?g|webp|gif)$/.test(f.type)
+                  );
+                  if (file) {
+                    e.preventDefault();
+                    void handleFileSelected(file);
+                  }
+                }}
                 onKeyDown={(e) => {
+                  // Ctrl/Cmd+Enter selalu kirim (shortcut, apa pun preferensi enter)
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    void send(input);
+                    return;
+                  }
                   if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                     if (enterToSend) {
                       e.preventDefault();
@@ -1463,8 +1663,24 @@ export default function ChatApp() {
         }}
         onDelete={(mid) => void doDelete(mid)}
         onEdit={(mid) => setEditMid(mid)}
-        onRegenerate={(mid) => void doRegenerate(mid)}
+        onRetry={(mid) => doRetry(mid)}
+        onRegenerate={(mid, variant) => void doRegenerate(mid, variant)}
+        onBookmark={(mid, bookmarked) => void doBookmark(mid, bookmarked)}
+        onFeedback={(mid, value) => void doFeedback(mid, value)}
+        onJumpTop={(mid) => jumpToMessage(mid)}
       />
+
+      {/* Simpanan (bookmark jawaban Aomi) */}
+      {savedOpen && (
+        <SavedView
+          onClose={() => setSavedOpen(false)}
+          onToast={showToast}
+          onOpenConversation={(cid) => {
+            setSavedOpen(false);
+            void loadConversation(cid);
+          }}
+        />
+      )}
 
       {/* Toast */}
       {toast && <div className="copy-toast show">{toast}</div>}

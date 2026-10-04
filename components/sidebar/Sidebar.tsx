@@ -3,28 +3,29 @@
 /* ============================================================
    Aomi — components/sidebar/Sidebar.tsx
    Laci percakapan pribadi — bukan panel kontrol AI.
-   Fungsi dipertahankan: chat baru, cari, pilih/hapus percakapan,
-   buka pengaturan Aomi/akun, logout, pemulihan riwayat.
-   Lazy render per batch (12) + IntersectionObserver, pencarian
-   debounce. Port struktur dari js/sidebar.js, visual dirombak.
+   Fungsi: chat baru, cari (judul lokal + isi via server, debounce),
+   pilih/pin/arsip/hapus percakapan, Simpanan (bookmark), buka
+   pengaturan, logout, pemulihan riwayat, lazy render per batch.
+   Port struktur dari js/sidebar.js, visual dirombak.
    ============================================================ */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { apiJson } from "@/lib/client-api";
 import { formatTime } from "@/lib/chat-utils";
-import type { ConversationItem } from "@/types";
+import type { ConversationItem, SearchItem } from "@/types";
 
 const BATCH = 12;
 
 /** Satu percakapan dikelompokkan di bawah label waktu (formatTime). */
 interface Group {
   label: string;
-  items: ConversationItem[];
+  items: (ConversationItem & { snippet?: string })[];
 }
 
-function groupByTime(list: ConversationItem[]): Group[] {
+function groupByTime(list: (ConversationItem & { snippet?: string })[]): Group[] {
   const groups: Group[] = [];
   for (const conv of list) {
-    const label = formatTime(conv.updated_at) || "Lainnya";
+    const label = conv.pinned ? "" : formatTime(conv.updated_at) || "Lainnya";
     const last = groups[groups.length - 1];
     if (last && last.label === label) last.items.push(conv);
     else groups.push({ label, items: [conv] });
@@ -47,9 +48,12 @@ export default function Sidebar({
   onNewChat,
   onOpenCharacter,
   onOpenSettings,
+  onOpenSaved,
   onLogout,
   onOpen,
   onDelete,
+  onPin,
+  onArchive,
   onRecover,
 }: {
   items: ConversationItem[];
@@ -66,31 +70,82 @@ export default function Sidebar({
   onNewChat: () => void;
   onOpenCharacter: () => void;
   onOpenSettings: (category: "profile" | "account") => void;
+  onOpenSaved: () => void;
   onLogout: () => void | Promise<void>;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
+  onPin: (id: string, value: boolean) => void;
+  onArchive: (id: string, value: boolean) => void;
   onRecover: () => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [rendered, setRendered] = useState(BATCH);
   const [recovering, setRecovering] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [viewArchived, setViewArchived] = useState(false);
+  // Hasil pencarian server (isi percakapan); null = tidak sedang mencari via server
+  const [serverResults, setServerResults] = useState<SearchItem[] | null>(null);
+  // Menu ⋯ per item percakapan
+  const [itemMenuFor, setItemMenuFor] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const itemMenuRef = useRef<HTMLDivElement>(null);
 
-  // Pencarian debounce 150ms (ringan, tanpa efek visual aneh)
+  // Pencarian debounce 150ms lokal; query >= 2 karakter → cari juga ke server
+  // (judul + ISI percakapan) dengan debounce 300ms terpisah.
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const serverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (serverTimer.current) clearTimeout(serverTimer.current);
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, []);
+
+  // Query berubah → jadwalkan pencarian server (q >= 2)
+  useEffect(() => {
+    if (serverTimer.current) clearTimeout(serverTimer.current);
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) {
+      setServerResults(null);
+      return;
+    }
+    serverTimer.current = setTimeout(async () => {
+      try {
+        const data = await apiJson<{ items: SearchItem[] }>(
+          "/api/conversations?q=" + encodeURIComponent(q)
+        );
+        setServerResults(Array.isArray(data.items) ? data.items : []);
+      } catch {
+        setServerResults(null); // gagal → fallback filter judul lokal
+      }
+    }, 300);
+  }, [query]);
+
+  // Mode pencarian: gabung hasil server (judul+isi, urutan server) — tanpa
+  // duplikat; fallback ke filter judul lokal saat server belum balas/gagal.
   const filtered = useMemo(() => {
     if (!query) return items;
-    return items.filter((c) => (c.title || "").toLowerCase().includes(query));
-  }, [items, query]);
+    const q = query.trim().toLowerCase();
+    if (serverResults) {
+      // Pertahankan urutan server (judul match dulu), tanpa duplikat
+      const seen = new Set<string>();
+      const merged = serverResults.filter((r) => {
+        if (seen.has(r.conversation_id)) return false;
+        seen.add(r.conversation_id);
+        return true;
+      });
+      return merged;
+    }
+    return items.filter((c) => (c.title || "").toLowerCase().includes(q));
+  }, [items, query, serverResults]);
 
-  // Reset jumlah render saat daftar berubah
+  // Reset jumlah render saat daftar/query berubah
   useEffect(() => {
     setRendered(BATCH);
-  }, [items, query]);
+  }, [items, query, viewArchived]);
 
   // IntersectionObserver: render batch berikutnya saat sentinel terlihat
   useEffect(() => {
@@ -109,18 +164,19 @@ export default function Sidebar({
     return () => obs.disconnect();
   }, [filtered.length]);
 
-  // Escape → tutup drawer / menu profil
+  // Escape → tutup drawer / menu profil / menu item
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (menuOpen) setMenuOpen(false);
+      if (itemMenuFor) setItemMenuFor(null);
+      else if (menuOpen) setMenuOpen(false);
       else onCloseDrawer();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onCloseDrawer, menuOpen]);
+  }, [onCloseDrawer, menuOpen, itemMenuFor]);
 
-  // Klik di luar menu profil → tutup
+  // Klik di luar menu profil / menu item → tutup
   useEffect(() => {
     if (!menuOpen) return;
     const onDown = (e: MouseEvent) => {
@@ -130,8 +186,31 @@ export default function Sidebar({
     return () => document.removeEventListener("mousedown", onDown);
   }, [menuOpen]);
 
-  const visible = filtered.slice(0, rendered);
+  useEffect(() => {
+    if (!itemMenuFor) return;
+    const onDown = (e: MouseEvent) => {
+      if (itemMenuRef.current && !itemMenuRef.current.contains(e.target as Node)) setItemMenuFor(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [itemMenuFor]);
+
+  // Mode tampilan: normal (aktif, non-arsip) / arsip. Pinned tetap di atas
+  // mode normal. Saat mencari → semua dicari (termasuk arsip, ditandai).
+  const visible = useMemo(() => {
+    if (query) return filtered.slice(0, rendered);
+    const base = filtered.filter((c) =>
+      viewArchived ? c.archived === true : c.archived !== true
+    );
+    const pinned = base.filter((c) => c.pinned);
+    const rest = base.filter((c) => !c.pinned);
+    return [...pinned, ...rest].slice(0, rendered);
+  }, [filtered, query, viewArchived, rendered]);
+
   const groups = useMemo(() => groupByTime(visible), [visible]);
+  const archivedCount = useMemo(() => items.filter((c) => c.archived === true).length, [items]);
+
+  const itemMenuTarget = itemMenuFor ? items.find((c) => c.conversation_id === itemMenuFor) : null;
 
   return (
     <>
@@ -175,13 +254,39 @@ export default function Sidebar({
           />
         </div>
 
+        {/* Tab tampilan: Semua / Arsip (arsip hanya muncul kalau ada isinya) */}
+        {archivedCount > 0 && !query && (
+          <div className="sb-views" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              className={"sb-view" + (!viewArchived ? " active" : "")}
+              onClick={() => setViewArchived(false)}
+            >
+              Semua
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className={"sb-view" + (viewArchived ? " active" : "")}
+              onClick={() => setViewArchived(true)}
+            >
+              Arsip ({archivedCount})
+            </button>
+          </div>
+        )}
+
         <nav className="sb-history" aria-label="Percakapan" ref={historyRef}>
-          {filtered.length === 0 ? (
+          {visible.length === 0 ? (
             <>
               <p className="sb-empty">
-                {query ? "Tidak ada hasil." : "Belum pernah ngobrol di sini."}
+                {query
+                  ? "Tidak ada hasil."
+                  : viewArchived
+                    ? "Arsip kosong."
+                    : "Belum pernah ngobrol di sini."}
               </p>
-              {!query && (
+              {!query && !viewArchived && (
                 <button
                   type="button"
                   className="sb-recover"
@@ -203,7 +308,9 @@ export default function Sidebar({
             <>
               {groups.map((group) => (
               <div className="sb-group" key={group.label + group.items[0].conversation_id}>
-                <div className="sb-group-label">{group.label}</div>
+                <div className="sb-group-label">
+                  {group.label === "" ? "📌 Disematkan" : group.label}
+                </div>
                 {group.items.map((conv) => (
                   <div
                     key={conv.conversation_id}
@@ -215,22 +322,63 @@ export default function Sidebar({
                       if (e.key === "Enter") onOpen(conv.conversation_id);
                     }}
                   >
-                    <span className="sb-item-title">{conv.title || "Chat baru"}</span>
+                    <span className="sb-item-main">
+                      <span className="sb-item-title">{conv.title || "Chat baru"}</span>
+                      {conv.snippet && <span className="sb-item-snippet">{conv.snippet}</span>}
+                    </span>
                     <button
-                      className="sb-item-del"
-                      aria-label="Hapus percakapan"
+                      className="sb-item-more"
+                      aria-label="Opsi percakapan"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDelete(conv.conversation_id);
+                        setItemMenuFor(itemMenuFor === conv.conversation_id ? null : conv.conversation_id);
                       }}
                     >
-                      <svg className="icon" aria-hidden="true"><use href="/icons.svg#trash" /></svg>
+                      <svg className="icon" aria-hidden="true"><use href="/icons.svg#more" /></svg>
                     </button>
+                    {itemMenuFor === conv.conversation_id && (
+                      <div className="sb-item-menu" ref={itemMenuRef} role="menu">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setItemMenuFor(null);
+                            onPin(conv.conversation_id, !conv.pinned);
+                          }}
+                        >
+                          {conv.pinned ? "Lepas dari sematan" : "📌 Sematkan"}
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setItemMenuFor(null);
+                            onArchive(conv.conversation_id, !conv.archived);
+                          }}
+                        >
+                          {conv.archived ? "Keluarkan dari arsip" : "🗂 Arsipkan"}
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="danger"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setItemMenuFor(null);
+                            onDelete(conv.conversation_id);
+                          }}
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
               ))}
-              {hasMore && onLoadMore && (
+              {hasMore && onLoadMore && !query && (
                 <button
                   type="button"
                   className="sb-loadmore"
@@ -247,6 +395,16 @@ export default function Sidebar({
         <footer className="sb-foot" ref={menuRef}>
           {menuOpen && (
             <div className="sb-menu" role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onOpenSaved();
+                }}
+              >
+                🔖 Simpanan
+              </button>
               <button
                 type="button"
                 role="menuitem"

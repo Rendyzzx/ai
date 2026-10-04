@@ -12,7 +12,7 @@ import { readJson, putJson, updateJson, expireJson } from "@/lib/server/store";
 import { DEFAULT_BOT } from "@/lib/server/bot-config";
 import { getSession } from "@/lib/server/auth";
 import { allowUser } from "@/lib/server/ratelimit";
-import { json, readBody, forbidden, originOk } from "@/lib/server/http";
+import { json, readBody, forbidden, originOk, tooMany } from "@/lib/server/http";
 import { matchMusicRequest, matchImageGenRequest, matchHdRequest, HD_TRIGGER_RE } from "@/lib/chat-utils";
 import { resolveMusicCard, MusicError } from "@/lib/server/music";
 import { submitHdJob, HdError } from "@/lib/server/hdvid";
@@ -579,11 +579,24 @@ async function touchIndex(uid: string, entry: ConversationItem): Promise<void> {
   await updateJson<ConversationItem[]>(`chats/${uid}/_index.json`, "conversation index", (current) => {
     const items = Array.isArray(current) ? current : [];
     const i = items.findIndex((c) => c.conversation_id === entry.conversation_id);
-    if (i >= 0) items[i] = entry;
+    // Merge, bukan replace — pin/archive harus selamat lewat update judul/waktu.
+    if (i >= 0) items[i] = { ...items[i], ...entry };
     else items.unshift(entry);
     return items;
   });
 }
+
+// ---------------- REGENERATE DENGAN OPSI ----------------
+// Variasi regenerate: arahan gaya DITEMBAHKAN ke instruction untuk
+// jawaban ulang itu saja (system prompt & personality tidak diubah).
+const REGEN_VARIANTS: Record<string, string> = {
+  shorter: "Untuk jawaban ulang ini: buat jauh LEBIH SINGKAT (maksimal 3-4 kalimat), langsung ke inti, tanpa basa-basi.",
+  detailed: "Untuk jawaban ulang ini: buat LEBIH DETAIL dan lengkap — uraikan poin-poinnya dengan runtut.",
+  casual: "Untuk jawaban ulang ini: pakai gaya LEBIH SANTAI dan receh, seperti ngobrol santai sama teman dekat.",
+  formal: "Untuk jawaban ulang ini: pakai bahasa yang LEBIH RAPI dan formal, tetap hangat tidak kaku.",
+  simpler: "Untuk jawaban ulang ini: jelaskan dengan cara LEBIH MUDAH DIPAHAMI — bahasa sehari-hari, pakai analogi sederhana, hindari istilah teknis.",
+  indonesian: "Untuk jawaban ulang ini: jawab sepenuhnya dalam BAHASA INDONESIA yang natural.",
+};
 
 // ---------------- HANDLER ----------------
 
@@ -803,11 +816,35 @@ export async function POST(req: Request) {
     return json({ ok: true });
   }
 
+  // ---------------- MODE FEEDBACK (👍/👎 pada jawaban Aomi) ----------------
+  if (body.action === "feedback") {
+    if (!file) return json({ error: "Percakapan tidak ditemukan" }, 404);
+    if (!flags.feedback) {
+      return json({ error: "Fitur feedback sedang dinonaktifkan sementara oleh admin." }, 503);
+    }
+    if (!allowUser("chatfeedback", uid, req, 30, 60_000)) {
+      return tooMany();
+    }
+    const mid = String(body.message_id || "");
+    const raw = Number(body.value);
+    const value = raw === 1 ? 1 : raw === -1 ? -1 : 0;
+    if (!/^[a-f0-9-]{8,36}$/.test(mid)) return json({ error: "ID tidak valid" }, 400);
+    const target = conv.messages.find((m) => m && m.message_id === mid && m.role === "assistant");
+    if (!target) return json({ error: "Pesan tidak ditemukan" }, 404);
+    // Toggle: kirim nilai yang sama dengan feedback yang tersimpan = hapus (0)
+    if (target.feedback === value || value === 0) delete target.feedback;
+    else target.feedback = value;
+    await putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, "message feedback");
+    return json({ ok: true, feedback: target.feedback ?? 0 });
+  }
+
   // ---------------- MODE REGENERATE / EDIT PESAN ----------------
   if (body.action === "regenerate" || body.action === "edit") {
     if (!file) return json({ error: "Percakapan tidak ditemukan" }, 404);
 
     const editing = body.action === "edit";
+    const variant = editing ? "" : String(body.variant || "");
+    const variantText = variant && REGEN_VARIANTS[variant] ? REGEN_VARIANTS[variant] : "";
 
     if (editing) {
       const mid = String(body.message_id || "");
@@ -862,7 +899,7 @@ export async function POST(req: Request) {
         imageBuffer: regImgBuffer,
         imageName: regImgBuffer ? regImgName : null,
       },
-      instruction
+      variantText ? instruction + "\n\n" + variantText : instruction
     );
     if (!regOut.reply) {
       return json({ error: "Koneksi sedang bermasalah. Coba lagi nanti ya." }, 502);

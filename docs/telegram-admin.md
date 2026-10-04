@@ -91,7 +91,8 @@ Status: 🟢 Website Online
 - **Database** — status, Redis info (latency/memory/keys),
   cleanup state bot (konfirmasi), export JSON (owner), statistik.
 - **AI & Tools** — feature flags (chat, music, image-edit, imggen,
-  hd, dl, video). Dicek **di server** di route API.
+  hd, dl, video, pin, bookmark, search, feedback). Dicek **di server**
+  di route API.
 - **Monitoring** — status jujur: hanya yang benar-benar diverifikasi
   (ping storage, probe AI nyata). Tidak ada status palsu.
 - **Tampilan & Limits (Configuration)** — nilai penting read-only (limits, version,
@@ -147,7 +148,7 @@ Telegram → POST /api/telegram/webhook
 `aomi:features/state.json` — satu record JSON terstruktur:
 
 ```json
-{ "values": { "chat": true, "music": true, "image-edit": true, "imggen": true, "hd": true, "dl": true, "video": true } }
+{ "values": { "chat": true, "music": true, "image-edit": true, "imggen": true, "hd": true, "dl": true, "video": true, "pin": true, "bookmark": true, "search": true, "feedback": true } }
 ```
 
 Dipaksa **di server**:
@@ -158,6 +159,10 @@ Dipaksa **di server**:
 - `hd` → branch HD foto/video/link + `/api/hd`
 - `dl` → `/api/dl`
 - `video` → upload video + AI vision
+- `pin` → action pin/arsip percakapan di `/api/conversations`
+- `bookmark` → Simpanan (bookmark jawaban) di `/api/conversations`
+- `search` → pencarian isi percakapan `?q=` di `/api/conversations`
+- `feedback` → aksi feedback 👍/👎 di `/api/chat`
 
 Menonaktifkan flag = menolak di server dengan pesan ramah — bukan
 cuma menyembunyikan tombol.

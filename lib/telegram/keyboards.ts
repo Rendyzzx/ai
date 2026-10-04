@@ -69,6 +69,8 @@ export function featureMenu(): TgInlineKeyboard {
     [["image-edit", "feat:image-edit"], ["imggen", "feat:imggen"]],
     [["hd", "feat:hd"], ["dl", "feat:dl"]],
     [["video", "feat:video"]],
+    [["pin", "feat:pin"], ["bookmark", "feat:bookmark"]],
+    [["search", "feat:search"], ["feedback", "feat:feedback"]],
     ...BACK_MAIN,
   ]);
 }

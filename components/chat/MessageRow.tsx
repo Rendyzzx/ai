@@ -47,13 +47,22 @@ async function copyText(text: string): Promise<boolean> {
 
 /* ---------------- Code block (dengan tombol Salin) ---------------- */
 
+/** Batas baris sebelum blok kode dianggap panjang → collapsed. */
+const CODE_COLLAPSE_LINES = 32;
+
 function CodeBlock({ lang, code }: { lang: string; code: string }) {
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const onCopy = async () => {
     const ok = await copyText(code);
     setCopied(ok);
     setTimeout(() => setCopied(false), 1600);
   };
+  // Kode panjang collapse secara default supaya chat tetap enak dibaca;
+  // konten tidak diubah — hanya tampilannya yang dipotong visual.
+  const lines = code.split("\n");
+  const long = lines.length > CODE_COLLAPSE_LINES;
+  const shown = long && !expanded ? lines.slice(0, CODE_COLLAPSE_LINES).join("\n") : code;
   return (
     <div className="code-block">
       <div className="code-head">
@@ -64,8 +73,21 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
         </button>
       </div>
       <pre>
-        <code>{code}</code>
+        <code>{shown}</code>
+        {long && !expanded && (
+          <span className="code-fade" aria-hidden="true" />
+        )}
       </pre>
+      {long && (
+        <button
+          type="button"
+          className="code-toggle"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? "Ciutkan" : `Tampilkan semua (${lines.length} baris)`}
+        </button>
+      )}
     </div>
   );
 }
