@@ -230,6 +230,8 @@ export default function MessageMenu({
         </div>
       )}
 
+      {/* Divider hanya untuk memisahkan aksi destruktif */}
+      <div className="msg-menu-divider" role="separator" />
       <button
         className="msg-menu-item danger"
         type="button"

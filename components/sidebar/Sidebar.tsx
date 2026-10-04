@@ -374,7 +374,7 @@ export default function Sidebar({
                             return;
                           }
                           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                          const W = 196, H = 178;
+                          const W = 200, H = 158;
                           const x = Math.max(8, Math.min(rect.right - W, window.innerWidth - W - 8));
                           const y =
                             rect.bottom + 6 + H > window.innerHeight
@@ -519,6 +519,8 @@ export default function Sidebar({
             <svg className="icon" aria-hidden="true"><use href="/icons.svg#archive" /></svg>
             <span>{itemMenuTarget.archived ? "Keluarkan dari arsip" : "Arsipkan"}</span>
           </button>
+          {/* Divider hanya untuk memisahkan aksi destruktif */}
+          <div className="sb-menu-divider" role="separator" />
           <button
             type="button"
             role="menuitem"

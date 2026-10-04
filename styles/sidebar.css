@@ -379,9 +379,9 @@
 }
 
 .sb-menu button .icon {
-  width: 14px;
-  height: 14px;
-  color: var(--muted);
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
 }
 
 .sb-menu button:hover {
@@ -622,15 +622,18 @@
 .sb-item-menu {
   position: fixed;
   z-index: 60;
-  width: 186px;
-  padding: 5px;
+  /* Ukuran mengikuti isi — bukan panel besar */
+  width: max-content;
+  min-width: 178px;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--overlay-shadow);
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
   animation: sb-item-menu-in 0.12s ease-out;
 }
 
@@ -642,23 +645,33 @@
 .sb-item-menu button {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   padding: 7px 10px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1;
   text-align: left;
   color: var(--text);
   border-radius: var(--radius);
   transition: background 0.12s;
 }
 
+/* Icon sama ukuran, rata kiri, warna seragam → label mulai di X sama */
 .sb-item-menu button .icon {
-  width: 14px;
-  height: 14px;
-  color: var(--muted);
+  width: 17px;
+  height: 17px;
+  color: var(--text-muted);
 }
 
 .sb-item-menu button:hover .icon {
   color: var(--text);
+}
+
+/* Divider hairline — hanya pemisah aksi destruktif */
+.sb-menu-divider {
+  height: 1px;
+  margin: 3px 8px;
+  background: var(--border);
+  flex: none;
 }
 
 .sb-item-menu button:hover {
@@ -666,6 +679,10 @@
 }
 
 .sb-item-menu button.danger {
+  color: var(--danger);
+}
+
+.sb-item-menu button.danger .icon {
   color: var(--danger);
 }
 
