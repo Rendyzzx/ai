@@ -1526,6 +1526,17 @@ export default function SettingsView({
               </button>
               <p className="card-desc">Sesi &quot;Ingat saya&quot; bertahan 30 hari; tanpa itu, 12 jam.</p>
             </div>
+            <p className="app-credit">
+              Aomi dikembangkan oleh{" "}
+              <a
+                href="https://whatsapp.com/channel/0029Vb8AgskLY6dCvnTjxU3c"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Akira
+              </a>
+              .
+            </p>
           </section>
         </main>
       </div>

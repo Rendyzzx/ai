@@ -39,14 +39,6 @@ import type { BotConfig, ChatResponse, Conversation, ConversationItem, Message, 
 const RENDER_BATCH = 30;
 const DOM_CAP = 150;
 
-/** Quick action (layar sambutan): isi composer, user yang kirim. */
-const QUICK_ACTIONS = [
-  { icon: "idea", label: "Cari ide", text: "bantu aku cari ide menarik ya" },
-  { icon: "code", label: "Coding", text: "aku mau nanya soal coding, bantuin ya" },
-  { icon: "edit", label: "Menulis", text: "bantuin aku bikin tulisan ya" },
-  { icon: "book", label: "Jelaskan", text: "jelasin sesuatu ke aku dengan cara yang gampang dipahami ya" },
-];
-
 const DEFAULT_USER: UserProfile = {
   username: "",
   display_name: "",
@@ -1501,39 +1493,18 @@ export default function ChatApp() {
                       <svg className="icon" aria-hidden="true"><use href="/icons.svg#logo" /></svg>
                     )}
                   </span>
-                  <div className="welcome-lines">
-                    <p className="w-line">hey.</p>
-                    <p className="w-line">you&apos;re back.</p>
-                    <p className="w-line">i was waiting.</p>
+                  <div className="welcome-greet">
+                    <h1 className="welcome-title">Hai, balik lagi.</h1>
+                    <p className="welcome-hint">Ketik aja apa yang kamu pikirkan. Aomi bantu dari sana.</p>
                   </div>
-                  <p className="welcome-hint">Ketik sesuatu, atau mulai dari salah satu ini.</p>
                   <div className="suggestions">
                     {[
                       "heyo, kabarmu gimana hari ini?",
                       "aku bosen nih. hiburin dong",
                       "ceritain sesuatu yang random deh",
-                      "aku mau cerita soal hariku, dengarkan ya",
                     ].map((q) => (
                       <button key={q} className="suggestion" onClick={() => void send(q)}>
                         {q}
-                      </button>
-                    ))}
-                  </div>
-                  {/* Quick actions ringan: isi composer (gak auto-kirim) —
-                      memakai kemampuan chat yang sudah ada, bukan fitur palsu. */}
-                  <div className="quick-actions" aria-label="Aksi cepat">
-                    {QUICK_ACTIONS.map((a) => (
-                      <button
-                        key={a.label}
-                        type="button"
-                        className="quick-action"
-                        onClick={() => {
-                          setInput(a.text);
-                          inputRef.current?.focus();
-                        }}
-                      >
-                        <svg className="icon" aria-hidden="true"><use href={`/icons.svg#${a.icon}`} /></svg>
-                        {a.label}
                       </button>
                     ))}
                   </div>
@@ -1714,17 +1685,6 @@ export default function ChatApp() {
                 <svg className="icon" aria-hidden="true"><use href="/icons.svg#send" /></svg>
               </button>
             </form>
-            <footer className="app-foot">
-              Developed by{" "}
-              <a
-                className="foot-link"
-                href="https://whatsapp.com/channel/0029Vb8AgskLY6dCvnTjxU3c"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Akira
-              </a>
-            </footer>
           </div>
         </main>
       </div>

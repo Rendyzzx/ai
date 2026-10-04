@@ -103,14 +103,15 @@
   gap: var(--msg-gap, 16px);     /* Settings > Tampilan > Kerapatan */
 }
 
-/* Layar sambutan: preview percakapan personal — avatar karakter +
-   beberapa baris sapaan pendek yang muncul berurutan (bukan
-   judul besar / slogan AI). Murni opacity+transform, murah. */
+/* Layar sambutan: "ruang kosong yang siap dipakai ngobrol" — avatar
+   kecil, satu heading, satu baris penjelas, beberapa contoh pesan
+   sebagai teks tipis. Tidak ada card besar, tidak ada CTA, tidak
+   ada grid fitur. Murni opacity+transform, murah. */
 .welcome {
   margin: auto;                   /* vertikal tengah di area flex */
   text-align: center;
-  padding: 40px 16px;
-  max-width: 560px;
+  padding: 32px 16px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -119,34 +120,40 @@
 .welcome-avatar {
   width: 64px;
   height: 64px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 
 .welcome-avatar svg {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
 }
 
-.welcome-lines {
+@media (min-width: 640px) {
+  .welcome-avatar {
+    width: 72px;
+    height: 72px;
+  }
+  .welcome-avatar svg {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+.welcome-greet {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
+  /* Satu fade masuk untuk judul+penjelas sebagai satu kelompok:
+     motion punya tujuan, 220ms, selesai seketika. */
+  animation: w-line-in 0.22s ease-out both;
 }
 
-/* Serif italic ("latin") hanya untuk sapaan hero — personal & khas,
-   kontras sengaja dengan UI sans di sekitarnya (tombol/komposer tetap
-   sans, lihat .suggestion). Sistem font, tanpa webfont baru. */
-.w-line {
+.welcome-title {
   font-weight: 600;
-  font-size: clamp(21px, 3vw, 26px);
+  font-size: clamp(18px, 2.2vw, 20px);
   letter-spacing: -0.01em;
   line-height: 1.35;
-}
-
-/* Satu fade masuk untuk KELOMPOK sapaan (bukan per baris satu-per-satu):
-   motion punya tujuan, 250ms, selesai seketika. */
-.welcome-lines {
-  animation: w-line-in 0.25s ease-out both;
+  margin: 0;
 }
 
 @keyframes w-line-in {
@@ -155,33 +162,30 @@
 }
 
 .welcome-hint {
-  margin-top: 22px;
+  margin: 0;
   font-size: 13.5px;
   color: var(--text-muted);
 }
 
-/* Saran pembuka: daftar baris dengan hairline antar item —
-   satu kelompok yang nyambung ke komposer, bukan kartu-kartu
-   lepas yang melayang. */
+/* Contoh pesan pembuka: baris teks tipis dengan hairline antar
+   item — bukan card. Tanpa border/background luar; hanya separator
+   antar baris, menyatu dengan empty state di sekitarnya. */
 .suggestions {
   display: flex;
   flex-direction: column;
-  margin-top: 24px;
+  margin-top: 26px;
   width: 100%;
-  max-width: 420px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  overflow: hidden;
+  max-width: 360px;
   text-align: left;
 }
 
 .suggestion {
-  padding: 11px 16px;
+  padding: 12px 6px;
   font-size: 13.5px;
   color: var(--text-muted);
   text-align: left;
   border-bottom: 1px solid var(--border-soft);
+  border-radius: var(--radius-s);
   transition: background 0.14s, color 0.14s;
 }
 
@@ -199,7 +203,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .w-line, .welcome-hint { animation: none; opacity: 1; }
+  .welcome-greet { animation: none; opacity: 1; }
 }
 
 /* ---------------- Pesan (renderer .message-row) ---------------- */
@@ -729,9 +733,10 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+/* Fokus komposer: border accent tipis saja — bukan ring ganda yang
+   terasa seperti CTA besar. Gold murni muncul saat interaksi. */
 .composer:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
 }
 
 /* Tombol + (lampirkan gambar) — kiri bawah komposer */
@@ -947,26 +952,6 @@
   transition: background 0.15s;
 }
 .boot-retry:hover { background: var(--accent-hover); }
-
-/* ---------------- Footer watermark ---------------- */
-/* Kecil, tenang, tidak seperti iklan; "Akira" bisa diklik.
-   Bagian dari composer-wrap → di mobile tetap di atas keyboard,
-   tidak mengganggu area chat. */
-.app-foot {
-  max-width: 1000px;
-  margin: 8px auto 0;
-  text-align: center;
-  font-size: 10.5px;
-  color: var(--text-muted);
-  opacity: 0.6;
-  transition: opacity 0.15s;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.app-foot:hover {
-  opacity: 1;
-}
 
 .foot-link {
   color: var(--text-muted);
@@ -1293,61 +1278,6 @@
   .jump-latest, .jump-row { animation: none; }
 }
 
-/* ---------------- Quick actions (layar sambutan) ---------------- */
-/* Baris kecil di bawah suggestion — isi composer, gak auto-kirim. */
-
-/* Grid — bukan flex acak: desktop satu baris (4 kolom proporsional),
-   mobile 2 kolom. Lebar mengikuti .suggestions → satu vertical rhythm. */
-.quick-actions {
-  margin-top: 12px;
-  width: 100%;
-  max-width: 420px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 2px;
-}
-
-.quick-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 8px 4px;
-  font-size: 13px;
-  line-height: 1;
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-s);
-  transition: color 0.16s, background 0.16s;
-}
-
-.quick-action .icon {
-  width: 15px;
-  height: 15px;
-}
-
-.quick-action:hover {
-  color: var(--text);
-  background: var(--surface-2);
-}
-
-.quick-action:active {
-  color: var(--accent);
-  background: transparent;
-}
-
-/* Mobile: 2×2 simetris — tidak ada item yang sendirian */
-@media (max-width: 560px) {
-  .quick-actions {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 2px 10px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .quick-action { transition: none; }
-}
 
 /* ---------------- Blok kode: toggle collapse ---------------- */
 
