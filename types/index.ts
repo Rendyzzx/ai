@@ -123,7 +123,6 @@ export interface UserProfile {
   providers?: {
     google: boolean;
     discord: boolean;
-    facebook: boolean;
     telegram: boolean;
   };
 }

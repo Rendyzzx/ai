@@ -249,7 +249,6 @@ export default function ChatApp() {
         providers: me.user?.providers || {
           google: Boolean(me.user?.google_linked),
           discord: false,
-          facebook: false,
           telegram: false,
         },
       });
@@ -313,7 +312,6 @@ export default function ChatApp() {
     const names: Record<string, string> = {
       google: "Google",
       discord: "Discord",
-      facebook: "Facebook",
       telegram: "Telegram",
     };
     const name = names[provider] || "Provider";

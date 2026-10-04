@@ -1,6 +1,6 @@
 /* ============================================================
    Aomi — lib/server/oauth.ts
-   Helper bersama untuk provider OAuth (Google/Discord/Facebook)
+   Helper bersama untuk provider OAuth (Google/Discord)
    + account linking yang aman. Telegram punya modul sendiri
    (lib/server/telegram-auth.ts) karena flow-nya OTP, bukan OAuth.
 
@@ -18,14 +18,13 @@
 import crypto from "node:crypto";
 import { readJson, updateJson, putJson } from "./store";
 
-export type ProviderId = "google" | "discord" | "facebook" | "telegram";
+export type ProviderId = "google" | "discord" | "telegram";
 
 export interface UserIndex {
   emails?: Record<string, string>;
   usernames?: Record<string, string>;
   google_ids?: Record<string, string>;
   discord_ids?: Record<string, string>;
-  facebook_ids?: Record<string, string>;
   telegram_ids?: Record<string, string>;
 }
 
@@ -36,7 +35,6 @@ export interface UserRecord {
   password_hash?: string;
   google_id?: string;
   discord_id?: string;
-  facebook_id?: string;
   telegram_id?: number;
   avatar_url?: string;
   provider?: string;
@@ -48,7 +46,6 @@ export function enabledProviders(): Record<ProviderId, boolean> {
   return {
     google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
     discord: Boolean(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET),
-    facebook: Boolean(process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET),
     telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_WEBHOOK_SECRET),
   };
 }
@@ -160,7 +157,6 @@ function providerIndexKey(provider: ProviderId): keyof UserIndex {
   switch (provider) {
     case "google": return "google_ids";
     case "discord": return "discord_ids";
-    case "facebook": return "facebook_ids";
     case "telegram": return "telegram_ids";
   }
 }
@@ -202,7 +198,6 @@ export async function linkProviderToUser(
       const next: UserRecord = { ...current };
       if (provider === "google") next.google_id = String(providerUserId);
       if (provider === "discord") next.discord_id = String(providerUserId);
-      if (provider === "facebook") next.facebook_id = String(providerUserId);
       if (provider === "telegram") next.telegram_id = Number(providerUserId);
       if (extra?.avatar_url && !current.avatar_url) next.avatar_url = extra.avatar_url;
       return next;
@@ -239,7 +234,6 @@ export async function createProviderUser(
   };
   if (provider === "google") user.google_id = String(providerUserId);
   if (provider === "discord") user.discord_id = String(providerUserId);
-  if (provider === "facebook") user.facebook_id = String(providerUserId);
   if (provider === "telegram") user.telegram_id = Number(providerUserId);
 
   await putJson(`users/${userId}.json`, user, `${provider} user create`);

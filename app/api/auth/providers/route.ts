@@ -1,6 +1,6 @@
 // ============================================================
 // POST /api/auth/providers — kelola provider yang terhubung.
-// Body: { provider: "google"|"discord"|"facebook"|"telegram",
+// Body: { provider: "google"|"discord"|"telegram",
 //         action: "disconnect" }
 // Aturan: user tidak boleh melepas SATU-SATUNYA metode login —
 // harus punya password atau minimal satu provider lain.
@@ -13,18 +13,16 @@ import type { UserIndex, UserRecord, ProviderId } from "@/lib/server/oauth";
 
 export const dynamic = "force-dynamic";
 
-const VALID: ProviderId[] = ["google", "discord", "facebook", "telegram"];
+const VALID: ProviderId[] = ["google", "discord", "telegram"];
 
-const FIELD: Record<ProviderId, "google_id" | "discord_id" | "facebook_id" | "telegram_id"> = {
+const FIELD: Record<ProviderId, "google_id" | "discord_id" | "telegram_id"> = {
   google: "google_id",
   discord: "discord_id",
-  facebook: "facebook_id",
   telegram: "telegram_id",
 };
 const IDX: Record<ProviderId, keyof UserIndex> = {
   google: "google_ids",
   discord: "discord_ids",
-  facebook: "facebook_ids",
   telegram: "telegram_ids",
 };
 

@@ -18,7 +18,6 @@ export async function GET(req: Request) {
     password_hash?: string;
     google_id?: string;
     discord_id?: string;
-    facebook_id?: string;
     telegram_id?: number;
   }>(`users/${session.user_id}.json`);
   if (!userFile) return json({ error: "User tidak ditemukan", code: "SESSION_INVALID" }, 401);
@@ -34,7 +33,6 @@ export async function GET(req: Request) {
       providers: {
         google: Boolean(u.google_id),
         discord: Boolean(u.discord_id),
-        facebook: Boolean(u.facebook_id),
         telegram: Boolean(u.telegram_id),
       },
     },
