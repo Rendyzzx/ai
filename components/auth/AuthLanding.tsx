@@ -21,6 +21,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import BrandSplash from "@/components/brand/BrandSplash";
 import { getSessionId, setSessionId, clearSessionId } from "@/lib/session";
+import TelegramAuth from "./TelegramAuth";
 import langStats from "@/lib/generated/lang-stats.json";
 
 interface CapData {
@@ -79,7 +80,7 @@ function StepDots({ step, total }: { step: number; total: number }) {
    section [data-reveal] tidak pernah flash terlihat lalu menghilang. */
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-const GOOGLE_ERRORS: Record<string, string> = {
+const OAUTH_ERRORS: Record<string, string> = {
   google_cancelled: "Login Google dibatalkan.",
   google_error: "Gagal masuk dengan Google. Coba lagi.",
   google_invalid_callback: "Callback Google tidak valid. Coba lagi.",
@@ -89,6 +90,22 @@ const GOOGLE_ERRORS: Record<string, string> = {
   google_email_not_verified: "Email Google belum terverifikasi.",
   google_user_not_found: "Akun tidak ditemukan. Coba lagi.",
   google_session_failed: "Session gagal dibuat. Coba lagi sebentar.",
+  discord_cancelled: "Login Discord dibatalkan.",
+  discord_error: "Login dengan Discord belum berhasil. Coba lagi.",
+  discord_invalid_callback: "Callback Discord tidak valid. Coba lagi.",
+  discord_state_mismatch: "Verifikasi keamanan Discord gagal. Coba lagi.",
+  discord_token_failed: "Login dengan Discord belum berhasil. Coba lagi.",
+  discord_userinfo_failed: "Login dengan Discord belum berhasil. Coba lagi.",
+  discord_email_taken:
+    "Email Discord kamu sudah terdaftar di Aomi. Masuk dengan email dan password, lalu hubungkan Discord dari Pengaturan.",
+  discord_session_failed: "Session gagal dibuat. Coba lagi sebentar.",
+  facebook_cancelled: "Login Facebook dibatalkan.",
+  facebook_error: "Login dengan Facebook belum berhasil. Coba lagi.",
+  facebook_invalid_callback: "Callback Facebook tidak valid. Coba lagi.",
+  facebook_state_mismatch: "Verifikasi keamanan Facebook gagal. Coba lagi.",
+  facebook_token_failed: "Login dengan Facebook belum berhasil. Coba lagi.",
+  facebook_userinfo_failed: "Login dengan Facebook belum berhasil. Coba lagi.",
+  facebook_session_failed: "Session gagal dibuat. Coba lagi sebentar.",
 };
 
 export default function AuthLanding({
@@ -102,6 +119,21 @@ export default function AuthLanding({
   const [capRegister, setCapRegister] = useState<CapData | null>(null);
   const [err, setErr] = useState<{ login: string | null; register: string | null }>({ login: null, register: null });
   const [googleError, setGoogleError] = useState<string | null>(null);
+  // Provider login yang aktif (dari /api/auth/config — yang belum
+  // dikonfigurasi di server tidak ditampilkan sama sekali).
+  const [providers, setProviders] = useState<{
+    google: boolean;
+    discord: boolean;
+    facebook: boolean;
+    telegram: boolean;
+  }>({ google: false, discord: false, facebook: false, telegram: false });
+  const [botUsername, setBotUsername] = useState<string | null>(null);
+  // Panel Telegram (?tg=<attemptId> dari tombol "Buka Aomi" di bot,
+  // atau dibuka manual dari tombol provider).
+  const [tgPanel, setTgPanel] = useState<{ open: boolean; attemptId: string | null }>({
+    open: false,
+    attemptId: null,
+  });
   const [btnLogin, setBtnLogin] = useState("Masuk");
   const [btnRegister, setBtnRegister] = useState("Buat akun");
   const [busy, setBusy] = useState(false);
@@ -140,11 +172,37 @@ export default function AuthLanding({
 
   // ---------------- Google OAuth callback: sid atau error dari query param ----------------
 
+  // Provider aktif di-load sekali saat halaman auth dibuka.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/config");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          providers?: Record<string, boolean>;
+          telegram_bot?: string | null;
+        };
+        if (data.providers) {
+          setProviders({
+            google: Boolean(data.providers.google),
+            discord: Boolean(data.providers.discord),
+            facebook: Boolean(data.providers.facebook),
+            telegram: Boolean(data.providers.telegram),
+          });
+        }
+        if (data.telegram_bot) setBotUsername(data.telegram_bot);
+      } catch {
+        /* config gagal → hanya email/password yang tampil (fallback aman) */
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     (async () => {
       const params = new URLSearchParams(window.location.search);
       const sidParam = params.get("sid");
       const errorParam = params.get("error");
+      const tgParam = params.get("tg");
 
       // Google OAuth sukses → simpan session, redirect ke app
       if (sidParam && /^[a-f0-9]{64}$/.test(sidParam)) {
@@ -157,8 +215,14 @@ export default function AuthLanding({
       }
 
       // Google OAuth error → tampilkan pesan
-      if (errorParam && GOOGLE_ERRORS[errorParam]) {
-        setGoogleError(GOOGLE_ERRORS[errorParam]);
+      if (errorParam && OAUTH_ERRORS[errorParam]) {
+        setGoogleError(OAUTH_ERRORS[errorParam]);
+        window.history.replaceState(null, "", "/auth");
+      }
+
+      // Tombol "Buka Aomi" dari bot Telegram → buka panel OTP dengan attempt itu
+      if (tgParam && /^[A-Za-z0-9_-]{10,64}$/.test(tgParam)) {
+        setTgPanel({ open: true, attemptId: tgParam });
         window.history.replaceState(null, "", "/auth");
       }
 
@@ -546,7 +610,6 @@ export default function AuthLanding({
       : regNav.step === 3
       ? { title: "Pilih nama kamu.", sub: "" }
       : { title: "Verifikasi akun.", sub: "" };
-  const showGoogle = (panel === "login" ? loginNav.step : regNav.step) === 1;
 
   return (
     <>
@@ -1050,24 +1113,6 @@ export default function AuthLanding({
                 </button>
               </div>
 
-              {/* ===== GOOGLE OAUTH — alternatif, hanya di langkah pertama ===== */}
-              <a
-                className="google-btn"
-                href="/api/auth/google"
-                hidden={!showGoogle}
-                aria-label={panel === "login" ? "Lanjutkan dengan Google" : "Daftar dengan Google"}
-              >
-                <svg className="google-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
-                </svg>
-                {panel === "login" ? "Lanjutkan dengan Google" : "Daftar dengan Google"}
-              </a>
-              <p className="google-error" hidden={!googleError}>{googleError}</p>
-              <div className="auth-divider" role="separator" aria-label="atau" hidden={!showGoogle}>atau</div>
-
               {/* ===== LOGIN — step 1: email/username, step 2: password ===== */}
               <form
                 className="auth-form"
@@ -1381,6 +1426,97 @@ export default function AuthLanding({
                   <p className="auth-error" id="errRegister" hidden={!err.register}>{err.register}</p>
                 </div>
               </form>
+
+              {/* ===== PROVIDER LAIN — alternatif, hanya di langkah pertama =====
+                  Bukan CTA utama: compact, di bawah form, hanya yang aktif
+                  di server (via /api/auth/config). */}
+              {(() => {
+                const showStep1 = (panel === "login" ? loginNav.step : regNav.step) === 1;
+                const anyProvider =
+                  providers.google || providers.discord || providers.facebook || providers.telegram;
+                if (!showStep1 || tgPanel.open) return null;
+                return (
+                  <div className="provider-alt">
+                    {googleError && <p className="provider-error" role="alert">{googleError}</p>}
+                    {anyProvider && (
+                      <>
+                        <div className="auth-divider" role="separator" aria-label="atau">atau</div>
+                        <p className="provider-alt-label">Lanjut dengan akun lain</p>
+                        <div className="provider-row" role="group" aria-label="Metode login lain">
+                          {providers.google && (
+                            <a
+                              className="provider-btn"
+                              href="/api/auth/google"
+                              aria-label={panel === "login" ? "Lanjutkan dengan Google" : "Daftar dengan Google"}
+                            >
+                              <svg className="provider-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
+                              </svg>
+                              <span className="provider-name">Google</span>
+                            </a>
+                          )}
+                          {providers.discord && (
+                            <a
+                              className="provider-btn"
+                              href="/api/auth/discord"
+                              aria-label={panel === "login" ? "Lanjutkan dengan Discord" : "Daftar dengan Discord"}
+                            >
+                              <svg className="provider-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="#5865F2" d="M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418Zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418Z"/>
+                              </svg>
+                              <span className="provider-name">Discord</span>
+                            </a>
+                          )}
+                          {providers.facebook && (
+                            <a
+                              className="provider-btn"
+                              href="/api/auth/facebook"
+                              aria-label={panel === "login" ? "Lanjutkan dengan Facebook" : "Daftar dengan Facebook"}
+                            >
+                              <svg className="provider-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073Z"/>
+                              </svg>
+                              <span className="provider-name">Facebook</span>
+                            </a>
+                          )}
+                          {providers.telegram && (
+                            <button
+                              className="provider-btn"
+                              type="button"
+                              onClick={() => setTgPanel({ open: true, attemptId: null })}
+                              aria-label="Lanjut dengan Telegram"
+                            >
+                              <svg className="provider-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="#26A5E4" d="M23.91 3.79 20.69 20.6c-.25 1.21-.98 1.5-2 .94l-5.5-4.07-2.66 2.57c-.3.3-.55.56-1.1.56-.72 0-.6-.27-.84-.95L6.3 13.7l-5.45-1.7c-1.18-.35-1.19-1.16.26-1.71l21.26-8.2c.97-.43 1.9.24 1.53 1.7Z"/>
+                              </svg>
+                              <span className="provider-name">Telegram</span>
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* ===== Panel OTP Telegram (login) ===== */}
+              {tgPanel.open && providers.telegram && (
+                <TelegramAuth
+                  mode="login"
+                  initialAttemptId={tgPanel.attemptId}
+                  botUsername={botUsername}
+                  onLoginSuccess={(sid) => {
+                    setSessionId(sid);
+                    redirectingRef.current = true;
+                    window.location.replace("/");
+                  }}
+                  onLinked={() => setTgPanel({ open: false, attemptId: null })}
+                  onCancel={() => setTgPanel({ open: false, attemptId: null })}
+                />
+              )}
 
               <p className="auth-note">
                 Sesi tersimpan aman di perangkatmu. Riwayat percakapan tersimpan di akunmu.

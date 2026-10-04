@@ -9,6 +9,12 @@ import crypto from "node:crypto";
 import { readJson, putJson, updateJson } from "@/lib/server/store";
 import { createSession } from "@/lib/server/auth";
 import { json, methodNotAllowed } from "@/lib/server/http";
+import {
+  getCookie,
+  verifyLinkValue,
+  redirectToAuth,
+  redirectToSettings,
+} from "@/lib/server/oauth";
 
 export const dynamic = "force-dynamic";
 
@@ -39,38 +45,11 @@ interface UserIndex {
   google_ids?: Record<string, string>;
 }
 
-/** Baca cookie dari header Cookie. */
-function getCookie(headers: Headers, name: string): string | null {
-  const raw = headers.get("cookie") || "";
-  for (const pair of raw.split(";")) {
-    const [k, ...v] = pair.trim().split("=");
-    if (k === name) return decodeURIComponent(v.join("="));
-  }
-  return null;
-}
-
 function getRedirectUri(req: Request): string {
   if (process.env.GOOGLE_REDIRECT_URI) return process.env.GOOGLE_REDIRECT_URI;
   const proto = req.headers.get("x-forwarded-proto") || "https";
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
   return `${proto}://${host}/api/auth/google/callback`;
-}
-
-function redirectToAuth(params: Record<string, string>): Response {
-  const qs = new URLSearchParams(params).toString();
-  const res = new Response(null, {
-    status: 302,
-    headers: {
-      Location: `/auth?${qs}`,
-      // Hapus cookie OAuth setelah dipakai
-      "Set-Cookie": [
-        "oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
-        "oauth_verifier=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
-      ].join(", "),
-      "Cache-Control": "no-store",
-    },
-  });
-  return res;
 }
 
 /** Tukar authorization code → access token + id_token. */
@@ -139,6 +118,8 @@ async function generateUsername(
   return candidate;
 }
 
+const CLEAR = ["oauth_state", "oauth_verifier", "oauth_link"];
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
@@ -147,14 +128,14 @@ export async function GET(req: Request) {
 
   // User membatalkan login Google
   if (errorParam === "access_denied") {
-    return redirectToAuth({ error: "google_cancelled" });
+    return redirectToAuth({ error: "google_cancelled" }, ["oauth_state", "oauth_verifier", "oauth_link"]);
   }
   if (errorParam) {
-    return redirectToAuth({ error: "google_error" });
+    return redirectToAuth({ error: "google_error" }, ["oauth_state", "oauth_verifier", "oauth_link"]);
   }
 
   if (!code || !state) {
-    return redirectToAuth({ error: "google_invalid_callback" });
+    return redirectToAuth({ error: "google_invalid_callback" }, ["oauth_state", "oauth_verifier", "oauth_link"]);
   }
 
   // Verifikasi state (CSRF protection)
@@ -162,32 +143,62 @@ export async function GET(req: Request) {
   const codeVerifier = getCookie(req.headers, "oauth_verifier");
 
   if (!cookieState || cookieState !== state) {
-    return redirectToAuth({ error: "google_state_mismatch" });
+    return redirectToAuth({ error: "google_state_mismatch" }, ["oauth_state", "oauth_verifier", "oauth_link"]);
   }
   if (!codeVerifier) {
-    return redirectToAuth({ error: "google_state_mismatch" });
+    return redirectToAuth({ error: "google_state_mismatch" }, ["oauth_state", "oauth_verifier", "oauth_link"]);
   }
 
   // Tukar code → token
   const redirectUri = getRedirectUri(req);
   const tokens = await exchangeCode(code, codeVerifier, redirectUri);
   if (!tokens) {
-    return redirectToAuth({ error: "google_token_failed" });
+    return redirectToAuth({ error: "google_token_failed" }, ["oauth_state", "oauth_verifier", "oauth_link"]);
   }
 
   // Ambil userinfo
   const userInfo = await getUserinfo(tokens.access_token);
   if (!userInfo || !userInfo.email) {
-    return redirectToAuth({ error: "google_userinfo_failed" });
+    return redirectToAuth({ error: "google_userinfo_failed" }, ["oauth_state", "oauth_verifier", "oauth_link"]);
   }
 
   // Google harus mengkonfirmasi email terverifikasi
   if (userInfo.email_verified === false) {
-    return redirectToAuth({ error: "google_email_not_verified" });
+    return redirectToAuth({ error: "google_email_not_verified" }, ["oauth_state", "oauth_verifier", "oauth_link"]);
   }
 
   const googleId = userInfo.sub;
   const email = userInfo.email.toLowerCase();
+
+  // ---- Link mode (Pengaturan): tautkan ke akun yang sedang login ----
+  const linkCookie = getCookie(req.headers, "oauth_link");
+  if (linkCookie) {
+    const linkUserId = verifyLinkValue(linkCookie);
+    if (!linkUserId) {
+      return redirectToAuth({ error: "google_state_mismatch" }, CLEAR);
+    }
+    const indexFile0 = await readJson<UserIndex>("users/_index.json");
+    const owner = indexFile0?.data?.google_ids?.[googleId];
+    if (owner && owner !== linkUserId) {
+      return redirectToSettings("google_taken", CLEAR);
+    }
+    const ok = await updateJson<UserRecord>(
+      `users/${linkUserId}.json`,
+      "google link",
+      (current) => {
+        if (!current) return undefined;
+        return { ...current, google_id: googleId };
+      }
+    );
+    if (!ok) return redirectToSettings("google_failed", CLEAR);
+    await updateJson<UserIndex>("users/_index.json", "google link index", (current) => {
+      const data = current || {};
+      data.google_ids = data.google_ids || {};
+      data.google_ids[googleId] = linkUserId;
+      return data;
+    });
+    return redirectToSettings("google", CLEAR);
+  }
 
   // Cari user berdasarkan google_id di index
   const indexFile = await readJson<UserIndex>("users/_index.json");

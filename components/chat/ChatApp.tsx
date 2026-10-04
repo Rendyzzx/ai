@@ -123,6 +123,8 @@ export default function ChatApp() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsCat, setSettingsCat] = useState("profile");
+  // Notifikasi hasil hubungkan provider (redirect balik dari OAuth callback)
+  const [linkedNotice, setLinkedNotice] = useState<string | null>(null);
   const [savedOpen, setSavedOpen] = useState(false);
 
   const loadingRef = useRef(false);
@@ -242,6 +244,12 @@ export default function ChatApp() {
         ...profile,
         email: me.user?.email || "",
         google_linked: Boolean(me.user?.google_linked),
+        providers: me.user?.providers || {
+          google: Boolean(me.user?.google_linked),
+          discord: false,
+          facebook: false,
+          telegram: false,
+        },
       });
       setBot({ ...DEFAULT_BOT_STATE, ...botCfg.bot });
 
@@ -290,6 +298,32 @@ export default function ChatApp() {
     if (window.visualViewport) window.visualViewport.addEventListener("resize", syncViewport);
     syncViewport();
     return () => window.visualViewport?.removeEventListener("resize", syncViewport);
+  }, []);
+
+  // Redirect balik dari OAuth link (?linked=<provider> / ?linked=<provider>_taken
+  // / ?linked=<provider>_failed) → buka Pengaturan > Akun dengan notice.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const linked = params.get("linked");
+    if (!linked) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    const [provider, outcome] = linked.split("_");
+    const names: Record<string, string> = {
+      google: "Google",
+      discord: "Discord",
+      facebook: "Facebook",
+      telegram: "Telegram",
+    };
+    const name = names[provider] || "Provider";
+    setLinkedNotice(
+      outcome === "taken"
+        ? `${name} sudah terhubung ke akun lain.`
+        : outcome === "failed"
+          ? `Gagal menghubungkan ${name}. Coba lagi.`
+          : `${name} berhasil dihubungkan.`
+    );
+    setSettingsCat("account");
+    setSettingsOpen(true);
   }, []);
 
   // Validasi sesi ringan saat tab kembali aktif (1x/menit)
@@ -1708,6 +1742,7 @@ export default function ChatApp() {
       {settingsOpen && (
         <SettingsView
           initialCategory={settingsCat}
+          linkedNotice={linkedNotice}
           user={user}
           bot={bot}
           onClose={() => setSettingsOpen(false)}

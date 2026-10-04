@@ -119,6 +119,13 @@ export interface UserProfile {
   email?: string;
   /** true jika akun ditautkan ke Google OAuth (lihat /api/auth/me). */
   google_linked?: boolean;
+  /** Provider login yang terhubung ke akun (lihat /api/auth/me). */
+  providers?: {
+    google: boolean;
+    discord: boolean;
+    facebook: boolean;
+    telegram: boolean;
+  };
 }
 
 /** Konfigurasi karakter companion. */

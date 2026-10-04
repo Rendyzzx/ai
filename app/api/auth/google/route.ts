@@ -7,6 +7,8 @@
 
 import crypto from "node:crypto";
 import { json, methodNotAllowed } from "@/lib/server/http";
+import { getSession } from "@/lib/server/auth";
+import { signLinkValue } from "@/lib/server/oauth";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +36,8 @@ export async function GET(req: Request) {
     return json({ error: "Google OAuth belum dikonfigurasi." }, 500);
   }
 
+  const url = new URL(req.url);
+  const wantLink = url.searchParams.get("link") === "1";
   const redirectUri = getRedirectUri(req);
   const state = base64url(crypto.randomBytes(32));
   const codeVerifier = base64url(crypto.randomBytes(32));
@@ -55,19 +59,36 @@ export async function GET(req: Request) {
 
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 
-  const res = new Response(null, {
+  const cookies = [
+    `oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
+    `oauth_verifier=${codeVerifier}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
+  ];
+
+  // Link mode (Pengaturan): cookie signed berisi user id dari session valid.
+  if (wantLink) {
+    const session = await getSession(req.headers);
+    if (!session) {
+      return json({ error: "Sesi berakhir. Silakan login kembali.", code: "SESSION_INVALID" }, 401);
+    }
+    cookies.push(`oauth_link=${signLinkValue(session.user_id)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
+  }
+
+  // Mode JSON (fetch dari Pengaturan): kirim URL saja — cookie state tetap
+  // terpasang di response yang sama.
+  if (url.searchParams.get("json") === "1") {
+    const res = json({ url: authUrl });
+    res.headers.append("Set-Cookie", cookies.join(", "));
+    return res;
+  }
+
+  return new Response(null, {
     status: 302,
     headers: {
       Location: authUrl,
-      "Set-Cookie": [
-        `oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
-        `oauth_verifier=${codeVerifier}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
-      ].join(", "),
+      "Set-Cookie": cookies.join(", "),
       "Cache-Control": "no-store",
     },
   });
-
-  return res;
 }
 
 export async function POST() {

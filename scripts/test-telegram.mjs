@@ -14,6 +14,14 @@ import {
   parseScheduleInput,
 } from "../lib/server/maintenance-pure.ts";
 import { detectImageType, validateUpload, MAX_ASSET_BYTES } from "../lib/server/imagedata.ts";
+import {
+  TG_OTP_RULES,
+  tgAttemptIdValid,
+  tgCodeValid,
+  tgOtpHash,
+  tgOtpEqual,
+  tgNewOtp,
+} from "../lib/server/tg-otp.ts";
 
 let pass = 0;
 let fail = 0;
@@ -142,6 +150,33 @@ try {
 } catch (err) {
   check("file > 5MB ditolak", /terlalu besar/.test(err.message));
 }
+
+// ---------- OTP login Telegram (logika murni) ----------
+console.log("OTP login Telegram:");
+const P = "test-pepper";
+const A1 = "abc123def456ghi789";
+const A2 = "xyz987wvu654tsr321";
+const code = "123456";
+const h1 = tgOtpHash(P, A1, code);
+check("hash deterministik", h1 === tgOtpHash(P, A1, code));
+check("attempt lain → hash beda (anti replay lintas attempt)", h1 !== tgOtpHash(P, A2, code));
+check("kode lain → hash beda", h1 !== tgOtpHash(P, A1, "123457"));
+check("pepper lain → hash beda", h1 !== tgOtpHash("pepper-lain", A1, code));
+check("verifikasi timing-safe sukses", tgOtpEqual(h1, A1, code, P) === true);
+check("verifikasi kode salah ditolak", tgOtpEqual(h1, A1, "654321", P) === false);
+check("hash rusak ditolak", tgOtpEqual("zz", A1, code, P) === false);
+check("hash kosong ditolak", tgOtpEqual("", A1, code, P) === false);
+check("OTP selalu 6 digit", [...Array(50)].every(() => /^\d{6}$/.test(tgNewOtp())));
+check("OTP tak pernah dobel beruntun (sample)", new Set([...Array(50)].map(() => tgNewOtp())).size > 45);
+check("attempt id valid diterima", tgAttemptIdValid(A1) === true);
+check("attempt id pendek ditolak", tgAttemptIdValid("abc") === false);
+check("attempt id aneh ditolak", tgAttemptIdValid("../../etc/passwd") === false);
+check("kode 5 digit ditolak", tgCodeValid("12345") === false);
+check("kode 7 digit ditolak", tgCodeValid("1234567") === false);
+check("kode huruf ditolak", tgCodeValid("12a456") === false);
+check("aturan: OTP 5 menit", TG_OTP_RULES.otpTtlS === 300);
+check("aturan: max 5 salah", TG_OTP_RULES.maxVerify === 5);
+check("aturan: resend cooldown 60 detik", TG_OTP_RULES.resendCooldownS === 60);
 
 console.log(`\n${pass} lulus, ${fail} gagal`);
 process.exit(fail ? 1 : 0);

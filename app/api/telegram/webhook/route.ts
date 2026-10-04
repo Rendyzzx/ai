@@ -18,6 +18,7 @@ import type { TgUpdate } from "@/lib/telegram/types";
 import { markUpdateSeen } from "@/lib/telegram/idempotency";
 import { handleUpdate } from "@/lib/telegram/router";
 import { sendMessage, answerCallbackQuery } from "@/lib/telegram/api";
+import { handleAuthUpdate } from "@/lib/server/telegram-auth";
 import { recordUnauthorized } from "@/lib/server/adminsvc";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,24 @@ export async function POST(req: Request) {
 
   const admins = parseAdmins(process.env.TELEGRAM_ADMIN_IDS);
   const admin = findAdmin(admins, from.id);
+
+  // ---- Flow login OTP (publik, admin maupun bukan) ----
+  // /start auth_<id> (deep link dari halaman login) dan /login dikelola
+  // modul auth — BUKAN menu admin. Pesan error tidak membocorkan detail internal.
+  const msgText = String(update.message?.text || "").trim();
+  const isAuthCommand =
+    /^\/start\s+auth_[A-Za-z0-9_-]{10,64}$/.test(msgText) ||
+    msgText === "/login" ||
+    /^\/login@/.test(msgText) ||
+    (msgText === "/start" && !admin); // /start polos dari non-admin → cara login
+  if (isAuthCommand && update.message?.chat?.id) {
+    await handleAuthUpdate(update.message.chat.id, {
+      id: from.id,
+      first_name: from.first_name,
+      username: from.username,
+    }, msgText);
+    return json({ ok: true });
+  }
   const chatId =
     update.message?.chat?.id ||
     update.edited_message?.chat?.id ||

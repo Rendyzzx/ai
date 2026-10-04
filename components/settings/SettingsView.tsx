@@ -22,7 +22,7 @@
      tersimpan otomatis, feedback "Tersimpan" kecil
    ============================================================ */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiJson } from "@/lib/client-api";
 import { compressToAvatar } from "@/lib/image";
 import {
@@ -37,6 +37,7 @@ import {
   usePref,
 } from "@/lib/prefs";
 import type { BotConfig, UserProfile } from "@/types";
+import TelegramAuth from "@/components/auth/TelegramAuth";
 
 type Section = "profile" | "identity" | "personality" | "behavior" | "memory" | "advanced";
 
@@ -174,8 +175,36 @@ function Row({
   );
 }
 
+const LINKED_PROVIDERS = [
+  {
+    id: "google" as const,
+    label: "Google",
+    color: "#4285F4",
+    svg: "M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z",
+  },
+  {
+    id: "discord" as const,
+    label: "Discord",
+    color: "#5865F2",
+    svg: "M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418Zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418Z",
+  },
+  {
+    id: "facebook" as const,
+    label: "Facebook",
+    color: "#1877F2",
+    svg: "M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073Z",
+  },
+  {
+    id: "telegram" as const,
+    label: "Telegram",
+    color: "#26A5E4",
+    svg: "M23.91 3.79 20.69 20.6c-.25 1.21-.98 1.5-2 .94l-5.5-4.07-2.66 2.57c-.3.3-.55.56-1.1.56-.72 0-.6-.27-.84-.95L6.3 13.7l-5.45-1.7c-1.18-.35-1.19-1.16.26-1.71l21.26-8.2c.97-.43 1.9.24 1.53 1.7Z",
+  },
+];
+
 export default function SettingsView({
   initialCategory,
+  linkedNotice,
   user,
   bot,
   onClose,
@@ -185,6 +214,7 @@ export default function SettingsView({
   onConversationsCleared,
 }: {
   initialCategory: string;
+  linkedNotice?: string | null;
   user: UserProfile;
   bot: BotConfig;
   onClose: () => void;
@@ -232,6 +262,94 @@ export default function SettingsView({
     response_style: bot.response_style || "casual",
     language: bot.language || "auto",
   });
+  // ---- Akun terhubung (provider OAuth/OTP) ----
+  const [linkedStatus, setLinkedStatus] = useState<string | null>(linkedNotice || null);
+  const [linkedBusy, setLinkedBusy] = useState<string | null>(null);
+  const [tgLinkOpen, setTgLinkOpen] = useState(false);
+  const [enabledProviders, setEnabledProviders] = useState<Record<string, boolean>>({
+    google: false,
+    discord: false,
+    facebook: false,
+    telegram: false,
+  });
+  const [botUsername, setBotUsername] = useState<string | null>(null);
+
+  // Provider aktif di-load saat settings dibuka (publik, tanpa session).
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/config");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          providers?: Record<string, boolean>;
+          telegram_bot?: string | null;
+        };
+        if (data.providers) setEnabledProviders(data.providers);
+        if (data.telegram_bot) setBotUsername(data.telegram_bot);
+      } catch {
+        /* fallback: hanya yang sudah terhubung yang tampil */
+      }
+    })();
+  }, []);
+
+  const refreshLinked = useCallback(async () => {
+    try {
+      const me = (await apiJson("/api/auth/me")) as {
+        user?: { providers?: Record<string, boolean> };
+      };
+      if (me.user?.providers) {
+        onUserUpdate({
+          providers: {
+            google: Boolean(me.user.providers.google),
+            discord: Boolean(me.user.providers.discord),
+            facebook: Boolean(me.user.providers.facebook),
+            telegram: Boolean(me.user.providers.telegram),
+          },
+        });
+      }
+    } catch {
+      /* session invalid sudah ditangani api() */
+    }
+  }, [onUserUpdate]);
+
+  const connectProvider = useCallback(
+    async (provider: "google" | "discord" | "facebook") => {
+      setLinkedBusy(provider);
+      setLinkedStatus(null);
+      try {
+        // Fetch dengan header session → server pasang cookie state signed,
+        // lalu kita redirect ke URL consent lewat window.location (cookie ikut).
+        const data = (await apiJson(`/api/auth/${provider}?link=1&json=1`)) as { url?: string };
+        if (data.url) window.location.href = data.url;
+      } catch (e) {
+        setLinkedStatus((e as Error).message);
+        setLinkedBusy(null);
+      }
+    },
+    []
+  );
+
+  const disconnectProvider = useCallback(
+    async (provider: "google" | "discord" | "facebook" | "telegram") => {
+      setLinkedBusy(provider);
+      setLinkedStatus(null);
+      try {
+        await apiJson("/api/auth/providers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider, action: "disconnect" }),
+        });
+        await refreshLinked();
+        setLinkedStatus("Provider dilepas.");
+      } catch (e) {
+        setLinkedStatus((e as Error).message);
+      } finally {
+        setLinkedBusy(null);
+      }
+    },
+    [refreshLinked]
+  );
+
   const [memDraft, setMemDraft] = useState<string[]>(bot.memories || []);
   const [memoryInput, setMemoryInput] = useState("");
   const [pendingUserAvatar, setPendingUserAvatar] = useState<string | null>(null);
@@ -1334,6 +1452,80 @@ export default function SettingsView({
                   </span>
                 </div>
               </div>
+            </div>
+            <div className="panel">
+              <h4 className="linked-title">Akun terhubung</h4>
+              <p className="card-desc">
+                Hubungkan cara masuk lain biar gampang — satu akun Aomi, banyak pintu.
+              </p>
+              <div className="linked-rows">
+                {LINKED_PROVIDERS.map((p) => {
+                  const connected = user.providers?.[p.id] || false;
+                  const enabled = enabledProviders[p.id] || connected;
+                  const busy = linkedBusy === p.id;
+                  return (
+                    <div className={"linked-row" + (connected ? " on" : "")} key={p.id}>
+                      <svg className="linked-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill={p.color} d={p.svg} />
+                      </svg>
+                      <div className="linked-meta">
+                        <span className="linked-name">{p.label}</span>
+                        <span className="linked-state">
+                          {connected ? "Terhubung" : enabled ? "Belum terhubung" : "Belum tersedia"}
+                        </span>
+                      </div>
+                      {!enabled ? null : connected ? (
+                        <button
+                          className="btn-mini ghost"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void disconnectProvider(p.id)}
+                        >
+                          {busy ? "…" : "Putuskan"}
+                        </button>
+                      ) : p.id === "telegram" ? (
+                        <button
+                          className="btn-mini"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setTgLinkOpen(true)}
+                        >
+                          Hubungkan
+                        </button>
+                      ) : (
+                        <button
+                          className="btn-mini"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void connectProvider(p.id)}
+                        >
+                          {busy ? "…" : "Hubungkan"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {linkedStatus && <p className="linked-status" role="status">{linkedStatus}</p>}
+              {tgLinkOpen && (
+                <div className="linked-tg-modal">
+                  <TelegramAuth
+                    mode="link"
+                    botUsername={botUsername}
+                    onLoginSuccess={() => setTgLinkOpen(false)}
+                    onLinked={() => {
+                      setTgLinkOpen(false);
+                      setLinkedStatus("Telegram berhasil dihubungkan.");
+                      void refreshLinked();
+                    }}
+                    onCancel={() => setTgLinkOpen(false)}
+                  />
+                </div>
+              )}
+              <p className="card-desc">
+                Kamu tidak bisa melepas satu-satunya cara masuk — pastikan masih ada
+                password atau minimal satu provider lain.
+              </p>
             </div>
             <div className="panel">
               <button className="btn-ghost danger" type="button" onClick={() => void onLogout()}>

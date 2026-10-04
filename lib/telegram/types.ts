@@ -7,6 +7,7 @@ export interface TgUser {
   id: number;
   is_bot?: boolean;
   first_name?: string;
+  username?: string;
 }
 
 export interface TgChat {
@@ -47,7 +48,8 @@ export interface TgUpdate {
 
 export interface TgButton {
   text: string;
-  callback_data: string;
+  callback_data?: string;
+  url?: string; // tombol tautan (mis. "Buka Aomi" untuk kode login)
 }
 
 export interface TgInlineKeyboard {
