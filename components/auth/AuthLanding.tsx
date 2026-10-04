@@ -161,6 +161,7 @@ export default function AuthLanding({
 
   const registerSectionRef = useRef<HTMLElement>(null);
   const registerTabRef = useRef<HTMLButtonElement>(null);
+  const statusSectionRef = useRef<HTMLElement>(null);
 
   // ---------------- Google OAuth callback: sid atau error dari query param ----------------
 
@@ -220,12 +221,24 @@ export default function AuthLanding({
       // Session valid di tab ini → langsung buka chat
       const sid = getSessionId();
       if (!sid) return; // tanpa sid: halaman login TIDAK pernah redirect
+      // Bounce-guard: middleware mengarahkan "/" tanpa cookie hint ke sini.
+      // Kalau document.cookie diblokir total, hint tidak pernah tertulis →
+      // "/" akan memantul balik ke /auth tanpa henti. Penanda ini memutus
+      // loop: bila kita BARU memantul dalam 15 detik, jangan redirect lagi
+      // (tampilkan halaman login; sid tetap ada di tab ini, tidak rusak).
+      try {
+        const last = Number(sessionStorage.getItem("aomi.bouncedAt") || 0);
+        if (Date.now() - last < 15_000) return;
+      } catch { /* private mode → tanpa guard, tapi tanpa cookie pun normal */ }
       try {
         const res = await fetch("/api/auth/me", { headers: { "X-Session-Id": sid } });
         if (res.status === 401) {
           clearSessionId(); // session invalid → tetap di login
         } else if (res.ok && !redirectingRef.current) {
           redirectingRef.current = true;
+          try {
+            sessionStorage.setItem("aomi.bouncedAt", String(Date.now()));
+          } catch { /* abaikan */ }
           window.location.replace("/");
         }
       } catch { /* offline: tampilkan halaman login */ }
@@ -266,6 +279,7 @@ export default function AuthLanding({
     if (!fine || !wide || reduced) return;
 
     let raf = 0;
+    let running = false;
     let tx = 0, ty = 0, cx = 0, cy = 0, wrote = false;
     const onMove = (e: MouseEvent) => {
       const nx = (e.clientX / window.innerWidth) * 2 - 1; // -1..1
@@ -274,6 +288,10 @@ export default function AuthLanding({
       ty = ny * 4; // maks ±4px
       // CATATAN: tanpa rotate — kartu chat berisi text ada di dalam
       // wrapper ini; rotasi kecil pun bikin text terlihat miring.
+      if (!running) {
+        running = true;
+        raf = requestAnimationFrame(tick); // loop hanya hidup saat bergerak
+      }
     };
     const tick = () => {
       const dx = tx - cx, dy = ty - cy;
@@ -283,14 +301,18 @@ export default function AuthLanding({
         el.style.transform =
           "translate3d(" + cx.toFixed(2) + "px," + cy.toFixed(2) + "px,0)";
         wrote = true;
-      } else if (wrote) {
-        el.style.transform = "translate3d(0,0,0) rotate(0deg)";
-        wrote = false;
+        raf = requestAnimationFrame(tick); // masih ada sisa gerakan
+      } else {
+        // Sudah diam → hentikan loop (dulu: rAF 60fps jalan terus
+        // selamanya walau mouse diam — pemborosan main-thread halus).
+        running = false;
+        if (wrote) {
+          el.style.transform = "translate3d(0,0,0)";
+          wrote = false;
+        }
       }
-      raf = requestAnimationFrame(tick);
     };
     window.addEventListener("mousemove", onMove, { passive: true });
-    raf = requestAnimationFrame(tick);
     return () => {
       window.removeEventListener("mousemove", onMove);
       cancelAnimationFrame(raf);
@@ -316,9 +338,13 @@ export default function AuthLanding({
   }, [loadCaptcha]);
 
   // ---------------- Status sistem (real, dari /api/status) ----------------
+  // /api/status memeriksa database + cek live provider AI — bukan barang
+  // kritikal first paint. Section-nya jauh di bawah fold, jadi fetch ditunda
+  // sampai section mendekat viewport (satu kali saja). Dulu: request ikut
+  // berebut bandwidth saat initial load.
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const load = async () => {
       try {
         const res = await fetch("/api/status");
         if (!res.ok) throw new Error("status http " + res.status);
@@ -327,9 +353,25 @@ export default function AuthLanding({
       } catch {
         if (alive) setStatus({ loading: false, data: null, error: true });
       }
-    })();
+    };
+    const node = statusSectionRef.current;
+    if (!node || !("IntersectionObserver" in window)) {
+      void load(); // fallback: langsung muat
+      return () => { alive = false; };
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          void load();
+        }
+      },
+      { rootMargin: "600px 0px" } // mulai lebih awal supaya tidak telat
+    );
+    io.observe(node);
     return () => {
       alive = false;
+      io.disconnect();
     };
   }, []);
 
@@ -965,7 +1007,7 @@ export default function AuthLanding({
         </section>
 
         {/* ================= STATUS SISTEM (real-time) ================= */}
-        <section className="status" aria-label="Status sistem Aomi" data-reveal>
+        <section className="status" aria-label="Status sistem Aomi" data-reveal ref={statusSectionRef}>
           <div className="status-panel">
             <div className="status-head">
               <span className="status-title">

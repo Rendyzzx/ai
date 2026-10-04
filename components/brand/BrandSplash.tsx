@@ -351,8 +351,19 @@ export default function BrandSplash({ onDone }: { onDone?: () => void }) {
             resize = size;
             window.addEventListener("resize", resize);
 
+            // Frame budget: raymarching full-screen di GPU mobile kelas
+            // menengah/rendah adalah pekerjaan terberat selama intro 3s.
+            // 30fps di layar sentuh cukup halus untuk intro & memotong
+            // setengah beban GPU+main-thread vs 60fps.
+            const frameBudgetMs = coarse ? 1000 / 30 : 0;
             const t0 = performance.now();
+            let lastDraw = 0;
             const draw = (now: number) => {
+              if (frameBudgetMs && now - lastDraw < frameBudgetMs - 1) {
+                raf = requestAnimationFrame(draw);
+                return; // skip frame — timeline pakai waktu absolut, aman
+              }
+              lastDraw = now;
               const t = (now - t0) / 1000;
               const p = timeline(t);
               gl.uniform2f(U.res, canvas.width, canvas.height);

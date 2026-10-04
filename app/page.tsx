@@ -22,8 +22,16 @@ export const revalidate = 30;
 export default async function ChatPage() {
   const ann = await getAnnouncement().catch(() => null);
   const showBanner = Boolean(ann?.enabled && ann.message);
+  // Cek session SEBELUM hydration: kalau tab ini tidak punya sid, redirect
+  // ke /auth dijalankan begitu HTML terparse — tidak menunggu bundle JS
+  // (±340KB) di-parse & hydrate (perilaku ChatGate lama: ±2.8s). Pengunjung
+  // balik dari /auth (bawa cookie hint) tapi sessionStorage kosong (tab
+  // baru) tetap tertangani cepat di sini. ChatGate tetap jadi fallback.
+  const earlyRedirect = `try{if(!sessionStorage.getItem('aomi.sid'))location.replace('/auth')}catch(e){}`;
+
   return (
     <>
+      <script dangerouslySetInnerHTML={{ __html: earlyRedirect }} />
       {showBanner ? (
         <div
           role="status"

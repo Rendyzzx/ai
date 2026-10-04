@@ -112,6 +112,17 @@ export async function middleware(req: NextRequest) {
   } catch {
     // fail open — jangan pernah mematikan situs karena cek maintenance
   }
+
+  // Pengunjung tanpa cookie hint (belum pernah login di browser ini) tidak
+  // perlu mengunduh bundle chat ±340KB hanya untuk di-redirect ke /auth oleh
+  // ChatGate di sisi client (dulu: redirect baru jalan SETELAH JS parse +
+  // hydration → overhead ±2.8s). 302 server-side: bundle "/" tidak pernah
+  // dikirim. HINT bukan autentikasi — chat tetap butuh sid valid.
+  // (Browser yang blokir document.cookie: /auth punya bounce-guard supaya
+  // tidak loop / ↔ /auth.)
+  if (pathname === "/" && !req.cookies.get("aomi.has")) {
+    return NextResponse.redirect(new URL("/auth", req.url));
+  }
   return NextResponse.next();
 }
 

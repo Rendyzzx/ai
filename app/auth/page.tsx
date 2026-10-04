@@ -56,13 +56,11 @@ export default async function AuthPage() {
   const peekaboo = await getAssetInfo("loginBanner").catch(() => null);
   return (
     <>
-      {/* Font non-blocking: display=swap, FOUT singkat ok */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600&family=IBM+Plex+Sans:wght@400;500&display=swap"
-      />
+      {/* Font tidak dimuat dari Google: CSP (style-src 'self') memblokir
+          stylesheet eksternal — link di bawah tidak pernah bekerja dan cuma
+          request mati + dependensi jaringan ekstra. Font sudah self-host
+          via next/font (layout.tsx), yang dipakai auth.css:
+          var(--font-plusjakarta) untuk display, Manrope default utk body. */}
       <AuthLanding peekSrc={peekaboo?.url} />
     </>
   );

@@ -37,8 +37,14 @@
   --bubble-bot:  #201f1b;
   --bubble-user: #43392c;
 
-  --font-display: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
-  --font:         "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  /* Plus Jakarta Sans self-host (next/font, layout.tsx). Sebelumnya
+     "Plus Jakarta Sans" nama family Google → diblok CSP style-src 'self'
+     → heading fallback Segoe UI selama ini. Sekarang font-nya benar-benar
+     dipakai, display=swap, tanpa jaringan eksternal. */
+  --font-display: var(--font-plusjakarta), "Segoe UI", system-ui, sans-serif;
+  /* --font sengaja TIDAK dioverride di sini: inline script layout
+     (preferensi font user, default Manrope) menang cascade — dan itu
+     memang font body yang sudah dipakai semua halaman Aomi. */
 
   --w: 1120px;
 }
