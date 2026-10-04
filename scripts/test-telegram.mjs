@@ -22,6 +22,7 @@ import {
   tgOtpEqual,
   tgNewOtp,
 } from "../lib/server/tg-otp.ts";
+import { stripForSpeech } from "../lib/voice.ts";
 
 let pass = 0;
 let fail = 0;
@@ -177,6 +178,25 @@ check("kode huruf ditolak", tgCodeValid("12a456") === false);
 check("aturan: OTP 5 menit", TG_OTP_RULES.otpTtlS === 300);
 check("aturan: max 5 salah", TG_OTP_RULES.maxVerify === 5);
 check("aturan: resend cooldown 60 detik", TG_OTP_RULES.resendCooldownS === 60);
+
+// ---------- TTS: pembersih markdown → teks lisan ----------
+console.log("TTS stripForSpeech:");
+check("teks polos utuh", stripForSpeech("halo, apa kabar?") === "halo, apa kabar?");
+check("blok kode diganti penanda", stripForSpeech("jawabnya:\n```js\nlet x = 1;\n```\nselesai").includes("(kode dilewati)"));
+check("isi kode gak ikut dibaca", !stripForSpeech("```\nconsole.log('rahasia')\n```").includes("rahasia"));
+check("inline code dibuka", stripForSpeech("pakai `npm install` ya") === "pakai npm install ya");
+check("link jadi teksnya", stripForSpeech("lihat [dokumentasi](https://x.com) ya") === "lihat dokumentasi ya");
+check("gambar dibuang", stripForSpeech("![foto](https://a.com/i.png) ini fotonya") === "ini fotonya");
+check("bold/italic dibersihkan", stripForSpeech("**penting** dan *miring*") === "penting dan miring");
+check("heading dibersihkan", stripForSpeech("## Judul\nisi") === "Judul isi");
+check("bullet dibersihkan", stripForSpeech("- satu\n- dua") === "satu dua");
+check("list angka tetap wajar", stripForSpeech("1. pertama\n2. kedua") === "pertama kedua" || stripForSpeech("1. pertama\n2. kedua") === "1. pertama 2. kedua");
+check("url telanjang dibuang", stripForSpeech("buka https://cyronime.web.id sekarang") === "buka sekarang");
+check("emoji dibuang", stripForSpeech("oke 🙂 sip 😄") === "oke sip");
+check("html dibuang", stripForSpeech("<b>tebal</b> biasa") === "tebal biasa");
+check("whitespace dirapikan", stripForSpeech("  banyak   spasi  \n\n tab\t") === "banyak spasi tab");
+check("teks kosong → kosong", stripForSpeech("") === "");
+check("tanda baca gak dobel spasi", !stripForSpeech("hai , apa") .includes(" ,"));
 
 console.log(`\n${pass} lulus, ${fail} gagal`);
 process.exit(fail ? 1 : 0);

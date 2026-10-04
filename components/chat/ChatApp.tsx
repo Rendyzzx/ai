@@ -19,6 +19,8 @@ import MessageRow, {
   type MessageFile,
 } from "@/components/chat/MessageRow";
 import MessageMenu, { type MenuState } from "@/components/chat/MessageMenu";
+import { useVoiceCall, VoiceCallOverlay } from "./VoiceCall";
+import { speechRecognitionSupported } from "@/lib/voice";
 import ConfirmDialog from "@/components/chat/ConfirmDialog";
 import SavedView from "@/components/chat/SavedView";
 // Settings (±40KB) jarang dibuka → dynamic import, keluar dari
@@ -752,14 +754,14 @@ export default function ChatApp() {
   /* ---------------- Kirim pesan ---------------- */
 
   const send = useCallback(
-    async (rawText: string) => {
+    async (rawText: string): Promise<string | null> => {
       const text = sanitizeText(rawText, 4000);
       const img = pendingImage;
       const vid = pendingVideo;
-      if ((!text && !img && !vid) || loadingRef.current) return;
+      if ((!text && !img && !vid) || loadingRef.current) return null;
       if (vid && vid.status === "uploading") {
         pushError("Video masih diunggah nih, tunggu sebentar ya~");
-        return;
+        return null;
       }
       const vidReady = vid && vid.status === "ready" && vid.url ? vid : null;
 
@@ -839,7 +841,7 @@ export default function ChatApp() {
             });
           }
           await runImgGenJob(data.imggen_job, data.conversation_id || currentIdRef.current);
-          return;
+          return null;
         }
 
         if (res.ok && data?.edit_job) {
@@ -855,7 +857,7 @@ export default function ChatApp() {
             });
           }
           await runEditJob(data.edit_job, data.conversation_id || currentIdRef.current);
-          return;
+          return null;
         }
 
         setIndicator(null);
@@ -891,6 +893,7 @@ export default function ChatApp() {
           refreshSidebar();
           // Kartu lagu → langsung buka player & putar
           if (data.music) playMusic(data.music);
+          return data.text;
         } else {
           pushMessages([
             {
@@ -900,6 +903,7 @@ export default function ChatApp() {
               timestamp: new Date().toISOString(),
             },
           ]);
+          return null;
         }
       } catch (err) {
         setIndicator(null);
@@ -912,13 +916,29 @@ export default function ChatApp() {
               timestamp: new Date().toISOString(),
             },
           ]);
+          return null;
         }
+        return null;
       } finally {
         loadingRef.current = false;
       }
     },
     [pendingImage, pendingVideo, pushMessages, refreshSidebar, runEditJob, scrollToBottom, persistEditThumb, playMusic]
   );
+
+  /* ---------------- Mode telepon suara ---------------- */
+
+  // STT hanya ada di browser (Chrome/Edge/Safari) — cek setelah mount
+  // supaya render server & client konsisten (tanpa hydration mismatch).
+  const [voiceOk, setVoiceOk] = useState(false);
+  useEffect(() => {
+    setVoiceOk(speechRecognitionSupported());
+  }, []);
+
+  // send didefinisikan di atas → bungkus via ref agar hook-nya stabil
+  const sendVoiceRef = useRef(send);
+  sendVoiceRef.current = send;
+  const voice = useVoiceCall(useCallback((t: string) => sendVoiceRef.current(t), []));
 
   /* ---------------- Aksi pesan ---------------- */
 
@@ -1543,6 +1563,7 @@ export default function ChatApp() {
             </div>
           </section>
 
+          <VoiceCallOverlay phase={voice.phase} transcript={voice.transcript} onStop={voice.stop} />
           <div className="composer-wrap">
             {/* Smart scroll: user lagi baca pesan lama → jangan paksa gulir;
                 kasih jalan pintas ke pesan terbaru (di atas komposer). */}
@@ -1670,6 +1691,18 @@ export default function ChatApp() {
                   }
                 }}
               />
+              {voiceOk && (
+                <button
+                  className="voice-btn"
+                  type="button"
+                  aria-label={voice.active ? "Akhiri telepon suara" : "Telepon suara dengan Aomi"}
+                  aria-pressed={voice.active}
+                  title={voice.active ? "Akhiri telepon suara" : "Telepon suara dengan Aomi"}
+                  onClick={() => (voice.active ? voice.stop() : voice.start())}
+                >
+                  <svg className="icon" aria-hidden="true"><use href="/icons.svg#phone" /></svg>
+                </button>
+              )}
               <button
                 className="send"
                 type="submit"
