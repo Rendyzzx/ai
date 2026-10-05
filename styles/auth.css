@@ -693,32 +693,6 @@ h1, h2, h3 {
   overflow: hidden;
 }
 
-/* Desktop: split composition (artwork kiri, form kanan) — bukan satu
-   card besar yang menumpuk banner di atas form. Peekaboo berhenti
-   memakai aspect-ratio di sini: align-items:stretch pada baris flex
-   membuat tingginya otomatis mengikuti tinggi form di sebelahnya. */
-@media (min-width: 860px) {
-  .auth-panel {
-    display: flex;
-    align-items: stretch;
-    max-width: 760px;
-  }
-  .peekaboo {
-    flex: 0 0 300px;
-    aspect-ratio: auto;
-    max-height: none;
-    border-bottom: none;
-    border-right: 1px solid var(--border);
-  }
-  .auth-body {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-}
-
 /* Peekaboo: karakter di atas form, full-bleed di tepi atas panel.
    Tinggi proporsional ke lebar panel (bukan px fix) — box 150px lama
    terlalu pipih utk portrait (rasio ~2.67:1), bikin karakter kepotong
@@ -730,6 +704,49 @@ h1, h2, h3 {
   max-height: 260px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
+}
+
+/* Desktop: split composition (artwork kiri, form kanan) — bukan satu
+   card besar yang menumpuk banner di atas form.
+
+   PENTING — urutan source: block ini HARUS berada SETELAH rule dasar
+   .peekaboo di atas. Spesifisitasnya sama (satu class selector), jadi
+   kalau block media-query ini ditaruh SEBELUM rule dasar, rule dasar
+   yang menang di layar ≥860px (CSS cascade: specificity sama → yang
+   terakhir di source yang berlaku) — walau rule dasar tidak dibungkus
+   media query apa pun. Bug lama persis ini: aspect-ratio & max-height
+   dari rule dasar (31/20 & 260px) selalu menimpa percobaan override di
+   sini, jadi box selalu kepentok tinggi 260px di desktop — padahal
+   rekomendasi upload admin ~460px. object-fit:cover lalu meng-crop
+   artwork portrait sampai cuma kepala/bahu yang tersisa.
+
+   FIX: pindah block ini ke bawah rule dasar + beri peekaboo
+   aspect-ratio tetap 300/460 (sama dengan rekomendasi ke admin saat
+   upload banner) sebagai tinggi intrinsik minimum — align-items:stretch
+   lalu mengambil tinggi MAKSIMUM antara peekaboo (≈460px) dan auth-body
+   (bisa lebih pendek, mis. tab "Masuk", atau lebih tinggi, mis. tab
+   "Buat akun"), jadi artwork tidak pernah di-crop lebih sempit dari
+   rasio yang diminta ke admin. */
+@media (min-width: 860px) {
+  .auth-panel {
+    display: flex;
+    align-items: stretch;
+    max-width: 760px;
+  }
+  .peekaboo {
+    flex: 0 0 300px;
+    aspect-ratio: 300 / 460;
+    max-height: none;
+    border-bottom: none;
+    border-right: 1px solid var(--border);
+  }
+  .auth-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
 }
 .peek-img {
   position: absolute;
