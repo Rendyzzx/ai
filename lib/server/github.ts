@@ -132,13 +132,42 @@ function b64FromBytes(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64");
 }
 
-/** Simpan file binary baru. Return sha file (untuk delete nanti). */
+/**
+ * Simpan file binary baru atau timpa yang sudah ada (bila path sama
+ * sudah terisi — mis. retry webhook Telegram atau upload ulang bytes
+ * yang identik, yang menghasilkan version hash sama).
+ *
+ * BUG LAMA: PUT selalu dikirim TANPA sha. GitHub Contents API menolak
+ * create-without-sha pada path yang sudah ada → 422 "sha wasn't
+ * supplied" → fungsi ini mengembalikan null → siteassets.ts melempar
+ * "Gagal menyimpan file ke storage. Coba lagi." walau token & akses
+ * repo valid. Sekarang: cek sha dulu, kirim bila ada, dan retry sekali
+ * dengan sha terbaru kalau tetap kena 409/422 (race antar request).
+ * Return sha file (untuk delete nanti).
+ */
 export async function putBinary(path: string, bytes: Uint8Array, message: string): Promise<string | null> {
-  const res = await ghFetch(`${BASE}/${path.replace(/^\//, "")}`, {
-    method: "PUT",
-    headers: { ...apiHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ message, content: b64FromBytes(bytes) }),
-  });
+  const clean = path.replace(/^\//, "");
+  const existingSha = await shaOf(path);
+
+  const attemptPut = async (sha: string | null): Promise<Response> =>
+    ghFetch(`${BASE}/${clean}`, {
+      method: "PUT",
+      headers: { ...apiHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ message, content: b64FromBytes(bytes), ...(sha ? { sha } : {}) }),
+    });
+
+  let res = await attemptPut(existingSha);
+
+  if (res.status === 409 || res.status === 422) {
+    // Race: file dibuat/diubah oleh request lain di antara cek sha dan
+    // PUT ini (mis. duplikat webhook Telegram). Ambil sha terbaru,
+    // retry sekali — kalau masih gagal, menyerah dan lapor error.
+    const retrySha = await shaOf(path);
+    if (retrySha !== existingSha) {
+      res = await attemptPut(retrySha);
+    }
+  }
+
   if (!res.ok) {
     console.error(`[github] putBinary http ${res.status} ${path}`);
     return null;
