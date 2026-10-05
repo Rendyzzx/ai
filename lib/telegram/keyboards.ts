@@ -47,7 +47,16 @@ export function databaseMenu(): TgInlineKeyboard {
     [["🩺 Status", "db:status"], ["ℹ️ Redis Info", "db:redis"]],
     [["🧹 Cleanup", "db:cleanup"], ["📦 Export", "db:export"]],
     [["📈 Statistik", "db:stats"]],
+    [["💥 Reset User & Chat", "db:wipe"]],
     ...BACK_MAIN,
+  ]);
+}
+
+/** Keyboard persetujuan OWNER untuk permintaan reset user & chat. */
+export function wipeRequestKeyboard(requestId: string): TgInlineKeyboard {
+  return kb([
+    [["✅ Setujui reset", `dbwipe:approve:${requestId}`]],
+    [["❌ Tolak", `dbwipe:deny:${requestId}`]],
   ]);
 }
 

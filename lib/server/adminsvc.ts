@@ -5,15 +5,20 @@
    (bukan handler yang akses storage langsung).
    ============================================================ */
 
+import crypto from "node:crypto";
 import {
   listJsonPaths,
   readJson,
   putJson,
   updateJson,
+  deleteJson,
+  expireJson,
   deleteMany,
   redisCommand,
+  scanPaths,
   USE_REDIS,
 } from "./store";
+import { listDirs } from "./github";
 import { KEYS } from "@/lib/redis/keys";
 import { getMaintenanceState } from "./maintenance";
 import { getFlags, type FeatureFlags } from "./features";
@@ -239,6 +244,151 @@ export async function suspendUser(uid: string): Promise<boolean> {
 
 export async function unsuspendUser(uid: string): Promise<boolean> {
   return setSuspended(uid, false);
+}
+
+// ---------------- Reset User & Chat (wipe) ----------------
+
+export interface WipePreview {
+  /** Perkiraan jumlah user yang terhapus (index + folder chat). */
+  users: number;
+  /** Jumlah folder chat per user yang ditemukan. */
+  chatFolders: number;
+  /** Jumlah sesi login aktif. */
+  sessions: number;
+}
+
+export interface WipeResult {
+  users: number;
+  chats: number;
+  bots: number;
+  sessions: number;
+  locks: number;
+  tempimg: number;
+}
+
+/** Daftar folder chat (uid) — Redis SCAN / GitHub dir list. */
+async function listChatDirs(): Promise<string[]> {
+  const scanned = await scanPaths("chats/*").catch(() => null as string[] | null);
+  if (scanned !== null) {
+    const dirs = new Set<string>();
+    for (const p of scanned) {
+      const parts = p.split("/"); // chats/<uid>/<file>.json
+      if (parts.length >= 3 && parts[2]) dirs.add(parts[2]);
+    }
+    return [...dirs];
+  }
+  return listDirs("chats").catch(() => [] as string[]);
+}
+
+/** Semua file akun user (users/*.json) KECUALI index & daftar suspend
+ *  — enumerasi langsung dari folder, jadi user orphan yang tidak ada
+ *  di index pun ikut terhapus. */
+async function userAccountFiles(): Promise<string[]> {
+  const files = await listJsonPaths("users").catch(() => [] as string[]);
+  return files.filter((p) => !p.endsWith("/_index.json") && !p.endsWith("/suspended.json"));
+}
+
+/** Ringkasan jumlah data yang AKAN dihapus (untuk konfirmasi). */
+export async function wipePreview(): Promise<WipePreview> {
+  const [accounts, chatDirs, sessions] = await Promise.all([
+    userAccountFiles(),
+    listChatDirs(),
+    listJsonPaths("sessions").catch(() => [] as string[]),
+  ]);
+  return { users: accounts.length, chatFolders: chatDirs.length, sessions: sessions.length };
+}
+
+/**
+ * Hapus SEMUA data user & chat sekaligus: akun + profil, riwayat chat,
+ * konfigurasi karakter, sesi login, lock login, gambar sementara.
+ * Index user & daftar suspend DIKOSONGKAN (bukan dihapus) supaya
+ * alur register/login tetap sehat. Config situs, asset, audit log,
+ * dan state bot TIDAK disentuh. Tidak bisa diurungkan.
+ */
+export async function wipeUserData(): Promise<WipeResult> {
+  const chatDirs = await listChatDirs();
+  const targets: string[] = [];
+  const result: WipeResult = { users: 0, chats: 0, bots: 0, sessions: 0, locks: 0, tempimg: 0 };
+
+  // Akun + profil user — langsung dari folder users/
+  const accounts = await userAccountFiles();
+  result.users = accounts.length;
+  targets.push(...accounts);
+
+  // Riwayat chat per user (semua folder chat, termasuk orphan)
+  for (const uid of chatDirs) {
+    const files = await listJsonPaths(`chats/${uid}`).catch(() => [] as string[]);
+    result.chats += files.length;
+    targets.push(...files);
+  }
+
+  // Konfigurasi karakter per user (semua file bots/)
+  const bots = await listJsonPaths("bots").catch(() => [] as string[]);
+  result.bots = bots.length;
+  targets.push(...bots);
+
+  // Sesi login, lock brute force, gambar sementara
+  for (const [dir, field] of [
+    ["sessions", "sessions"],
+    ["locks", "locks"],
+    ["tempimg", "tempimg"],
+  ] as const) {
+    const files = await listJsonPaths(dir).catch(() => [] as string[]);
+    result[field] = files.length;
+    targets.push(...files);
+  }
+
+  await deleteMany(targets);
+
+  // Index user & daftar suspend dikosongkan kembali (bukan dihapus)
+  await putJson("users/_index.json", { emails: {}, usernames: {} }, "wipe: user index reset");
+  await putJson(KEYS.suspendedUsers, { ids: [] }, "wipe: suspended reset");
+  resetSuspendedCache();
+
+  return result;
+}
+
+// ---------------- Permintaan wipe (persetujuan OWNER) ----------------
+
+export interface WipeRequest {
+  id: string;
+  requested_by_id: number;
+  requested_by_role: string;
+  created_at: string;
+}
+
+export const WIPE_REQUEST_TTL_MS = 15 * 60 * 1000;
+
+/** Buat permintaan wipe (menunggu persetujuan OWNER). TTL 15 menit. */
+export async function createWipeRequest(by: { id: number; role: string }): Promise<WipeRequest> {
+  const req: WipeRequest = {
+    id: crypto.randomBytes(6).toString("hex"),
+    requested_by_id: by.id,
+    requested_by_role: by.role,
+    created_at: new Date().toISOString(),
+  };
+  await putJson(KEYS.dbWipeRequest, req, "wipe request create");
+  await expireJson(KEYS.dbWipeRequest, WIPE_REQUEST_TTL_MS / 1000).catch(() => {});
+  return req;
+}
+
+/**
+ * Ambil permintaan wipe by id — sekaligus HAPUS (dikonsumsi sekali,
+ * klik Setujui/Tolak dua kali tidak menjalankan aksi dua kali).
+ * "gone" = tidak ada / sudah diproses; "expired" = lewat TTL.
+ */
+export async function takeWipeRequest(
+  id: string
+): Promise<{ status: "ok"; req: WipeRequest } | { status: "gone" | "expired" }> {
+  const file = await readJson<WipeRequest>(KEYS.dbWipeRequest).catch(() => null);
+  const req = file?.data;
+  if (!req || req.id !== id) return { status: "gone" };
+  if (Date.now() - Date.parse(req.created_at) > WIPE_REQUEST_TTL_MS) {
+    await deleteJson(KEYS.dbWipeRequest).catch(() => {});
+    return { status: "expired" };
+  }
+  await deleteJson(KEYS.dbWipeRequest).catch(() => {});
+  return { status: "ok", req };
 }
 
 // ---------------- Monitoring ----------------

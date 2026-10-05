@@ -70,6 +70,24 @@ export async function listPaths(dirPath: string): Promise<string[]> {
     .map((f) => `${clean}/${f.name}`);
 }
 
+/** Daftar subfolder di satu folder (untuk enumerasi folder chat per user). */
+export async function listDirs(dirPath: string): Promise<string[]> {
+  const clean = String(dirPath || "").replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!clean) return [];
+  const res = await ghFetch(`${BASE}/${clean}`, { headers: apiHeaders() });
+  if (!res.ok) return [];
+  let out: unknown = null;
+  try {
+    out = await res.json();
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(out)) return [];
+  return (out as Array<{ type?: string; name?: string }>)
+    .filter((f) => f && f.type === "dir" && typeof f.name === "string")
+    .map((f) => String(f.name));
+}
+
 /** Tulis file JSON (create bila sha kosong, update bila ada). */
 export async function putJson(
   path: string,

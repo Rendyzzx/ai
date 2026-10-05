@@ -18,6 +18,8 @@
      aomi:telegram/seen/<upid>.json  — update Telegram sudah diproses (TTL 1j)
      aomi:telegram/security.json     — statistik akses tanpa izin
      aomi:users/suspended.json       — daftar id user dibekukan
+     aomi:database/wipe-request.json — permintaan reset user+chat
+                                       (menunggu persetujuan OWNER, TTL 15m)
      aomi:assets/state.json          — reference asset situs (character,
                                        login banner). Binary TIDAK di
                                        Redis — file gambar disimpan di
@@ -35,6 +37,7 @@ export const KEYS = {
   telegramSeen: (updateId: number) => `telegram/seen/${updateId}.json`,
   telegramSecurity: "telegram/security.json",
   suspendedUsers: "users/suspended.json",
+  dbWipeRequest: "database/wipe-request.json",
   healthcheck: "status/_healthcheck.json",
   siteAssets: "assets/state.json",
 } as const;

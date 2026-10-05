@@ -113,6 +113,26 @@ export async function redisCommand(args: unknown[]): Promise<unknown> {
   return cmd(args);
 }
 
+/**
+ * SCAN Redis untuk semua path yang cocok pola glob — bisa MENYEBAR ke
+ * subfolder ("chats/*" → chats/<uid>/<file>). Return null di mode GitHub
+ * (pemanggil pakai jalur fallback-nya, mis. github.listDirs).
+ */
+export async function scanPaths(pattern: string): Promise<string[] | null> {
+  if (!USE_REDIS) return null;
+  let cursor = "0";
+  const keys: string[] = [];
+  let guard = 0;
+  do {
+    const out = (await cmd(["SCAN", cursor, "MATCH", keyOf(pattern), "COUNT", "300"])) as [string, string[]];
+    cursor = String(out[0] ?? "0");
+    for (const k of Array.isArray(out[1]) ? out[1] : []) {
+      keys.push(String(k).slice("aomi:".length));
+    }
+  } while (cursor !== "0" && ++guard < 100);
+  return keys;
+}
+
 /** Tulis JSON hanya jika key belum ada (Redis: SET NX EX). Return true jika baru ditulis. */
 export async function putJsonIfAbsent(
   path: string,
