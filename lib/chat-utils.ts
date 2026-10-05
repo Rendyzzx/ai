@@ -4,6 +4,7 @@
    ============================================================ */
 
 import type { Message, DlCard, HdCard, MusicCard } from "@/types";
+import { dlPlatformFromHost } from "@/lib/server/dl-platforms";
 
 // API edit foto — browser menembak LANGSUNG (CORS terbuka), bebas dari
 // batas 60 detik runtime server. API baru (xrina) balas gambar binary
@@ -24,8 +25,11 @@ export const IMG_GEN_TIMEOUT = 150_000; // API eksternal terukur ±30-60s
 export const EDIT_TRIGGER_RE =
   /\b(edit(?:in|kan|ed|an)?|ubah(?:in)?|ganti(?:in)?|hias(?:in)?|rapikan|perjelas(?:kan)?|perbaiki(?:k)?(?:in|kan)?|hilangkan|hapus(?:in)?|tambah(?:in|kan)?|jadikan|warnain|warnai|warna(?:kan)?|colori[sz]e|retouch|remove|restore)\b/i;
 
-/** Deteksi link TikTok/Instagram (untuk memilih animasi loading). */
-export function matchDlTarget(text: string): "tiktok" | "ig" | null {
+/** Deteksi link downloader (animasi loading "downloading").
+ *  Nilai baliknya cuma dipakai sebagai boolean oleh ChatApp — server
+ *  tetap memutuskan rutenya. "dl" = platform tambahan (X/Twitter,
+ *  Facebook, Spotify, dll — daftarnya di lib/server/dl-platforms). */
+export function matchDlTarget(text: string): "tiktok" | "ig" | "dl" | null {
   const urls = String(text || "").match(/https?:\/\/[^\s<>"')\]]+/gi) || [];
   for (const raw of urls) {
     let u: URL;
@@ -37,6 +41,7 @@ export function matchDlTarget(text: string): "tiktok" | "ig" | null {
     const h = u.hostname.replace(/^www\./, "").toLowerCase();
     if (/(^|\.)tiktok\.com$/.test(h)) return "tiktok";
     if (/(^|\.)instagram\.com$/.test(h)) return "ig";
+    if (dlPlatformFromHost(h)) return "dl";
   }
   return null;
 }

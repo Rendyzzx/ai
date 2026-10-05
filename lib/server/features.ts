@@ -44,7 +44,7 @@ const FLAG_LABELS: Record<FeatureName, string> = {
   "image-edit": "Edit foto",
   imggen: "Generate gambar AI",
   hd: "HD foto & video",
-  dl: "Downloader TikTok/IG",
+  dl: "Downloader media sosial & file",
   video: "Upload video + AI vision",
   pin: "Pin & arsip percakapan",
   bookmark: "Simpanan (bookmark jawaban)",

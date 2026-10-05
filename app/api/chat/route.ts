@@ -22,6 +22,8 @@ import { LIMITS } from "@/lib/server/limits";
 import { maintenanceBlockResponse } from "@/lib/server/maintenance";
 import { getFlags } from "@/lib/server/features";
 import { isUserSuspended } from "@/lib/server/adminsvc";
+import { matchExtraDlTarget } from "@/lib/server/dl-platforms";
+import { scrapeExtraDl, ScrapeError } from "@/lib/server/scrape";
 import type { BotConfig, Conversation, ConversationItem, DlCard, HdCard, Message } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -148,7 +150,7 @@ function buildInstruction(bot: BotConfig): string {
   parts.push(
     "Fitur aplikasi chat tempat kamu mengobrol (semuanya kamu yang jalankan, jadi bilang 'aku bisa...'): " +
       "(1) Ngobrol santai kapan aja. " +
-      "(2) Download video TikTok/Instagram: kirim link videonya, hasilnya langsung bisa diunduh tanpa watermark. " +
+      "(2) Download media: kirim linknya, hasilnya langsung bisa diunduh — TikTok & Instagram (video/foto), X/Twitter, Facebook, Threads, Pinterest, Pixiv, Reddit, Bilibili, dan RedNote/Xiaohongshu (video/foto), Spotify, SoundCloud, dan Bandcamp (lagu MP3), serta file dari TeraBox, MediaFire, Sfile, dan Sub2Unlock. " +
       "(3) Lagu plus lirik: kirim link YouTube atau tulis aja kayak 'putarkan lagu X', lagunya muncul lengkap sama liriknya. " +
       "(4) Bikin gambar: tulis 'bikin gambar X' atau 'gambarin X' dengan deskripsi bebas. " +
       "(5) Edit foto: kirim fotonya bareng instruksi, contoh 'ubah jadi anime' atau 'perjelas foto ini'. " +
@@ -1537,6 +1539,73 @@ export async function POST(req: Request) {
         conversation_id: conv.conversation_id,
         title: conv.title,
         provider: "faa-dl",
+        bot_name: bot.bot_name,
+        dl,
+      });
+    }
+  }
+
+  // ---------------- MODE DOWNLOADER PLATFORM LAIN (scrapr) ----------------
+  // X/Twitter, Facebook, Spotify, SoundCloud, Bandcamp, Pinterest, Threads,
+  // Bilibili, Pixiv, RedNote, Reddit, TeraBox, MediaFire/Sfile/Sub2Unlock.
+  // Trigger-nya sama seperti TikTok/IG: kirim linknya di chat.
+  if (!imageBuffer && message) {
+    const extra = matchExtraDlTarget(message);
+    if (extra) {
+      let dl: DlCard | null = null;
+      let failMsg = "";
+      try {
+        dl = await scrapeExtraDl(extra.platform, extra.url);
+      } catch (err) {
+        failMsg = err instanceof ScrapeError ? err.message : "";
+        if (!failMsg) {
+          console.error("[chat] scrapr gagal", extra.platform, String((err as Error).message || err).slice(0, 150));
+        }
+      }
+      if (!dl) {
+        return json(
+          { error: failMsg || "Gagal mengunduh linknya. Pastikan linknya publik dan coba lagi ya." },
+          502
+        );
+      }
+
+      const imgCount = (dl.images && dl.images.length) || 1;
+      const replyText =
+        dl.type === "video"
+          ? "selesai~ ini dia videonya. tinggal klik tombol unduh di bawah ya."
+          : dl.type === "audio"
+            ? "selesai~ ini dia lagunya (MP3). tinggal klik tombol unduh di bawah ya."
+            : dl.type === "file"
+              ? "selesai~ ini dia filenya. tinggal klik tombol unduh di bawah ya."
+              : "selesai~ ini dia " + (imgCount > 1 ? imgCount + " fotonya" : "fotonya") + ". tinggal klik gambar atau tombol unduhnya ya.";
+
+      const userMessageId = crypto.randomUUID();
+      const assistantMessageId = crypto.randomUUID();
+      conv.messages.push(
+        { message_id: userMessageId, role: "user", content: message, timestamp: now },
+        { message_id: assistantMessageId, role: "assistant", content: replyText, dl, timestamp: now }
+      );
+      if (conv.title === "Chat baru") {
+        conv.title = (dl.title || "Unduhan " + extra.platform).slice(0, 48);
+      }
+      conv.updated_at = now;
+
+      await Promise.all([
+        putJson(`chats/${uid}/${conv.conversation_id}.json`, conv, "download append"),
+        touchIndex(uid, {
+          conversation_id: conv.conversation_id,
+          title: conv.title,
+          updated_at: conv.updated_at,
+        }),
+      ]);
+
+      return json({
+        text: replyText,
+        user_message_id: userMessageId,
+        assistant_message_id: assistantMessageId,
+        conversation_id: conv.conversation_id,
+        title: conv.title,
+        provider: "scrapr-dl",
         bot_name: bot.bot_name,
         dl,
       });

@@ -15,6 +15,7 @@ import { parseMessageText } from "@/lib/markdown";
 import type { DlCard, HdCard, MusicCard, Role } from "@/types";
 import MusicCardView from "@/components/music/MusicCardView";
 import { api } from "@/lib/client-api";
+import { dlPlatformLabel, dlFilePrefix } from "@/lib/server/dl-platforms";
 
 export interface MessageFile {
   url: string;
@@ -117,8 +118,36 @@ export function MessageText({ content, showCode = true }: { content: string; sho
 
 /* ---------------- Tombol unduh kartu DL ---------------- */
 
+/* Platform yang link unduhannya dibuka LANGSUNG (CDN-nya sudah memaksa
+ * unduh lewat Content-Type octet-stream, atau file-nya bisa >30MB yang
+ * tidak muat di proxy /api/dl). Sisanya lewat proxy /api/dl supaya dapat
+ * Content-Disposition: attachment + nama file rapi.
+ * SoundCloud sengaja LEWAT PROXY — host MP3-nya (dl.klickaud.org)
+ * menolak request tanpa Referer yang cuma proxy yang kirim. */
+const DIRECT_DL = new Set([
+  "ig",
+  "twitter",
+  "facebook",
+  "spotify",
+  "bandcamp",
+  "pinterest",
+  "threads",
+  "bilibili",
+  "pixiv",
+  "rednote",
+  "reddit",
+  "terabox",
+  "mediafire",
+  "sfile",
+  "sub2unlock",
+]);
+
+function directDl(platform: string): boolean {
+  return DIRECT_DL.has(platform);
+}
+
 function dlDownloadHref(dl: DlCard, url: string, name: string, sid: string | null): string {
-  if (dl.platform === "ig") return url;
+  if (directDl(dl.platform)) return url;
   return (
     "/api/dl?url=" +
     encodeURIComponent(url) +
@@ -128,29 +157,40 @@ function dlDownloadHref(dl: DlCard, url: string, name: string, sid: string | nul
   );
 }
 
+function dlFileName(dl: DlCard, kind: "mp4" | "mp3" | "file"): string {
+  if (dl.platform === "tiktok") {
+    return "tiktok-" + (dl.id || (kind === "mp4" ? "video" : "audio")) + (kind === "mp4" ? ".mp4" : ".mp3");
+  }
+  if (dl.platform === "ig") {
+    return "instagram-" + (kind === "mp4" ? "video" : kind === "mp3" ? "audio" : "file") + (kind === "mp4" ? ".mp4" : ".mp3");
+  }
+  if (kind === "file") {
+    return dlFilePrefix(dl.platform) + "-file";
+  }
+  return dlFilePrefix(dl.platform) + "-" + (kind === "mp4" ? "video.mp4" : "audio.mp3");
+}
+
 function DlBtn({
   dl,
   kind,
   sid,
 }: {
   dl: DlCard;
-  kind: "mp4" | "mp3";
+  kind: "mp4" | "mp3" | "file";
   sid: string | null;
 }) {
-  const url = kind === "mp4" ? dl.video! : dl.music!;
-  const name =
-    (dl.platform === "tiktok" ? "tiktok-" + (dl.id || (kind === "mp4" ? "video" : "audio")) : "instagram-" + kind) +
-    (kind === "mp4" ? ".mp4" : ".mp3");
+  const url = kind === "mp3" ? dl.music! : dl.video!;
+  const name = dlFileName(dl, kind);
   return (
     <a
       className="dl-btn"
       rel="noopener"
       href={dlDownloadHref(dl, url, name, sid)}
-      aria-label={kind === "mp4" ? "Unduh video MP4" : "Unduh audio MP3"}
-      {...(dl.platform === "ig" ? { target: "_blank" } : {})}
+      aria-label={kind === "mp4" ? "Unduh video MP4" : kind === "mp3" ? "Unduh audio MP3" : "Unduh file"}
+      {...(directDl(dl.platform) ? { target: "_blank" } : {})}
     >
       <Icon id="download" />
-      <span>{kind === "mp4" ? "MP4" : "MP3"}</span>
+      <span>{kind === "mp4" ? "MP4" : kind === "mp3" ? "MP3" : "Unduh file"}</span>
     </a>
   );
 }
@@ -162,8 +202,10 @@ export function DlCardView({ dl, sid }: { dl: DlCard; sid: string | null }) {
   return (
     <div className="dl-card">
       <div className="dl-head">
-        <span className="dl-badge">{dl.platform === "tiktok" ? "TikTok" : "Instagram"}</span>
-        <span className="dl-title">{dl.title || (dl.type === "video" ? "Video" : "Foto")}</span>
+        <span className="dl-badge">{dlPlatformLabel(dl.platform)}</span>
+        <span className="dl-title">
+          {dl.title || (dl.type === "video" ? "Video" : dl.type === "audio" ? "Lagu" : dl.type === "file" ? "File" : "Foto")}
+        </span>
       </div>
       {dl.author && (
         <div className="dl-sub">
@@ -181,6 +223,19 @@ export function DlCardView({ dl, sid }: { dl: DlCard; sid: string | null }) {
             {dl.music && <DlBtn dl={dl} kind="mp3" sid={sid} />}
           </div>
         </>
+      ) : dl.type === "audio" ? (
+        <>
+          {dl.cover && (
+            <img className="dl-thumb" src={dl.cover} alt="Sampul lagu" loading="lazy" />
+          )}
+          <div className="dl-btns">
+            {dl.music && <DlBtn dl={dl} kind="mp3" sid={sid} />}
+          </div>
+        </>
+      ) : dl.type === "file" ? (
+        <div className="dl-btns">
+          <DlBtn dl={dl} kind="file" sid={sid} />
+        </div>
       ) : (
         <>
           {imgs.length > 0 && (
@@ -192,14 +247,18 @@ export function DlCardView({ dl, sid }: { dl: DlCard; sid: string | null }) {
                   href={dlDownloadHref(
                     dl,
                     u,
-                    (dl.platform === "tiktok" ? "tiktok-" + (dl.id || "img") : "instagram-img") +
+                    (dl.platform === "tiktok"
+                      ? "tiktok-" + (dl.id || "img")
+                      : dl.platform === "ig"
+                        ? "instagram-img"
+                        : dlFilePrefix(dl.platform) + "-img") +
                       "-" +
                       (i + 1) +
                       ".jpg",
                     sid
                   )}
                   rel="noopener"
-                  {...(dl.platform === "ig" ? { target: "_blank" } : {})}
+                  {...(directDl(dl.platform) ? { target: "_blank" } : {})}
                 >
                   <img className="dl-img" src={u} alt={"Foto " + (i + 1)} loading="lazy" />
                 </a>

@@ -20,7 +20,14 @@ const ALLOWED_HOSTS = [
   /^([a-z0-9-]+\.)?tiktokcdn-eu\.com$/i,
   /^([a-z0-9-]+\.)?tiktok\.com$/i,
   /^([a-z0-9-]+\.)?byteoversea\.com$/i,
+  // MP3 SoundCloud (klickaud) — host-nya menolak tanpa Referer
+  /^(?:[a-z0-9-]+\.)?klickaud\.org$/i,
 ];
+
+// CDN tertentu wajib pakai Referer yang benar (403 tanpa itu)
+const REFERER_HOSTS: Record<string, string> = {
+  "klickaud.org": "https://klickaud.org/",
+};
 
 const MAX_BYTES = 30_000_000; // ~30MB cap buffer unduhan
 const MAX_SECONDS = 60;
@@ -70,9 +77,18 @@ export async function GET(req: Request) {
   const timer = setTimeout(() => ctrl.abort(), MAX_SECONDS * 1000);
   let upstream: Response;
   try {
+    const dlHeaders: Record<string, string> = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0",
+    };
+    for (const [suffix, referer] of Object.entries(REFERER_HOSTS)) {
+      if (target.hostname === suffix || target.hostname.endsWith("." + suffix)) {
+        dlHeaders.Referer = referer;
+        break;
+      }
+    }
     upstream = await fetch(target.href, {
       signal: ctrl.signal,
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0" },
+      headers: dlHeaders,
     });
   } catch {
     return Response.json(

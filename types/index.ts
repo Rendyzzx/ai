@@ -64,10 +64,34 @@ export interface Conversation {
   messages: Message[];
 }
 
-/** Metadata unduhan TikTok/IG yang tersimpan di pesan assistant. */
+/** Platform yang didukung kartu unduhan.
+ *  tiktok/ig → mode downloader lama (api-faa).
+ *  sisanya → lib/server/scrape.ts (scrapr). */
+export type DlPlatform =
+  | "tiktok"
+  | "ig"
+  | "twitter"
+  | "facebook"
+  | "spotify"
+  | "soundcloud"
+  | "bandcamp"
+  | "pinterest"
+  | "threads"
+  | "bilibili"
+  | "pixiv"
+  | "rednote"
+  | "reddit"
+  | "terabox"
+  | "mediafire"
+  | "sfile"
+  | "sub2unlock";
+
+/** Metadata unduhan yang tersimpan di pesan assistant.
+ *  type "audio" = lagu (Spotify/SoundCloud/Bandcamp),
+ *  type "file"  = file hasil resolver (MediaFire/Sfile/Sub2Unlock/TeraBox). */
 export interface DlCard {
-  platform: "tiktok" | "ig";
-  type: "video" | "image";
+  platform: DlPlatform;
+  type: "video" | "image" | "audio" | "file";
   id?: string;
   title?: string;
   cover?: string;

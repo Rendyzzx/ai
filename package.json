@@ -10,11 +10,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node scripts/test-telegram.mjs",
+    "test": "node scripts/test-telegram.mjs && node scripts/test-downloader.mjs",
     "prebuild": "node scripts/compute-lang-stats.mjs",
     "predev": "node scripts/compute-lang-stats.mjs"
   },
   "dependencies": {
+    "axios": "^1.20.0",
+    "cheerio": "^1.2.0",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

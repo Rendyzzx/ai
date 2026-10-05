@@ -757,7 +757,7 @@ export default function AuthLanding({
         <section className="cando" id="fitur" data-reveal>
           <div className="section-head">
             <h2>Yang bisa kamu lakukan di Aomi</h2>
-            <p>Sembilan hal ini bisa langsung kamu pakai sekarang.</p>
+            <p>Sebelas hal ini bisa langsung kamu pakai sekarang.</p>
           </div>
 
           {/* Editorial list, hairline per baris — bukan grid kartu */}
@@ -812,6 +812,22 @@ export default function AuthLanding({
               <h3 className="cando-name">Downloader Instagram</h3>
               <p className="cando-desc">
                 Sama seperti TikTok — khusus video dan foto Instagram.
+              </p>
+            </div>
+            <div className="cando-row">
+              <h3 className="cando-name">Downloader Sosial Media Lainnya</h3>
+              <p className="cando-desc">
+                Tempel aja linknya di chat — X/Twitter, Facebook, Threads,
+                Pinterest, Pixiv, Reddit, Bilibili, dan RedNote (Xiaohongshu).
+                Video maupun fotonya langsung bisa diunduh.
+              </p>
+            </div>
+            <div className="cando-row">
+              <h3 className="cando-name">Downloader Lagu &amp; File</h3>
+              <p className="cando-desc">
+                Link Spotify, SoundCloud, dan Bandcamp dikirim MP3-nya;
+                link TeraBox, MediaFire, Sfile, dan Sub2Unlock di-resolve
+                jadi unduhan langsung.
               </p>
             </div>
             <div className="cando-row" id="feat-music">
@@ -893,6 +909,7 @@ export default function AuthLanding({
                 </div>
               )}
               {demoTab === "dl" && (
+                <>
                 <div className="demo-dl-row">
                   <span className="demo-dl-thumb">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
@@ -902,6 +919,16 @@ export default function AuthLanding({
                     <span className="demo-dl-sub">video + audio siap diunduh</span>
                   </span>
                 </div>
+                <div className="demo-dl-row">
+                  <span className="demo-dl-thumb">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                  </span>
+                  <span className="demo-dl-text">
+                    <span className="demo-dl-title">open.spotify.com/track/...</span>
+                    <span className="demo-dl-sub">MP3 320kbps siap diunduh — begitu juga link X, Facebook, dll.</span>
+                  </span>
+                </div>
+                </>
               )}
             </div>
           </div>
