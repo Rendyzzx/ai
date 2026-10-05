@@ -27,19 +27,24 @@ const HOST_RULES: Array<[RegExp, DlPlatform]> = [
   [/(^|\.)twitter\.com$/, "twitter"],
   [/(^|\.)x\.com$/, "twitter"],
   [/(^|\.)facebook\.com$/, "facebook"],
+  [/(^|\.)fb\.watch$/, "facebook"], // short link resmi Facebook (video)
+  [/(^|\.)fb\.me$/, "facebook"], // short link resmi Facebook
   [/(^|\.)open\.spotify\.com$/, "spotify"],
   [/(^|\.)spotify\.com$/, "spotify"],
   [/(^|\.)soundcloud\.com$/, "soundcloud"],
   [/(^|\.)bandcamp\.com$/, "bandcamp"],
   [/(^|\.)pinterest\.com$/, "pinterest"],
+  [/(^|\.)pin\.it$/, "pinterest"], // short link resmi Pinterest
   [/(^|\.)threads\.net$/, "threads"],
   [/(^|\.)threads\.com$/, "threads"],
   [/(^|\.)bilibili\.com$/, "bilibili"],
   [/(^|\.)bilibili\.tv$/, "bilibili"],
+  [/(^|\.)b23\.tv$/, "bilibili"], // short link resmi Bilibili
   [/(^|\.)pixiv\.net$/, "pixiv"],
   [/(^|\.)rednote\.com$/, "rednote"],
   [/(^|\.)xiaohongshu\.com$/, "rednote"],
   [/(^|\.)reddit\.com$/, "reddit"],
+  [/(^|\.)redd\.it$/, "reddit"], // short link resmi Reddit
   [/(^|\.)terabox\.com$/, "terabox"],
   [/(^|\.)teraboxapp\.com$/, "terabox"],
   [/(^|\.)1024tera\.com$/, "terabox"],

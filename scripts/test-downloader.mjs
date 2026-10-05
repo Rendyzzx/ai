@@ -40,6 +40,11 @@ check("instagram.com → null (ditangani mode lama)", dlPlatformFromHost("instag
 check("evil-twitter.com → null", dlPlatformFromHost("evil-twitter.com") === null);
 check("twitter.com.evil.net → null", dlPlatformFromHost("twitter.com.evil.net") === null);
 check("host kosong → null", dlPlatformFromHost("") === null);
+check("pin.it → pinterest (short link)", dlPlatformFromHost("pin.it") === "pinterest");
+check("b23.tv → bilibili (short link)", dlPlatformFromHost("b23.tv") === "bilibili");
+check("redd.it → reddit (short link)", dlPlatformFromHost("redd.it") === "reddit");
+check("fb.watch → facebook (short link)", dlPlatformFromHost("fb.watch") === "facebook");
+check("fb.me → facebook (short link)", dlPlatformFromHost("fb.me") === "facebook");
 
 // ---------- matchExtraDlTarget ----------
 console.log("matchExtraDlTarget:");
@@ -55,6 +60,7 @@ check("instagram tidak ikut mode baru", matchExtraDlTarget("https://www.instagra
 check("threads.com → threads", matchExtraDlTarget("https://www.threads.com/@a/post/ABC")?.platform === "threads");
 check("reddit share link → reddit", matchExtraDlTarget("https://www.reddit.com/r/x/s/FhrWISKmrS")?.platform === "reddit");
 check("sfile.mobi → sfile", matchExtraDlTarget("https://sfile.mobi/f/abc")?.platform === "sfile");
+check("pin.it link di chat terdeteksi", matchExtraDlTarget("https://pin.it/PXQlmtq5U")?.platform === "pinterest");
 
 // ---------- label & prefix ----------
 console.log("Label & prefix:");
